@@ -1,0 +1,17 @@
+name: Swift
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: xcodebuild -scheme YeelightControl -destination 'platform=iOS Simulator,name=iPhone 14 Pro'
+    - name: Run tests
+      run: xcodebuild test -scheme YeelightControl -destination 'platform=iOS Simulator,name=iPhone 14 Pro'

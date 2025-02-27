@@ -1,127 +1,69 @@
 #!/bin/bash
 
-# reorganize.sh
-# Script to maintain consistent project structure
+# Get the directory where the script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+# Create timestamp for backup
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="$PROJECT_ROOT/temp_backup/backup_$TIMESTAMP"
 
 echo "🏗️ Starting project reorganization..."
 
-# Store the script's directory
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
-
-# Base directories
-SOURCES_DIR="Sources"
-RESOURCES_DIR="Resources"
-SCRIPTS_DIR="Scripts"
-GITHUB_DIR=".github"
-
 # Create backup
 echo "📦 Creating backup..."
-BACKUP_DIR="temp_backup/backup_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$BACKUP_DIR"
-for dir in "$SOURCES_DIR" "$RESOURCES_DIR" "$SCRIPTS_DIR" "$GITHUB_DIR"; do
-    if [ -d "$dir" ]; then
-        cp -R "$dir" "$BACKUP_DIR/"
-    fi
-done
-
-# Clean existing structure
-echo "🧹 Cleaning existing structure..."
-rm -rf Build/  # Remove Build directory first
-for dir in "$SOURCES_DIR" "$RESOURCES_DIR" "$SCRIPTS_DIR"; do
-    rm -rf "$dir"
-done
-
-# Create main directories
-echo "📁 Creating directory structure..."
-mkdir -p "$SOURCES_DIR" "$RESOURCES_DIR" "$SCRIPTS_DIR"
-
-# Create Sources subdirectories
-SOURCES_SUBDIRS=(
-    "Core/Analytics"
-    "Core/Background"
-    "Core/Configuration"
-    "Core/Device"
-    "Core/Effect"
-    "Core/Error"
-    "Core/Location"
-    "Core/Network"
-    "Core/Notification"
-    "Core/Permission"
-    "Core/Scene"
-    "Core/Security"
-    "Core/Services"
-    "Core/State"
-    "Core/Storage"
-    "Features/Automation"
-    "Features/Effects"
-    "Features/Rooms"
-    "Features/Scenes"
-    "UI/Components"
-    "UI/Views"
-    "Tests/UnitTests"
-    "Tests/UITests"
-    "Tests/IntegrationTests"
-)
-
-for dir in "${SOURCES_SUBDIRS[@]}"; do
-    mkdir -p "$SOURCES_DIR/$dir"
-done
-
-# Create Resources subdirectories
-RESOURCES_SUBDIRS=(
-    "Screenshots"
-    "Assets"
-    "Localization"
-)
-
-for dir in "${RESOURCES_SUBDIRS[@]}"; do
-    mkdir -p "$RESOURCES_DIR/$dir"
-done
-
-# Move Scripts
-mkdir -p "$SCRIPTS_DIR"
-for script in setup_xcode_project.sh cleanup.sh reorganize.sh; do
-    if [ -f "$script" ]; then
-        mv "$script" "$SCRIPTS_DIR/"
-        ln -sf "$SCRIPTS_DIR/$script" "$script"
-    fi
-done
-
-# Restore from backup if exists
-echo "📋 Restoring files from backup..."
-if [ -d "$BACKUP_DIR" ]; then
-    # Function to safely restore files
-    safe_restore() {
-        local src="$BACKUP_DIR/$1"
-        local dest="$2"
-        if [ -e "$src" ]; then
-            mkdir -p "$(dirname "$dest")"
-            cp -R "$src" "$dest"
-            echo "✓ Restored: $1"
-        fi
-    }
-
-    # Restore directories
-    for dir in Sources Resources .github; do
-        if [ -d "$BACKUP_DIR/$dir" ]; then
-            safe_restore "$dir" "$dir"
-        fi
-    done
+if [ -d "$PROJECT_ROOT/Sources" ]; then
+    cp -R "$PROJECT_ROOT/Sources/." "$BACKUP_DIR/Sources/" 2>/dev/null || true
+fi
+if [ -d "$PROJECT_ROOT/Resources" ]; then
+    cp -R "$PROJECT_ROOT/Resources/." "$BACKUP_DIR/Resources/" 2>/dev/null || true
+fi
+if [ -d "$PROJECT_ROOT/.github" ]; then
+    cp -R "$PROJECT_ROOT/.github" "$BACKUP_DIR/" 2>/dev/null || true
 fi
 
-# Clean up empty directories
-echo "🧹 Cleaning up empty directories..."
-find . -type d -empty -not -path "*/\.*" -delete
+# Create directory structure (without removing existing)
+echo "📁 Creating directory structure..."
+mkdir -p "$PROJECT_ROOT/Sources"
+mkdir -p "$PROJECT_ROOT/Sources/App"
+mkdir -p "$PROJECT_ROOT/Sources/Models"
+mkdir -p "$PROJECT_ROOT/Sources/Views"
+mkdir -p "$PROJECT_ROOT/Sources/Controllers"
+mkdir -p "$PROJECT_ROOT/Sources/Utils"
+mkdir -p "$PROJECT_ROOT/Sources/Extensions"
+mkdir -p "$PROJECT_ROOT/Sources/Services"
 
-# Ensure scripts are executable
+mkdir -p "$PROJECT_ROOT/Resources"
+mkdir -p "$PROJECT_ROOT/Resources/Assets"
+mkdir -p "$PROJECT_ROOT/Resources/Configs"
+mkdir -p "$PROJECT_ROOT/Resources/Localization"
+
+mkdir -p "$PROJECT_ROOT/Scripts"
+
+# Set proper permissions
+chmod -R 755 "$PROJECT_ROOT/Sources"
+chmod -R 755 "$PROJECT_ROOT/Resources"
+chmod -R 755 "$PROJECT_ROOT/Scripts"
+
+# Restore files from backup if they exist
+echo "📋 Restoring files from backup..."
+if [ -d "$BACKUP_DIR/Sources" ]; then
+    cp -R "$BACKUP_DIR/Sources/." "$PROJECT_ROOT/Sources/" 2>/dev/null || true
+    echo "✓ Restored: Sources"
+fi
+if [ -d "$BACKUP_DIR/Resources" ]; then
+    cp -R "$BACKUP_DIR/Resources/." "$PROJECT_ROOT/Resources/" 2>/dev/null || true
+    echo "✓ Restored: Resources"
+fi
+if [ -d "$BACKUP_DIR/.github" ]; then
+    cp -R "$BACKUP_DIR/.github" "$PROJECT_ROOT/" 2>/dev/null || true
+    echo "✓ Restored: .github"
+fi
+
+# Set permissions for scripts
 echo "🔧 Setting permissions..."
-chmod +x Scripts/*.sh
-for script in setup_xcode_project.sh cleanup.sh reorganize.sh; do
-    if [ -L "$script" ]; then
-        chmod +x "$script"
-    fi
-done
+chmod +x "$PROJECT_ROOT/Scripts/"*.sh 2>/dev/null || true
 
 echo "✨ Project reorganization complete!"
 echo "📦 Backup saved to: $BACKUP_DIR"
