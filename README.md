@@ -4,7 +4,7 @@
 
 ![YeelightControl](https://raw.githubusercontent.com/DanielKng/YeelightControl/main/Resources/header.png)
 
-*A modern iOS app for controlling Yeelight smart lighting devices*
+*My modern iOS app for controlling Yeelight smart lighting devices*
 
 [![Swift Version](https://img.shields.io/badge/Swift-5.5+-orange.svg)](https://swift.org)
 [![Platform](https://img.shields.io/badge/Platform-iOS%2015.0+-blue.svg)](https://developer.apple.com/ios/)
@@ -18,7 +18,7 @@
 
 ## ✨ What is YeelightControl?
 
-YeelightControl transforms your iPhone into a powerful smart lighting command center. Control your Yeelight devices with an elegant, intuitive interface designed for everyday use and creative lighting projects.
+I've created YeelightControl to transform your iPhone into a powerful smart lighting command center. You can control your Yeelight devices with an elegant, intuitive interface I've designed for everyday use and creative lighting projects.
 
 <div align="center">
   <img src="Resources/Screenshots/home.png" width="200" alt="Home Screen"/>
@@ -29,28 +29,28 @@ YeelightControl transforms your iPhone into a powerful smart lighting command ce
 ## 🚀 Key Features
 
 ### 💡 Smart Control
-- **Instant Control**: Power, brightness, and color with a tap
-- **Group Management**: Control multiple lights simultaneously
-- **Room Organization**: Organize lights by location
-- **Status Monitoring**: Real-time device status updates
+- **Instant Control**: I've made it easy to adjust power, brightness, and color with a tap
+- **Group Management**: You can control multiple lights simultaneously
+- **Room Organization**: I've added ways to organize lights by location
+- **Status Monitoring**: You'll get real-time device status updates
 
 ### 🎨 Creative Lighting
-- **Dynamic Color Flows**: Create moving color patterns
-- **Music Visualization**: Lights that react to sound
-- **Scene Presets**: Save and recall your favorite settings
-- **Custom Transitions**: Smooth fades between states
+- **Dynamic Color Flows**: Create moving color patterns with my custom flow editor
+- **Music Visualization**: I've built a system for lights that react to sound
+- **Scene Presets**: You can save and recall your favorite settings
+- **Custom Transitions**: I've implemented smooth fades between states
 
 ### ⚡ Smart Automation
-- **Time-Based Triggers**: Schedule lights to change automatically
-- **Sunrise/Sunset Sync**: Align with natural light cycles
-- **Location Awareness**: Trigger based on your location
-- **Multi-Device Routines**: Coordinate complex lighting scenes
+- **Time-Based Triggers**: I've made it possible to schedule lights to change automatically
+- **Sunrise/Sunset Sync**: Your lights can align with natural light cycles
+- **Location Awareness**: I've added triggers based on your location
+- **Multi-Device Routines**: You can coordinate complex lighting scenes
 
 ### 🔌 Advanced Features
-- **Home Screen Widgets**: Control lights without opening the app
-- **Virtual LED Strips**: Combine lights for chase effects
-- **Offline Support**: Control devices without internet
-- **Backup & Restore**: Save your configurations
+- **Home Screen Widgets**: I've created widgets so you can control lights without opening the app
+- **Virtual LED Strips**: You can combine lights for chase effects
+- **Offline Support**: I've ensured you can control devices without internet
+- **Backup & Restore**: You can save your configurations
 
 ## 📱 Quick Start Guide
 
@@ -74,15 +74,15 @@ YeelightControl transforms your iPhone into a powerful smart lighting command ce
 ### Tips for Best Experience
 
 - Keep your Yeelight devices' firmware updated
-- For music sync features, use in a quiet environment
-- Create rooms first, then add devices to them
+- For my music sync features, use in a quiet environment
+- I recommend creating rooms first, then adding devices to them
 - Experiment with scenes for quick mood changes
 
 ## 🎬 Features in Action
 
 ### Music Sync Mode
 
-Transform your space with lights that pulse and change with your music:
+I've created a way to transform your space with lights that pulse and change with your music:
 
 <div align="center">
   <img src="Resources/Screenshots/music-sync.png" width="300" alt="Music Sync Feature"/>
@@ -90,7 +90,7 @@ Transform your space with lights that pulse and change with your music:
 
 ### Virtual LED Strip
 
-Combine multiple lights to create chase effects and waves:
+I've implemented a system to combine multiple lights to create chase effects and waves:
 
 <div align="center">
   <img src="Resources/Screenshots/led-strip.png" width="300" alt="Virtual LED Strip"/>
@@ -98,7 +98,7 @@ Combine multiple lights to create chase effects and waves:
 
 ### Scene Creation
 
-Design and save custom lighting scenes for any occasion:
+I've built a powerful editor to design and save custom lighting scenes for any occasion:
 
 <div align="center">
   <img src="Resources/Screenshots/scene-editor.png" width="300" alt="Scene Editor"/>
@@ -122,7 +122,7 @@ Need more help? Check the [full troubleshooting guide](https://github.com/Daniel
 
 ### Project Structure
 
-YeelightControl uses a unique project structure that separates source code from the Xcode build environment:
+I've designed YeelightControl with a unique project structure that separates source code from the Xcode build environment:
 
 ```
 YeelightControl/
@@ -165,12 +165,12 @@ This separation allows for:
 
 ### Technical Highlights
 
-- **SwiftUI Framework**: Modern declarative UI
-- **Combine Framework**: Reactive programming for state management
-- **Background Tasks**: Reliable background updates
-- **WidgetKit**: Home screen widgets for quick control
-- **Network Discovery**: Automatic device detection using Bonjour
-- **Async/Await**: Modern concurrency for network operations
+- **SwiftUI Framework**: I've built the app with modern declarative UI
+- **Combine Framework**: I've used reactive programming for state management
+- **Background Tasks**: I've implemented reliable background updates
+- **WidgetKit**: I've created home screen widgets for quick control
+- **Network Discovery**: I've added automatic device detection using Bonjour
+- **Async/Await**: I've utilized modern concurrency for network operations
 
 ### Building from Source
 
@@ -183,7 +183,7 @@ This separation allows for:
 - Swift 5.5+
 
 #### Steps
-1. Clone the repository
+1. Clone my repository
 ```bash
 git clone https://github.com/DanielKng/YeelightControl.git
 ```
@@ -204,7 +204,7 @@ open Xcode/YeelightControl.xcworkspace
 
 ## 👥 Contributing
 
-We welcome contributions! See our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+I welcome contributions! See my [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ### Areas for Improvement
 
@@ -215,11 +215,11 @@ We welcome contributions! See our [CONTRIBUTING.md](CONTRIBUTING.md) for guideli
 
 ## 📄 License
 
-YeelightControl is available under the MIT License. See the [LICENSE](LICENSE) file for details.
+I'm making YeelightControl available under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-This project wouldn't be possible without the amazing work of:
+I couldn't have built this project without the amazing work of:
 
 - [Apple](https://developer.apple.com)
   - [SwiftUI](https://developer.apple.com/xcode/swiftui/) - Modern UI framework
@@ -236,7 +236,7 @@ This project wouldn't be possible without the amazing work of:
   - [Swift](https://swift.org) - Programming language
   - [Bonjour](https://developer.apple.com/bonjour/) - Network discovery
 
-Special thanks to all contributors and testers who have helped improve this project.
+Special thanks to all contributors and testers who have helped me improve this project.
 
 ---
 
