@@ -181,25 +181,48 @@ This separation allows for:
 - iOS 15.0+
 - Xcode 13.0+
 - Swift 5.5+
+- Optional but recommended: xcodegen or tuist (`brew install xcodegen` or `brew install tuist`)
 
 #### Steps
 1. Clone my repository
 ```bash
 git clone https://github.com/DanielKng/YeelightControl.git
+cd YeelightControl
 ```
 
 2. Generate the Xcode project
 ```bash
-cd YeelightControl
+chmod +x ./setup_xcode_project.sh
 ./setup_xcode_project.sh
 ```
 
 3. Open the project
 ```bash
-open Xcode/YeelightControl.xcworkspace
+cd Xcode
+./open_project.sh
 ```
 
 4. Configure signing and build
+
+#### Troubleshooting Project Generation
+If you encounter issues with the generated Xcode project:
+
+1. Install one of the recommended project generation tools:
+```bash
+brew install xcodegen
+# or
+brew install tuist
+```
+
+2. Run the setup script again:
+```bash
+./setup_xcode_project.sh
+```
+
+3. If issues persist, you can create a new Xcode project manually:
+   - Create a new iOS App project with SwiftUI interface in Xcode
+   - Add the source files from the `/Sources` directory
+   - Configure the Info.plist with required permissions for network and microphone access
 </details>
 
 ## 👥 Contributing

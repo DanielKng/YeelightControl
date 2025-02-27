@@ -27,71 +27,22 @@ fi
 
 # Create Xcode directory
 mkdir -p "$XCODE_DIR"
+
+# Create Resources directory if it doesn't exist
+if [ ! -d "$WORKSPACE_ROOT/Resources" ]; then
+    mkdir -p "$WORKSPACE_ROOT/Resources"
+    mkdir -p "$WORKSPACE_ROOT/Resources/Screenshots"
+    echo "📁 Created Resources directory"
+fi
+
+# Method 1: Create a new Xcode project using Xcode's command line tools
+echo "📝 Creating new Xcode project..."
+
+# Create a new Xcode project using Swift UI template
 mkdir -p "$XCODE_DIR/$PROJECT_NAME"
 
-# Create temporary build directory
-mkdir -p "$TEMP_DIR"
-
-# Step 1: Create a basic SwiftUI app project using Swift Package Manager
-echo "📦 Creating Swift package structure..."
-cd "$TEMP_DIR"
-
-# Create Package.swift
-cat > Package.swift << EOL
-// swift-tools-version:5.5
-import PackageDescription
-
-let package = Package(
-    name: "$PROJECT_NAME",
-    platforms: [.iOS(.v15)],
-    products: [
-        .executable(name: "$PROJECT_NAME", targets: ["$PROJECT_NAME"]),
-    ],
-    dependencies: [],
-    targets: [
-        .executableTarget(
-            name: "$PROJECT_NAME",
-            dependencies: [],
-            path: "Sources"
-        ),
-        .testTarget(
-            name: "${PROJECT_NAME}Tests",
-            dependencies: ["$PROJECT_NAME"],
-            path: "Tests"
-        ),
-    ]
-)
-EOL
-
-# Create basic app structure for SPM
-mkdir -p Sources
-touch Sources/main.swift
-echo 'print("Hello, YeelightControl!")' > Sources/main.swift
-
-# Step 2: Generate Xcode project from the package
-echo "🛠 Generating Xcode project from package..."
-swift package generate-xcodeproj
-
-# Step 3: Copy the generated project to the Xcode directory
-echo "📋 Copying generated project..."
-cp -R "$PROJECT_NAME.xcodeproj" "$XCODE_DIR/"
-
-# Step 4: Create proper app structure in Xcode directory
-echo "📁 Creating app structure..."
-mkdir -p "$XCODE_DIR/$PROJECT_NAME/Sources"
-
-# Step 5: Copy source files
-echo "📂 Copying source files..."
-rsync -av --exclude='.DS_Store' --exclude='.git' "$SOURCE_DIR/" "$XCODE_DIR/$PROJECT_NAME/Sources/"
-
-# Count files copied for verification
-SOURCE_FILE_COUNT=$(find "$SOURCE_DIR" -type f | grep -v ".DS_Store" | grep -v ".git" | wc -l | xargs)
-DEST_FILE_COUNT=$(find "$XCODE_DIR/$PROJECT_NAME/Sources" -type f | wc -l | xargs)
-echo "📊 Files in source: $SOURCE_FILE_COUNT"
-echo "📊 Files copied to destination: $DEST_FILE_COUNT"
-
-# Step 6: Create Info.plist
-echo "📝 Creating Info.plist..."
+# Create Info.plist
+echo "📄 Creating Info.plist..."
 cat > "$XCODE_DIR/$PROJECT_NAME/Info.plist" << EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -100,13 +51,13 @@ cat > "$XCODE_DIR/$PROJECT_NAME/Info.plist" << EOL
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
+    <string>\$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <string>\$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
+    <string>\$(PRODUCT_NAME)</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -141,24 +92,12 @@ cat > "$XCODE_DIR/$PROJECT_NAME/Info.plist" << EOL
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>
         <false/>
-        <key>UISceneConfigurations</key>
-        <dict>
-            <key>UIWindowSceneSessionRoleApplication</key>
-            <array>
-                <dict>
-                    <key>UISceneConfigurationName</key>
-                    <string>Default Configuration</string>
-                    <key>UISceneDelegateClassName</key>
-                    <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
-                </dict>
-            </array>
-        </dict>
     </dict>
 </dict>
 </plist>
 EOL
 
-# Step 7: Create LaunchScreen.storyboard
+# Create LaunchScreen.storyboard
 echo "📱 Creating LaunchScreen.storyboard..."
 mkdir -p "$XCODE_DIR/$PROJECT_NAME/Resources"
 cat > "$XCODE_DIR/$PROJECT_NAME/Resources/LaunchScreen.storyboard" << EOL
@@ -189,45 +128,123 @@ cat > "$XCODE_DIR/$PROJECT_NAME/Resources/LaunchScreen.storyboard" << EOL
 </document>
 EOL
 
-# Step 8: Create workspace
-echo "🏗 Creating Xcode workspace..."
-mkdir -p "$XCODE_DIR/$PROJECT_NAME.xcworkspace/xcshareddata"
-cat > "$XCODE_DIR/$PROJECT_NAME.xcworkspace/contents.xcworkspacedata" << EOL
-<?xml version="1.0" encoding="UTF-8"?>
-<Workspace
-   version = "1.0">
-   <FileRef
-      location = "group:$PROJECT_NAME.xcodeproj">
-   </FileRef>
-</Workspace>
-EOL
-
-cat > "$XCODE_DIR/$PROJECT_NAME.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist" << EOL
+# Create entitlements file
+echo "🔐 Creating entitlements file..."
+cat > "$XCODE_DIR/$PROJECT_NAME/$PROJECT_NAME.entitlements" << EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>IDEDidComputeMac32BitWarning</key>
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <key>com.apple.security.network.client</key>
     <true/>
 </dict>
 </plist>
 EOL
 
-# Step 9: Create a script to open the project in Xcode
-echo "📜 Creating helper script to open project..."
-cat > "$XCODE_DIR/open_project.sh" << EOL
-#!/bin/bash
-open "$PROJECT_NAME.xcworkspace"
+# Create a Swift Package for the project
+echo "📦 Creating Swift package..."
+cat > "$XCODE_DIR/Package.swift" << EOL
+// swift-tools-version:5.5
+import PackageDescription
+
+let package = Package(
+    name: "$PROJECT_NAME",
+    platforms: [.iOS(.v15)],
+    products: [
+        .library(name: "$PROJECT_NAME", targets: ["$PROJECT_NAME"]),
+    ],
+    targets: [
+        .target(
+            name: "$PROJECT_NAME",
+            path: "$PROJECT_NAME"
+        )
+    ]
+)
 EOL
-chmod +x "$XCODE_DIR/open_project.sh"
 
-# Step 10: Clean up temporary files
-echo "🧹 Cleaning up temporary files..."
-rm -rf "$TEMP_DIR"
+# Copy source files
+echo "📂 Copying source files..."
+mkdir -p "$XCODE_DIR/$PROJECT_NAME"
+rsync -av --exclude='.DS_Store' --exclude='.git' "$SOURCE_DIR/" "$XCODE_DIR/$PROJECT_NAME/"
 
-# Step 11: Create a better Xcode project using xcodegen if available
-if command -v xcodegen &> /dev/null; then
-    echo "🔧 xcodegen found, creating optimized project..."
+# Count files copied for verification
+SOURCE_FILE_COUNT=$(find "$SOURCE_DIR" -type f -name "*.swift" | wc -l | xargs)
+DEST_FILE_COUNT=$(find "$XCODE_DIR/$PROJECT_NAME" -type f -name "*.swift" | wc -l | xargs)
+echo "📊 Swift files in source: $SOURCE_FILE_COUNT"
+echo "📊 Swift files copied to destination: $DEST_FILE_COUNT"
+
+# Check if tuist is installed (preferred method)
+if command -v tuist &> /dev/null; then
+    echo "🔧 Using tuist to generate Xcode project..."
+    
+    # Create Project.swift for tuist
+    mkdir -p "$XCODE_DIR/Project"
+    cat > "$XCODE_DIR/Project/Project.swift" << EOL
+import ProjectDescription
+
+let project = Project(
+    name: "$PROJECT_NAME",
+    organizationName: "Daniel Kng",
+    options: .options(
+        automaticSchemesOptions: .disabled,
+        disableBundleAccessors: false,
+        disableSynthesizedResourceAccessors: false
+    ),
+    packages: [],
+    settings: .settings(
+        base: [
+            "DEVELOPMENT_TEAM": "",
+            "PRODUCT_BUNDLE_IDENTIFIER": "com.danielkng.$PROJECT_NAME",
+            "MARKETING_VERSION": "1.0.0",
+            "CURRENT_PROJECT_VERSION": "1",
+            "SWIFT_VERSION": "5.5",
+            "IPHONEOS_DEPLOYMENT_TARGET": "15.0"
+        ],
+        configurations: [
+            .debug(name: "Debug"),
+            .release(name: "Release")
+        ]
+    ),
+    targets: [
+        Target(
+            name: "$PROJECT_NAME",
+            platform: .iOS,
+            product: .app,
+            bundleId: "com.danielkng.$PROJECT_NAME",
+            infoPlist: .file(path: "$PROJECT_NAME/Info.plist"),
+            sources: ["$PROJECT_NAME/**/*.swift"],
+            resources: [
+                "$PROJECT_NAME/Resources/**"
+            ],
+            entitlements: .file(path: "$PROJECT_NAME/$PROJECT_NAME.entitlements")
+        )
+    ],
+    schemes: [
+        Scheme(
+            name: "$PROJECT_NAME",
+            shared: true,
+            buildAction: .buildAction(targets: ["$PROJECT_NAME"]),
+            testAction: .targets([]),
+            runAction: .runAction(configuration: .debug),
+            archiveAction: .archiveAction(configuration: .release),
+            profileAction: .profileAction(configuration: .release),
+            analyzeAction: .analyzeAction(configuration: .debug)
+        )
+    ]
+)
+EOL
+
+    # Generate project with tuist
+    cd "$XCODE_DIR"
+    tuist generate
+    
+    echo "✅ Created Xcode project with tuist"
+    
+# Check if xcodegen is installed (alternative method)
+elif command -v xcodegen &> /dev/null; then
+    echo "🔧 Using xcodegen to generate Xcode project..."
     
     # Create project.yml for xcodegen
     cat > "$XCODE_DIR/project.yml" << EOL
@@ -241,7 +258,7 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: $PROJECT_NAME/Sources
+      - path: $PROJECT_NAME
     info:
       path: $PROJECT_NAME/Info.plist
       properties:
@@ -256,52 +273,81 @@ targets:
       base:
         TARGETED_DEVICE_FAMILY: 1,2
         DEVELOPMENT_TEAM: ""
+        SWIFT_VERSION: 5.5
     entitlements:
-      path: $PROJECT_NAME/YeelightControl.entitlements
-      properties:
-        com.apple.security.app-sandbox: true
-        com.apple.security.network.client: true
-EOL
-
-    # Create entitlements file
-    cat > "$XCODE_DIR/$PROJECT_NAME/YeelightControl.entitlements" << EOL
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>com.apple.security.app-sandbox</key>
-    <true/>
-    <key>com.apple.security.network.client</key>
-    <true/>
-</dict>
-</plist>
+      path: $PROJECT_NAME/$PROJECT_NAME.entitlements
 EOL
 
     # Run xcodegen
     cd "$XCODE_DIR"
     xcodegen generate
     
-    echo "✅ Created optimized Xcode project with xcodegen"
+    echo "✅ Created Xcode project with xcodegen"
+    
 else
-    echo "⚠️ xcodegen not found. Using basic project structure."
-    echo "💡 For a better project structure, install xcodegen: brew install xcodegen"
+    echo "⚠️ Neither tuist nor xcodegen found. Using manual project creation method..."
+    
+    # Create a basic project structure that can be opened in Xcode
+    # This is a fallback method that will require manual configuration in Xcode
+    
+    # Create a basic xcodeproj structure
+    mkdir -p "$XCODE_DIR/$PROJECT_NAME.xcodeproj"
+    
+    # Create project.pbxproj file (minimal version)
+    cat > "$XCODE_DIR/$PROJECT_NAME.xcodeproj/project.pbxproj" << EOL
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 55;
+	objects = {
+		LastUpgradeCheck = 1320;
+		ORGANIZATIONNAME = "Daniel Kng";
+		TargetAttributes = {
+			IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+		};
+	};
+	rootObject = 1D6058900D05DD3D006BFB54 /* Project object */;
+}
+EOL
+    
+    echo "⚠️ Created minimal Xcode project structure."
+    echo "⚠️ You will need to manually configure the project in Xcode:"
+    echo "  1. Open Xcode and create a new iOS App project named $PROJECT_NAME"
+    echo "  2. Close the project and replace the generated files with your source files"
+    echo "  3. Reopen the project and configure as needed"
 fi
+
+# Create a script to open the project in Xcode
+echo "📜 Creating helper script to open project..."
+cat > "$XCODE_DIR/open_project.sh" << EOL
+#!/bin/bash
+if [ -d "$PROJECT_NAME.xcworkspace" ]; then
+    open "$PROJECT_NAME.xcworkspace"
+elif [ -d "$PROJECT_NAME.xcodeproj" ]; then
+    open "$PROJECT_NAME.xcodeproj"
+else
+    echo "No Xcode project or workspace found."
+fi
+EOL
+chmod +x "$XCODE_DIR/open_project.sh"
 
 # Verify app entry point files exist
 echo "🔍 Verifying app entry point files..."
-if [ -f "$XCODE_DIR/$PROJECT_NAME/Sources/App/YeelightApp.swift" ]; then
+if [ -f "$XCODE_DIR/$PROJECT_NAME/App/YeelightApp.swift" ]; then
     echo "✅ Found YeelightApp.swift (main app entry point)"
 else
     echo "⚠️ Warning: YeelightApp.swift not found in expected location"
 fi
 
-if [ -f "$XCODE_DIR/$PROJECT_NAME/Sources/App/ContentView.swift" ]; then
+if [ -f "$XCODE_DIR/$PROJECT_NAME/App/ContentView.swift" ]; then
     echo "✅ Found ContentView.swift"
 else
     echo "⚠️ Warning: ContentView.swift not found in expected location"
 fi
 
-if [ -f "$XCODE_DIR/$PROJECT_NAME/Sources/UI/Views/MainView.swift" ]; then
+if [ -f "$XCODE_DIR/$PROJECT_NAME/UI/Views/MainView.swift" ]; then
     echo "✅ Found MainView.swift"
 else
     echo "⚠️ Warning: MainView.swift not found in expected location"
@@ -314,9 +360,16 @@ echo "To open the project in Xcode:"
 echo "  cd $XCODE_DIR"
 echo "  ./open_project.sh"
 echo ""
-echo "If you encounter any issues with the generated project, try:"
-echo "  1. Opening the project manually: open $XCODE_DIR/$PROJECT_NAME.xcworkspace"
-echo "  2. Creating a new project in Xcode and manually adding the source files"
+echo "If you encounter issues with the generated project:"
 echo ""
-echo "Note: Original source files in /Sources remain unchanged. You can continue working in /Sources"
-echo "and run this script again to update the Xcode project when needed." 
+echo "Option 1: Install project generation tools (recommended)"
+echo "  brew install xcodegen    # or"
+echo "  brew install tuist"
+echo "  Then run this script again"
+echo ""
+echo "Option 2: Create a new project manually in Xcode"
+echo "  1. Create a new iOS App project with SwiftUI interface"
+echo "  2. Add your source files from the Sources directory"
+echo "  3. Configure the Info.plist with required permissions"
+echo ""
+echo "Note: Original source files in /Sources remain unchanged." 
