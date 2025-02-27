@@ -1,1 +1,0 @@
-Scripts/setup_xcode_project.sh

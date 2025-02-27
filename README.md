@@ -151,7 +151,8 @@ YeelightControl/
 ├── Scripts/         # Development scripts
 │   ├── setup_xcode_project.sh  # Generate Xcode project
 │   ├── cleanup.sh              # Clean temporary files
-│   └── reorganize.sh           # Maintain project structure
+│   ├── reorganize.sh           # Maintain project structure
+│   └── git_push.sh            # Git push helper
 │
 ├── Tests/          # Test files
 │   └── YeelightControlTests/  # Unit tests
@@ -181,6 +182,7 @@ I've provided several utility scripts to help maintain the project:
    - Cleans Xcode derived data
    - Removes temporary files
    - Cleans build artifacts
+   - Removes old backups (older than 7 days)
 
 3. **Project Reorganization**
    ```bash
@@ -190,6 +192,16 @@ I've provided several utility scripts to help maintain the project:
    - Creates backup of current state
    - Organizes source files
    - Restores files from backup
+
+4. **Git Push Helper**
+   ```bash
+   ./Scripts/git_push.sh
+   ```
+   - Shows pending changes
+   - Prompts for confirmation
+   - Collects commit message
+   - Handles git add, commit, and push
+   - Supports any current branch
 
 ### Development Workflow
 

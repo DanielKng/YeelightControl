@@ -6,6 +6,12 @@ if ! command -v xcodebuild &> /dev/null; then
     exit 1
 fi
 
+# Check if XcodeGen is installed
+if ! command -v xcodegen &> /dev/null; then
+    echo "Error: XcodeGen is not installed. Please install it with 'brew install xcodegen'"
+    exit 1
+fi
+
 # Directory setup
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
@@ -20,71 +26,258 @@ if [ -d "$BUILD_DIR" ]; then
     rm -rf "$BUILD_DIR"/*
 fi
 
-# Create Xcode project structure
-echo "Creating Xcode project structure..."
-xcodebuild -create \
-    -template "iOS Application" \
-    -destination "$BUILD_DIR" \
-    -productName "YeelightControl" \
-    -bundleIdentifier "de.knng.app.yeelightcontrol" \
-    -organizationName "Daniel Kng" \
-    -deploymentTarget "15.0"
+# Create necessary directories
+echo "📁 Creating directory structure..."
+mkdir -p "$SOURCES_DIR/App"
+mkdir -p "$SOURCES_DIR/Widget"
+mkdir -p "$SOURCES_DIR/Models"
+mkdir -p "$SOURCES_DIR/Views"
+mkdir -p "$SOURCES_DIR/Controllers"
+mkdir -p "$SOURCES_DIR/Utils"
+mkdir -p "$SOURCES_DIR/Extensions"
+mkdir -p "$SOURCES_DIR/Services"
+mkdir -p "Tests/YeelightControlTests"
 
-# Create widget extension
-echo "Creating widget extension..."
-xcodebuild -create \
-    -template "iOS Widget Extension" \
-    -destination "$BUILD_DIR" \
-    -productName "YeelightWidget" \
-    -bundleIdentifier "de.knng.app.yeelightcontrol.widget" \
-    -organizationName "Daniel Kng" \
-    -deploymentTarget "15.0"
+# Create basic app structure
+echo "📱 Creating basic app structure..."
+cat > "$SOURCES_DIR/App/YeelightControlApp.swift" << 'EOL'
+import SwiftUI
 
-# Create symbolic links for development
-echo "Creating symbolic links..."
-ln -sf "$SOURCES_DIR" "$BUILD_DIR/Sources"
-ln -sf "$PROJECT_ROOT/Resources" "$BUILD_DIR/Resources"
+@main
+struct YeelightControlApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+EOL
 
-# Configure main app build settings
-echo "Configuring app build settings..."
-xcodebuild -project "$BUILD_DIR/YeelightControl.xcodeproj" \
-    -scheme "YeelightControl" \
-    -configuration Debug \
-    DEVELOPMENT_TEAM="" \
-    CODE_SIGN_STYLE="Automatic" \
-    PRODUCT_BUNDLE_IDENTIFIER="de.knng.app.yeelightcontrol" \
-    MARKETING_VERSION="1.0.0" \
-    CURRENT_PROJECT_VERSION="1" \
-    TARGETED_DEVICE_FAMILY="1" \
-    INFOPLIST_KEY_UILaunchScreen_Generation="YES" \
-    INFOPLIST_KEY_UISupportedInterfaceOrientations="UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight" \
-    INFOPLIST_KEY_UIApplicationSceneManifest_Generation="YES" \
-    INFOPLIST_KEY_NSLocalNetworkUsageDescription="YeelightControl needs access to your local network to discover and control Yeelight devices." \
-    INFOPLIST_KEY_NSMicrophoneUsageDescription="YeelightControl needs microphone access for music visualization features." \
-    INFOPLIST_KEY_NSLocationWhenInUseUsageDescription="YeelightControl uses your location for automation features."
+cat > "$SOURCES_DIR/App/ContentView.swift" << 'EOL'
+import SwiftUI
 
-# Configure widget build settings
-echo "Configuring widget build settings..."
-xcodebuild -project "$BUILD_DIR/YeelightWidget.xcodeproj" \
-    -scheme "YeelightWidget" \
-    -configuration Debug \
-    DEVELOPMENT_TEAM="" \
-    CODE_SIGN_STYLE="Automatic" \
-    PRODUCT_BUNDLE_IDENTIFIER="de.knng.app.yeelightcontrol.widget" \
-    MARKETING_VERSION="1.0.0" \
-    CURRENT_PROJECT_VERSION="1" \
-    TARGETED_DEVICE_FAMILY="1" \
-    INFOPLIST_KEY_CFBundleDisplayName="YeelightControl" \
-    INFOPLIST_KEY_NSHumanReadableCopyright="" \
-    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME="AccentColor" \
-    ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME="WidgetBackground"
+struct ContentView: View {
+    var body: some View {
+        NavigationView {
+            Text("Welcome to YeelightControl")
+                .navigationTitle("YeelightControl")
+        }
+    }
+}
 
-echo "Project setup complete! Opening Xcode project..."
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+    }
+}
+EOL
 
-# Open the Xcode project
-if [ -d "$BUILD_DIR/YeelightControl.xcodeproj" ]; then
-    open "$BUILD_DIR/YeelightControl.xcodeproj"
+# Create basic widget structure
+echo "🔧 Creating widget structure..."
+cat > "$SOURCES_DIR/Widget/YeelightWidget.swift" << 'EOL'
+import WidgetKit
+import SwiftUI
+
+struct Provider: TimelineProvider {
+    func placeholder(in context: Context) -> SimpleEntry {
+        SimpleEntry(date: Date())
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
+        let entry = SimpleEntry(date: Date())
+        completion(entry)
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+        let entries = [SimpleEntry(date: Date())]
+        let timeline = Timeline(entries: entries, policy: .atEnd)
+        completion(timeline)
+    }
+}
+
+struct SimpleEntry: TimelineEntry {
+    let date: Date
+}
+
+struct YeelightWidgetEntryView : View {
+    var entry: Provider.Entry
+
+    var body: some View {
+        Text("YeelightControl Widget")
+    }
+}
+
+@main
+struct YeelightWidget: Widget {
+    let kind: String = "YeelightWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+            YeelightWidgetEntryView(entry: entry)
+        }
+        .configurationDisplayName("Yeelight Control")
+        .description("Control your Yeelight devices")
+        .supportedFamilies([.systemSmall])
+    }
+}
+EOL
+
+# Create Info.plist files
+echo "📄 Creating Info.plist files..."
+cat > "$SOURCES_DIR/App/Info.plist" << 'EOL'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>YeelightControl</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>YeelightControl needs access to your local network to discover and control Yeelight devices.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>YeelightControl needs microphone access for music visualization features.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>YeelightControl uses your location for automation features.</string>
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <false/>
+    </dict>
+    <key>UILaunchScreen</key>
+    <dict/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+</dict>
+</plist>
+EOL
+
+cat > "$SOURCES_DIR/Widget/Info.plist" << 'EOL'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>YeelightWidget</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.widgetkit-extension</string>
+    </dict>
+</dict>
+</plist>
+EOL
+
+# Create project.yml for XcodeGen
+echo "📝 Creating XcodeGen configuration..."
+cat > project.yml << 'EOL'
+name: YeelightControl
+options:
+  bundleIdPrefix: de.knng.app
+  deploymentTarget:
+    iOS: 15.0
+  xcodeVersion: "15.2"
+  generateEmptyDirectories: true
+  createIntermediateGroups: true
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 1
+
+targets:
+  YeelightControl:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/App
+        name: App
+      - path: Sources/Models
+        name: Models
+      - path: Sources/Views
+        name: Views
+      - path: Sources/Controllers
+        name: Controllers
+      - path: Sources/Utils
+        name: Utils
+      - path: Sources/Extensions
+        name: Extensions
+      - path: Sources/Services
+        name: Services
+    info:
+      path: Sources/App/Info.plist
+      properties:
+        UILaunchScreen: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol
+        TARGETED_DEVICE_FAMILY: 1
+        ENABLE_PREVIEWS: YES
+
+  YeelightWidget:
+    type: app-extension
+    platform: iOS
+    dependencies:
+      - target: YeelightControl
+    sources:
+      - path: Sources/Widget
+    info:
+      path: Sources/Widget/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.widget
+        TARGETED_DEVICE_FAMILY: 1
+        ENABLE_PREVIEWS: YES
+EOL
+
+# Generate Xcode project
+echo "🛠️ Generating Xcode project..."
+xcodegen generate
+
+echo "✨ Project setup complete!"
+echo "Opening Xcode project..."
+
+if [ -d "YeelightControl.xcodeproj" ]; then
+    open "YeelightControl.xcodeproj"
 else
-    echo "Error: Xcode project not found at $BUILD_DIR/YeelightControl.xcodeproj"
+    echo "Error: Xcode project not found"
     exit 1
 fi 
