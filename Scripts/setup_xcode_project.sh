@@ -8,9 +8,9 @@ fi
 
 # Directory setup
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_DIR="$SCRIPT_DIR"
-BUILD_DIR="$PROJECT_DIR/Build"
-SOURCES_DIR="$PROJECT_DIR/Sources"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+BUILD_DIR="$PROJECT_ROOT/Build"
+SOURCES_DIR="$PROJECT_ROOT/Sources"
 
 # Create build directory if it doesn't exist
 mkdir -p "$BUILD_DIR"
@@ -43,7 +43,7 @@ xcodebuild -create \
 # Create symbolic links for development
 echo "Creating symbolic links..."
 ln -sf "$SOURCES_DIR" "$BUILD_DIR/Sources"
-ln -sf "$PROJECT_DIR/Resources" "$BUILD_DIR/Resources"
+ln -sf "$PROJECT_ROOT/Resources" "$BUILD_DIR/Resources"
 
 # Configure main app build settings
 echo "Configuring app build settings..."
