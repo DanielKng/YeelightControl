@@ -127,47 +127,34 @@ I've designed YeelightControl with a clean and modular project structure:
 ```
 YeelightControl/
 ├── Sources/           # Main source code
-│   ├── Core/         # Core functionality
-│   │   ├── Analytics/     # Analytics tracking
-│   │   ├── Background/    # Background tasks
-│   │   ├── Configuration/ # App configuration
-│   │   ├── Device/       # Device management
-│   │   ├── Effect/       # Effect implementations
-│   │   ├── Error/        # Error handling
-│   │   ├── Location/     # Location services
-│   │   ├── Network/      # Network operations
-│   │   ├── Notification/ # Notification handling
-│   │   ├── Permission/   # Permission management
-│   │   ├── Scene/        # Scene core logic
-│   │   ├── Security/     # Security features
-│   │   ├── Services/     # Core services
-│   │   ├── State/        # State management
-│   │   └── Storage/      # Data persistence
+│   ├── App/          # Main app target
+│   │   ├── YeelightControlApp.swift
+│   │   ├── ContentView.swift
+│   │   └── Info.plist
 │   │
-│   ├── Features/     # Main features
-│   │   ├── Automation/   # Automation system
-│   │   ├── Effects/      # Light effects
-│   │   ├── Rooms/        # Room organization
-│   │   └── Scenes/       # Scene management
+│   ├── Widget/       # Widget extension
+│   │   ├── YeelightWidget.swift
+│   │   └── Info.plist
 │   │
-│   ├── UI/          # UI layer
-│   │   ├── Components/   # Reusable UI components
-│   │   └── Views/        # Screen views
-│   │
-│   └── Tests/       # Test files
-│       ├── UnitTests/    # Unit test suites
-│       ├── UITests/      # UI test suites
-│       └── IntegrationTests/ # Integration tests
+│   ├── Models/       # Data models
+│   ├── Views/        # SwiftUI views
+│   ├── Controllers/  # View controllers
+│   ├── Utils/        # Utility functions
+│   ├── Extensions/   # Swift extensions
+│   └── Services/     # Core services
 │
-├── Resources/       # App resources
-│   ├── Screenshots/ # App screenshots
-│   ├── Assets/      # Images and assets
+├── Resources/        # App resources
+│   ├── Assets/       # Images and assets
+│   ├── Configs/      # Configuration files
 │   └── Localization/ # Localization files
 │
-├── Scripts/        # Development scripts
+├── Scripts/         # Development scripts
 │   ├── setup_xcode_project.sh  # Generate Xcode project
-│   ├── cleanup.sh             # Clean temporary files
-│   └── reorganize.sh          # Maintain project structure
+│   ├── cleanup.sh              # Clean temporary files
+│   └── reorganize.sh           # Maintain project structure
+│
+├── Tests/          # Test files
+│   └── YeelightControlTests/  # Unit tests
 │
 └── .github/        # GitHub configuration
 ```
@@ -180,11 +167,11 @@ I've provided several utility scripts to help maintain the project:
    ```bash
    ./Scripts/setup_xcode_project.sh
    ```
-   - Generates fresh Xcode project
+   - Generates Xcode project using XcodeGen
    - Creates necessary directory structure
-   - Sets up build configurations
-   - Configures widget extension
-   - Creates symbolic links for resources
+   - Sets up main app and widget targets
+   - Configures build settings
+   - Creates initial SwiftUI views
 
 2. **Project Cleanup**
    ```bash
@@ -192,12 +179,8 @@ I've provided several utility scripts to help maintain the project:
    ```
    - Removes Build directory
    - Cleans Xcode derived data
-   - Removes temporary and system files
+   - Removes temporary files
    - Cleans build artifacts
-   - Removes empty directories
-   - Cleans editor files
-   - Removes legacy framework files
-   - Optimizes Git repository
 
 3. **Project Reorganization**
    ```bash
@@ -205,10 +188,7 @@ I've provided several utility scripts to help maintain the project:
    ```
    - Maintains consistent directory structure
    - Creates backup of current state
-   - Removes Build directory
    - Organizes source files
-   - Sets up Scripts directory
-   - Creates necessary symbolic links
    - Restores files from backup
 
 ### Development Workflow
@@ -222,14 +202,16 @@ I've designed the development workflow to be smooth and maintainable:
    cd YeelightControl
    chmod +x Scripts/*.sh
    
-   # Clean and generate project
-   ./Scripts/cleanup.sh
+   # Install required tools
+   brew install xcodegen
+   
+   # Generate project
    ./Scripts/setup_xcode_project.sh
    ```
 
 2. **Daily Development**
    - Work in Xcode as normal
-   - Build directory is regenerated as needed
+   - Use SwiftUI previews for rapid development
    - Changes are tracked in Sources and Resources
 
 3. **Before Committing**
@@ -239,14 +221,11 @@ I've designed the development workflow to be smooth and maintainable:
    
    # Ensure structure is correct
    ./Scripts/reorganize.sh
-   
-   # Regenerate project if needed
-   ./Scripts/setup_xcode_project.sh
    ```
 
 4. **After Pulling Updates**
    ```bash
-   # Clean and rebuild
+   # Clean and regenerate project
    ./Scripts/cleanup.sh
    ./Scripts/setup_xcode_project.sh
    ```
