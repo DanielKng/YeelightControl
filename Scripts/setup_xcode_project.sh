@@ -301,11 +301,8 @@ xcodegen generate
 
 echo "✅ Setup complete!"
 
-# Try to open the Xcode project
-if [ -d "YeelightControl.xcodeproj" ]; then
+# Try to open the Xcode project only if we have a GUI
+if [ -d "YeelightControl.xcodeproj" ] && [ -n "$DISPLAY" ]; then
     echo "Opening Xcode project..."
     open YeelightControl.xcodeproj
-else
-    echo "Error: Xcode project not found"
-    exit 1
 fi 
