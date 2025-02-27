@@ -15,12 +15,12 @@ mkdir -p "$BACKUP_DIR"
 # Backup existing files with full structure
 echo "💾 Backing up existing files..."
 if [ -d "$PROJECT_ROOT/Sources" ]; then
-    cp -a "$PROJECT_ROOT/Sources/." "$BACKUP_DIR/Sources/"
+    cp -a "$PROJECT_ROOT/Sources" "$BACKUP_DIR/"
     echo "✓ Sources directory backed up"
 fi
 
 if [ -d "$PROJECT_ROOT/Resources" ]; then
-    cp -a "$PROJECT_ROOT/Resources/." "$BACKUP_DIR/Resources/"
+    cp -a "$PROJECT_ROOT/Resources" "$BACKUP_DIR/"
     echo "✓ Resources directory backed up"
 fi
 
@@ -30,18 +30,12 @@ if [ -d "$PROJECT_ROOT/.github" ]; then
 fi
 
 if [ -d "$PROJECT_ROOT/Tests" ]; then
-    cp -a "$PROJECT_ROOT/Tests/." "$BACKUP_DIR/Tests/"
+    cp -a "$PROJECT_ROOT/Tests" "$BACKUP_DIR/"
     echo "✓ Tests directory backed up"
 fi
 
-# Clean existing structure
-echo "🧹 Cleaning existing structure..."
-rm -rf "$PROJECT_ROOT/Sources" 2>/dev/null || true
-rm -rf "$PROJECT_ROOT/Resources" 2>/dev/null || true
-rm -rf "$PROJECT_ROOT/Tests" 2>/dev/null || true
-
-# Create directory structure
-echo "📁 Creating directory structure..."
+# Create directory structure (only if directories don't exist)
+echo "📁 Ensuring directory structure exists..."
 mkdir -p "$PROJECT_ROOT/Sources/"{App,Widget,Models,Views,Controllers,Utils,Extensions,Services}
 mkdir -p "$PROJECT_ROOT/Resources/"{Assets,Configs,Localization}
 mkdir -p "$PROJECT_ROOT/Tests/YeelightControlTests"
@@ -49,14 +43,14 @@ mkdir -p "$PROJECT_ROOT/Tests/YeelightControlTests"
 # Restore from backup with proper permissions
 echo "📥 Restoring files from backup..."
 if [ -d "$BACKUP_DIR/Sources" ]; then
-    cp -a "$BACKUP_DIR/Sources/." "$PROJECT_ROOT/Sources/"
+    cp -a "$BACKUP_DIR/Sources/"* "$PROJECT_ROOT/Sources/"
     echo "✓ Sources directory restored"
     find "$PROJECT_ROOT/Sources" -type f -exec chmod 644 {} \;
     find "$PROJECT_ROOT/Sources" -type d -exec chmod 755 {} \;
 fi
 
 if [ -d "$BACKUP_DIR/Resources" ]; then
-    cp -a "$BACKUP_DIR/Resources/." "$PROJECT_ROOT/Resources/"
+    cp -a "$BACKUP_DIR/Resources/"* "$PROJECT_ROOT/Resources/"
     echo "✓ Resources directory restored"
     find "$PROJECT_ROOT/Resources" -type f -exec chmod 644 {} \;
     find "$PROJECT_ROOT/Resources" -type d -exec chmod 755 {} \;
@@ -68,7 +62,7 @@ if [ -d "$BACKUP_DIR/.github" ]; then
 fi
 
 if [ -d "$BACKUP_DIR/Tests" ]; then
-    cp -a "$BACKUP_DIR/Tests/." "$PROJECT_ROOT/Tests/"
+    cp -a "$BACKUP_DIR/Tests/"* "$PROJECT_ROOT/Tests/"
     echo "✓ Tests directory restored"
     find "$PROJECT_ROOT/Tests" -type f -exec chmod 644 {} \;
     find "$PROJECT_ROOT/Tests" -type d -exec chmod 755 {} \;
