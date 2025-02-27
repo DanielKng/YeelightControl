@@ -219,7 +219,17 @@ brew install tuist
 ./setup_xcode_project.sh
 ```
 
-3. If issues persist, you can create a new Xcode project manually:
+3. If you see an error about Xcode's Info.plist:
+```
+Couldn't find Xcode's Info.plist at /Library/Contents/Info.plist
+```
+Run the following command to set your Xcode path correctly:
+```bash
+sudo xcode-select -s /Applications/Xcode.app
+```
+Then run the setup script again.
+
+4. If issues persist, you can create a new Xcode project manually:
    - Create a new iOS App project with SwiftUI interface in Xcode
    - Add the source files from the `/Sources` directory
    - Configure the Info.plist with required permissions for network and microphone access
