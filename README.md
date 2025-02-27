@@ -176,26 +176,21 @@ I've provided several utility scripts to help maintain the project:
    - Configures build settings
    - Creates initial SwiftUI views
 
-2. **Project Cleanup**
-   ```bash
-   ./Scripts/cleanup.sh
-   ```
-   - Removes Build directory
-   - Cleans Xcode derived data
-   - Removes temporary files
-   - Cleans build artifacts
-   - Removes old backups (older than 7 days)
-
-3. **Project Reorganization**
+2. **Project Cleanup and Reorganization**
    ```bash
    ./Scripts/reorganize.sh
    ```
+   - Creates verified backup of current state
+   - Cleans derived data and temporary files
+   - Removes build artifacts and old backups
    - Maintains consistent directory structure
-   - Creates backup of current state
-   - Organizes source files
-   - Restores files from backup
+   - Safely restores files with verification
+   - Performs multiple safety checks
+   - Auto-recovers from failures
+   - Maintains proper file permissions
+   - Verifies Swift file count at each step
 
-4. **Git Push Helper**
+3. **Git Push Helper**
    ```bash
    ./Scripts/git_push.sh
    ```
@@ -233,17 +228,14 @@ I've designed the development workflow to be smooth and maintainable:
 
 3. **Before Committing**
    ```bash
-   # Clean temporary files
-   ./Scripts/cleanup.sh
-   
-   # Ensure structure is correct
+   # Clean and reorganize project
    ./Scripts/reorganize.sh
    ```
 
 4. **After Pulling Updates**
    ```bash
-   # Clean and regenerate project
-   ./Scripts/cleanup.sh
+   # Clean, reorganize, and regenerate project
+   ./Scripts/reorganize.sh
    ./Scripts/setup_xcode_project.sh
    ```
 
