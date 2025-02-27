@@ -20,9 +20,8 @@ xcuserdata/
 !*.xcworkspace/contents.xcworkspacedata
 
 # Generated project configuration
-/Resources/Configs/*
-!/Resources/Configs/Package.swift
-!/Resources/Configs/project.yml.template
+Resources/Configs/
+project.yml
 
 ## Build generated
 build/
