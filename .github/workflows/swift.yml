@@ -29,19 +29,31 @@ jobs:
 
     - name: Set up project
       run: |
+        echo "Current directory:"
         pwd
+        echo "\nInitial directory contents:"
         ls -la
+        echo "\nMaking scripts executable:"
         chmod +x Scripts/*.sh
+        echo "\nRunning setup script:"
         ./Scripts/setup_xcode_project.sh
-        ls -la
+        echo "\nVerifying generated files:"
+        ls -la Build/
+        ls -la Resources/Configs/
+        echo "\nChecking project.yml content:"
+        cat Resources/Configs/project.yml
+        echo "\nChecking Info.plist files:"
+        cat Resources/Configs/App-Info.plist
+        cat Resources/Configs/Widget-Info.plist
 
     - name: Show available destinations
-      run: xcodebuild -showdestinations -scheme YeelightControl
+      run: xcodebuild -showdestinations -scheme YeelightControl -project Build/YeelightControl.xcodeproj
 
     - name: Build
       run: |
         set -o pipefail && xcodebuild clean build \
           -scheme YeelightControl \
+          -project Build/YeelightControl.xcodeproj \
           -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
@@ -54,6 +66,7 @@ jobs:
       run: |
         set -o pipefail && xcodebuild test \
           -scheme YeelightControl \
+          -project Build/YeelightControl.xcodeproj \
           -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
