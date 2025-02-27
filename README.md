@@ -178,6 +178,8 @@ For detailed documentation on specific modules, see:
 - [Device Module Documentation](Sources/Core/Device/DEVICE_MODULE.md)
 - [Scenes Feature Documentation](Sources/Features/Scenes/SCENES_FEATURE.md)
 
+> **Note**: To avoid build conflicts, all module-specific README files have been renamed to follow the pattern `MODULE_README.md` or given unique names like `DEVICE_MODULE.md`. This prevents the "Multiple commands produce README.md" error during build.
+
 ### Building from Source
 
 <details>

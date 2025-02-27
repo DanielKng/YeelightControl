@@ -179,6 +179,12 @@ find "$SOURCE_DIR" -type f -not -path "*/\.*" | while read -r file; do
     # Get directory part of the path
     dir_part=$(dirname "$rel_path")
     
+    # Skip README.md files in subdirectories to avoid build conflicts
+    if [[ "$(basename "$file")" == "README.md" && "$dir_part" != "." ]]; then
+        echo "⚠️ Skipping subdirectory README.md: $rel_path (to avoid build conflicts)"
+        continue
+    fi
+    
     # Create target directory
     target_dir="$XCODE_DIR/$PROJECT_NAME/$dir_part"
     mkdir -p "$target_dir"
