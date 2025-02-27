@@ -155,101 +155,226 @@ YeelightControl/
 │   │   └── Views/        # Screen views
 │   │
 │   └── Tests/       # Test files
+│       ├── UnitTests/    # Unit test suites
+│       ├── UITests/      # UI test suites
+│       └── IntegrationTests/ # Integration tests
 │
 ├── Resources/       # App resources
-└── setup_xcode_project.sh  # Script to generate Xcode project
+│   ├── Screenshots/ # App screenshots
+│   ├── Assets/      # Images and assets
+│   └── Localization/ # Localization files
+│
+├── Scripts/        # Development scripts
+│   ├── setup_xcode_project.sh  # Generate Xcode project
+│   ├── cleanup.sh             # Clean temporary files
+│   └── reorganize.sh          # Maintain project structure
+│
+└── .github/        # GitHub configuration
 ```
 
-This structure provides:
-- Clear separation of concerns between core functionality and features
-- Modular architecture for easy maintenance and testing
-- Centralized UI components for consistent design
-- Dedicated test directory for comprehensive testing
+### Development Scripts
+
+I've provided several utility scripts to help maintain the project:
+
+1. **Project Setup**
+   ```bash
+   ./Scripts/setup_xcode_project.sh
+   ```
+   - Generates fresh Xcode project
+   - Creates necessary directory structure
+   - Sets up build configurations
+   - Configures widget extension
+   - Creates symbolic links for resources
+
+2. **Project Cleanup**
+   ```bash
+   ./Scripts/cleanup.sh
+   ```
+   - Removes Build directory
+   - Cleans Xcode derived data
+   - Removes temporary and system files
+   - Cleans build artifacts
+   - Removes empty directories
+   - Cleans editor files
+   - Removes legacy framework files
+   - Optimizes Git repository
+
+3. **Project Reorganization**
+   ```bash
+   ./Scripts/reorganize.sh
+   ```
+   - Maintains consistent directory structure
+   - Creates backup of current state
+   - Removes Build directory
+   - Organizes source files
+   - Sets up Scripts directory
+   - Creates necessary symbolic links
+   - Restores files from backup
 
 ### Development Workflow
 
-1. Clone the repository and navigate to the project directory
-2. Run `./reorganize.sh` to ensure proper directory structure
-3. Run `./setup_xcode_project.sh` to generate the Xcode project
-4. Open the project and start development
+I've designed the development workflow to be smooth and maintainable:
 
-### Technical Highlights
+1. **Initial Setup**
+   ```bash
+   # Clone and setup
+   git clone https://github.com/DanielKng/YeelightControl.git
+   cd YeelightControl
+   chmod +x Scripts/*.sh
+   
+   # Clean and generate project
+   ./Scripts/cleanup.sh
+   ./Scripts/setup_xcode_project.sh
+   ```
 
-- **SwiftUI Framework**: Modern declarative UI with the latest iOS features
-- **Combine Framework**: Reactive programming for robust state management
-- **Core Services**: Modular core services architecture for maintainability
-- **Analytics Integration**: Built-in analytics for usage insights
-- **Security Layer**: Dedicated security features for data protection
-- **State Management**: Centralized state handling with Combine
-- **Network Layer**: Robust networking with async/await
-- **UI Components**: Reusable component library for consistent design
-- **Automated Testing**: Comprehensive test suite in dedicated test directory
+2. **Daily Development**
+   - Work in Xcode as normal
+   - Build directory is regenerated as needed
+   - Changes are tracked in Sources and Resources
 
-### Module Documentation
+3. **Before Committing**
+   ```bash
+   # Clean temporary files
+   ./Scripts/cleanup.sh
+   
+   # Ensure structure is correct
+   ./Scripts/reorganize.sh
+   
+   # Regenerate project if needed
+   ./Scripts/setup_xcode_project.sh
+   ```
 
-For detailed documentation on specific modules, see:
-- [Analytics Documentation](Sources/Core/Analytics/README.md)
-- [Device Documentation](Sources/Core/Device/README.md)
-- [Network Documentation](Sources/Core/Network/README.md)
-- [Security Documentation](Sources/Core/Security/README.md)
-- [Services Documentation](Sources/Core/Services/README.md)
+4. **After Pulling Updates**
+   ```bash
+   # Clean and rebuild
+   ./Scripts/cleanup.sh
+   ./Scripts/setup_xcode_project.sh
+   ```
 
-### Building from Source
+### Project Maintenance
 
-<details>
-<summary>Click to expand build instructions</summary>
+The project uses several strategies to maintain cleanliness and organization:
 
-#### Requirements
-- iOS 15.0+
-- Xcode 14.0+
-- Swift 5.5+
-- Command Line Tools for Xcode (run `xcode-select --install`)
+1. **Build Management**
+   - Build directory is temporary and regenerated
+   - Never commit Build directory contents
+   - Use cleanup script before commits
 
-#### Steps
-1. Clone the repository
-```bash
-git clone https://github.com/DanielKng/YeelightControl.git
-cd YeelightControl
-```
+2. **Resource Management**
+   - Keep Resources directory organized
+   - Use Assets catalog for images
+   - Maintain localization files
 
-2. Run the reorganization script
-```bash
-chmod +x ./reorganize.sh
-./reorganize.sh
-```
+3. **Source Organization**
+   - Follow modular architecture
+   - Keep features isolated
+   - Use clear naming conventions
 
-3. Generate the Xcode project
-```bash
-chmod +x ./setup_xcode_project.sh
-./setup_xcode_project.sh
-```
+4. **Script Management**
+   - Scripts are in dedicated directory
+   - Symbolic links for convenience
+   - Regular cleanup and maintenance
 
-4. Open the generated Xcode project and build
+### Advanced Troubleshooting
 
-#### Troubleshooting Project Generation
-If you encounter issues with the project generation:
+#### Build Issues
 
-1. Ensure Command Line Tools are installed:
-```bash
-xcode-select --install
-```
+1. **Clean Build Fails**
+   ```bash
+   # Full cleanup
+   ./Scripts/cleanup.sh
+   rm -rf ~/Library/Developer/Xcode/DerivedData/*YeelightControl*
+   rm -rf Build/
+   
+   # Regenerate
+   ./Scripts/setup_xcode_project.sh
+   ```
 
-2. Ensure all scripts have proper permissions:
-```bash
-chmod +x ./*.sh
-```
+2. **Symbolic Link Issues**
+   ```bash
+   # Check symbolic links
+   ls -la
+   
+   # Recreate if needed
+   ./Scripts/reorganize.sh
+   ```
 
-3. If you see build errors:
-   - Clean the build folder (Cmd + Shift + K in Xcode)
-   - Clean the build cache (Cmd + Shift + Alt + K in Xcode)
-   - Delete derived data and rebuild
+3. **Resource Missing**
+   ```bash
+   # Verify resources
+   ls -la Resources/
+   
+   # Restore from backup
+   git checkout Resources/
+   ```
 
-4. For any other issues:
-   - Check the console output for specific error messages
-   - Ensure all required dependencies are properly installed
-   - Verify your Xcode installation is up to date
+4. **Script Permission Issues**
+   ```bash
+   # Fix permissions
+   chmod +x Scripts/*.sh
+   chmod +x *.sh  # For symbolic links
+   ```
 
-</details>
+#### Project Structure Issues
+
+1. **Missing Directories**
+   ```bash
+   # Recreate structure
+   ./Scripts/reorganize.sh
+   
+   # Verify
+   tree -L 3
+   ```
+
+2. **Backup Recovery**
+   ```bash
+   # Check backups
+   ls -la temp_backup/
+   
+   # Restore specific backup
+   cp -R temp_backup/backup_YYYYMMDD_HHMMSS/* .
+   ```
+
+3. **Git Issues**
+   ```bash
+   # Clean untracked files
+   git clean -fdx
+   
+   # Reset to clean state
+   git reset --hard HEAD
+   ./Scripts/reorganize.sh
+   ```
+
+#### Common Error Solutions
+
+| Error | Solution |
+|-------|----------|
+| **"Build directory not found"** | Run `./Scripts/setup_xcode_project.sh` to regenerate |
+| **"Permission denied"** | Run `chmod +x Scripts/*.sh` and try again |
+| **"Resource not found"** | Check symbolic links with `ls -la` |
+| **"Script not found"** | Ensure you're in project root directory |
+| **"Invalid project structure"** | Run `./Scripts/reorganize.sh` to fix |
+
+#### Performance Issues
+
+1. **Slow Build Times**
+   - Clean DerivedData
+   - Remove Build directory
+   - Close other Xcode projects
+   - Reset simulator state
+
+2. **Git Performance**
+   ```bash
+   # Optimize repository
+   git gc --aggressive --prune=now
+   git repack -a -d --depth=250 --window=250
+   ```
+
+3. **Xcode Issues**
+   - Reset window arrangement
+   - Clear derived data
+   - Reset simulator content
+   - Restart Xcode
 
 ## 👥 Contributing
 

@@ -142,4 +142,150 @@ temp_backup/
 
 # YeelightControl specific
 Xcode/build/
+Resources/Screenshots/*.png
+
+# Additional cleanup patterns
+## Editor specific
+.vscode/
+*.sublime-workspace
+*.sublime-project
+.atom/
+.idea/
+*.vim
+.project
+.settings/
+
+## Generated files
+*.generated.*
+**/Generated/
+GeneratedAssetSymbols.swift
+*.gen.*
+*.generated/
+
+## Temporary files
+*.log
+log/
+logs/
+tmp/
+temp/
+*.cache
+.cache/
+*.old
+*.bak
+*.tmp
+*~
+\#*\#
+.\#*
+
+## Debug files
+*.dSYM/
+*.dSYM.zip
+*.crash
+crash.log
+syslog
+*.trace
+
+## Analysis files
+*.profraw
+*.gcda
+*.gcno
+*.xccovarchive
+.scannerwork/
+
+# Remove legacy dependency management
+Pods/
+Carthage/
+Dependencies/
+.accio/
+Frameworks/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Environment and IDE
+.env
+.env.*
+.idea/
+*.swp
+*~
+*.bak
+
+# Documentation
+docs/build/
+
+# Test and Coverage
+*.xcresult/
+coverage.xml
+*.coverage
+*.coveragexml
+coverage/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Project specific
+Resources/Screenshots/*.png
+*.generated.swift
+
+# Temporary files
+temp_backup/
+*.tmp
+*.temp
+
+# Widget Extension
+*.appex
+
+# Code Injection
+#
+# After new code Injection tools there's a generated folder /iOSInjectionProject
+# https://github.com/johnno1962/injectionforxcode
+
+iOSInjectionProject/
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Documentation
+docs/build/
+
+# Test coverage
+*.xcresult/
+coverage.xml
+
+# Project specific
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Xcode Patch
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/xcuserdata/
+!*.xcworkspace/contents.xcworkspacedata
+/*.gcno
+**/xcshareddata/WorkspaceSettings.xcsettings
+
+# Code coverage
+*.coverage
+*.coveragexml
+coverage/
+
+# Temp backup
+temp_backup/
+
+# YeelightControl specific
+Xcode/build/
 Resources/Screenshots/*.png 
