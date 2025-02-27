@@ -171,7 +171,21 @@ EOL
 
 # Copy source files
 echo "📂 Copying source files..."
-rsync -av --exclude='.DS_Store' --exclude='.git' "$SOURCE_DIR/" "$XCODE_DIR/$PROJECT_NAME/"
+
+# Create target directories and copy files
+find "$SOURCE_DIR" -type f -not -path "*/\.*" | while read -r file; do
+    # Get relative path from SOURCE_DIR
+    rel_path="${file#$SOURCE_DIR/}"
+    # Get directory part of the path
+    dir_part=$(dirname "$rel_path")
+    
+    # Create target directory
+    target_dir="$XCODE_DIR/$PROJECT_NAME/$dir_part"
+    mkdir -p "$target_dir"
+    
+    # Copy the file
+    cp "$file" "$target_dir/"
+done
 
 # Count files copied for verification
 SOURCE_FILE_COUNT=$(find "$SOURCE_DIR" -type f -name "*.swift" | wc -l | xargs)
@@ -376,9 +390,15 @@ else
 fi
 
 if [ -f "$XCODE_DIR/$PROJECT_NAME/App/ContentView.swift" ]; then
-    echo "✅ Found ContentView.swift"
+    echo "✅ Found ContentView.swift in App directory (primary ContentView)"
 else
-    echo "⚠️ Warning: ContentView.swift not found in expected location"
+    echo "⚠️ Warning: ContentView.swift not found in App directory"
+fi
+
+if [ -f "$XCODE_DIR/$PROJECT_NAME/UI/Views/DetailContentView.swift" ]; then
+    echo "✅ Found DetailContentView.swift in UI/Views directory"
+else
+    echo "⚠️ Warning: DetailContentView.swift not found in UI/Views directory"
 fi
 
 if [ -f "$XCODE_DIR/$PROJECT_NAME/UI/Views/MainView.swift" ]; then

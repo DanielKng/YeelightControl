@@ -1,4 +1,5 @@
 import SwiftUI
+import Core
 
 struct SceneEditorView: View {
     @ObservedObject var manager: YeelightManager

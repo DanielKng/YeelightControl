@@ -1,4 +1,5 @@
 import SwiftUI
+import Core
 
 struct ScenesView: View {
     @ObservedObject var device: YeelightDevice

@@ -1,6 +1,10 @@
+// DetailContentView.swift
+// Renamed from ContentView.swift in UI/Views directory
+// This file contains the detailed content view for the Yeelight Control app
+
 import SwiftUI
 
-struct ContentView: View {
+struct DetailContentView: View {
     @StateObject private var yeelightManager = YeelightManager()
     @State private var isDiscovering = false
     @State private var showingHelp = false
@@ -96,9 +100,9 @@ struct ContentView: View {
     }
 }
 
-struct ContentView_Previews: PreviewProvider {
+struct DetailContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView()
+        DetailContentView()
     }
 }
 
@@ -132,7 +136,7 @@ struct EmptyStateView: View {
     }
 }
 
-struct DeviceCard: View {
+struct DeviceRow: View {
     @ObservedObject var device: YeelightDevice
     let manager: YeelightManager
     @State private var showingDetail = false
@@ -273,47 +277,6 @@ struct DeviceDetailView: View {
                 }
             }
             .navigationTitle("Light Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct HelpView: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("How to Use")
-                            .font(.headline)
-                        Text("1. Make sure your Yeelight devices are connected to the same network as this device")
-                        Text("2. Tap 'Discover Devices' to find your lights")
-                        Text("3. Tap any light to access detailed controls")
-                    }
-                    .padding(.vertical, 4)
-                }
-                
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Troubleshooting")
-                            .font(.headline)
-                        Text("• Ensure LAN Control is enabled in the Yeelight app")
-                        Text("• Check that your devices are powered on and connected to WiFi")
-                        Text("• Try restarting your lights if they're not responding")
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-            .navigationTitle("Help")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

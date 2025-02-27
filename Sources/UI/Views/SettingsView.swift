@@ -13,9 +13,9 @@ struct SettingsView: View {
     @State private var showingAbout = false
     
     var body: some View {
-        Form {
-            Section("User Settings") {
-                TextField("Your Name", text: $userName)
+            Form {
+                Section("User Settings") {
+                    TextField("Your Name", text: $userName)
                     .autocorrectionDisabled()
                 
                 Toggle("Auto-Discovery", isOn: $autoDiscovery)
@@ -117,7 +117,7 @@ struct AboutView: View {
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
                 
-                Spacer()
+                                Spacer()
                 
                 Text("© 2024 Daniel Kng. All rights reserved.")
                     .font(.caption)
@@ -131,12 +131,12 @@ struct AboutView: View {
                     Button("Done") {
                         // Dismiss
                     }
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-        }
-    }
-}
-
+                
 struct InfoRow: View {
     let label: String
     let value: String
