@@ -202,8 +202,9 @@ For detailed documentation on specific modules, see:
 
 #### Requirements
 - iOS 15.0+
-- Xcode 13.0+
+- Xcode 14.0+
 - Swift 5.5+
+- Command Line Tools for Xcode (run `xcode-select --install`)
 
 #### Steps
 1. Clone the repository
@@ -229,17 +230,22 @@ chmod +x ./setup_xcode_project.sh
 #### Troubleshooting Project Generation
 If you encounter issues with the project generation:
 
-1. Ensure all scripts have proper permissions:
+1. Ensure Command Line Tools are installed:
+```bash
+xcode-select --install
+```
+
+2. Ensure all scripts have proper permissions:
 ```bash
 chmod +x ./*.sh
 ```
 
-2. If you see build errors:
+3. If you see build errors:
    - Clean the build folder (Cmd + Shift + K in Xcode)
    - Clean the build cache (Cmd + Shift + Alt + K in Xcode)
    - Delete derived data and rebuild
 
-3. For any other issues:
+4. For any other issues:
    - Check the console output for specific error messages
    - Ensure all required dependencies are properly installed
    - Verify your Xcode installation is up to date
