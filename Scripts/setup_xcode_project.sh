@@ -305,4 +305,15 @@ echo "✅ Setup complete!"
 if [ -d "YeelightControl.xcodeproj" ] && [ -n "$DISPLAY" ]; then
     echo "Opening Xcode project..."
     open YeelightControl.xcodeproj
-fi 
+fi
+
+# Verify generated files
+echo -e "\nVerifying generated files:"
+echo "Project files:"
+ls -la YeelightControl.xcodeproj
+
+echo -e "\nConfig files:"
+ls -la "$CONFIGS_DIR"
+
+echo -e "\nProject.yml content:"
+cat project.yml 
