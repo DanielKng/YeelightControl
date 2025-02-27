@@ -157,7 +157,6 @@ YeelightControl/
 │   └── Tests/       # Test files
 │
 ├── Resources/       # App resources
-├── Frameworks/      # External frameworks
 └── setup_xcode_project.sh  # Script to generate Xcode project
 ```
 

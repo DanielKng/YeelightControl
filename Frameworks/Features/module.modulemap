@@ -1,5 +1,0 @@
-framework module Features {
-  umbrella header "Features.h"
-  export *
-  link framework "Core"
-}

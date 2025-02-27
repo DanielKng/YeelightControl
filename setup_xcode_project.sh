@@ -44,7 +44,6 @@ xcodebuild -create \
 echo "Creating symbolic links..."
 ln -sf "$SOURCES_DIR" "$BUILD_DIR/Sources"
 ln -sf "$PROJECT_DIR/Resources" "$BUILD_DIR/Resources"
-ln -sf "$PROJECT_DIR/Frameworks" "$BUILD_DIR/Frameworks"
 
 # Configure main app build settings
 echo "Configuring app build settings..."
@@ -80,4 +79,12 @@ xcodebuild -project "$BUILD_DIR/YeelightWidget.xcodeproj" \
     ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME="AccentColor" \
     ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME="WidgetBackground"
 
-echo "Project setup complete! Open $BUILD_DIR/YeelightControl.xcodeproj to start development." 
+echo "Project setup complete! Opening Xcode project..."
+
+# Open the Xcode project
+if [ -d "$BUILD_DIR/YeelightControl.xcodeproj" ]; then
+    open "$BUILD_DIR/YeelightControl.xcodeproj"
+else
+    echo "Error: Xcode project not found at $BUILD_DIR/YeelightControl.xcodeproj"
+    exit 1
+fi 
