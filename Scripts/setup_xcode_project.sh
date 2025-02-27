@@ -220,9 +220,88 @@ final class YeelightControlTests: XCTestCase {
 }
 EOL
 
-# Copy and process project.yml template
-echo "📝 Setting up XcodeGen configuration..."
-cp "$CONFIGS_DIR/project.yml.template" "$CONFIGS_DIR/project.yml"
+# Create project.yml
+echo "📝 Creating XcodeGen configuration..."
+cat > "$CONFIGS_DIR/project.yml" << 'EOL'
+name: YeelightControl
+options:
+  bundleIdPrefix: de.knng.app
+  deploymentTarget:
+    iOS: 15.0
+  xcodeVersion: "15.2"
+  generateEmptyDirectories: true
+  createIntermediateGroups: true
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 1
+
+targets:
+  YeelightControl:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/App
+        name: App
+      - path: Sources/Models
+        name: Models
+      - path: Sources/Views
+        name: Views
+      - path: Sources/Controllers
+        name: Controllers
+      - path: Sources/Utils
+        name: Utils
+      - path: Sources/Extensions
+        name: Extensions
+      - path: Sources/Services
+        name: Services
+    info:
+      path: Resources/Configs/App-Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol
+        TARGETED_DEVICE_FAMILY: 1
+        ENABLE_PREVIEWS: YES
+
+  YeelightWidget:
+    type: app-extension
+    platform: iOS
+    dependencies:
+      - target: YeelightControl
+    sources:
+      - path: Sources/Widget
+        name: Widget
+    info:
+      path: Resources/Configs/Widget-Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.widget
+        TARGETED_DEVICE_FAMILY: 1
+        ENABLE_PREVIEWS: YES
+
+  YeelightControlTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: YeelightControl
+
+schemes:
+  YeelightControl:
+    build:
+      targets:
+        YeelightControl: all
+        YeelightWidget: all
+    test:
+      targets:
+        - name: YeelightControlTests
+          parallelizable: true
+          randomExecutionOrder: true
+EOL
 
 # Run XcodeGen
 echo "🛠 Running XcodeGen..."
