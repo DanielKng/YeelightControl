@@ -17,9 +17,11 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 BUILD_DIR="$PROJECT_ROOT/Build"
 SOURCES_DIR="$PROJECT_ROOT/Sources"
+CONFIGS_DIR="$PROJECT_ROOT/Resources/Configs"
 
 # Create build directory if it doesn't exist
 mkdir -p "$BUILD_DIR"
+mkdir -p "$CONFIGS_DIR"
 
 # Clean up previous build files
 if [ -d "$BUILD_DIR" ]; then
@@ -124,7 +126,7 @@ EOL
 
 # Create Info.plist files
 echo "📄 Creating Info.plist files..."
-cat > "$SOURCES_DIR/App/Info.plist" << 'EOL'
+cat > "$CONFIGS_DIR/App-Info.plist" << 'EOL'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -172,7 +174,7 @@ cat > "$SOURCES_DIR/App/Info.plist" << 'EOL'
 </plist>
 EOL
 
-cat > "$SOURCES_DIR/Widget/Info.plist" << 'EOL'
+cat > "$CONFIGS_DIR/Widget-Info.plist" << 'EOL'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -218,111 +220,15 @@ final class YeelightControlTests: XCTestCase {
 }
 EOL
 
-# Create project.yml for XcodeGen
-echo "📝 Creating XcodeGen configuration..."
-cat > project.yml << 'EOL'
-name: YeelightControl
-options:
-  bundleIdPrefix: de.knng.app
-  deploymentTarget:
-    iOS: 15.0
-  xcodeVersion: "15.2"
-  generateEmptyDirectories: true
-  createIntermediateGroups: true
+# Copy and process project.yml template
+echo "📝 Setting up XcodeGen configuration..."
+cp "$CONFIGS_DIR/project.yml.template" "$CONFIGS_DIR/project.yml"
 
-settings:
-  base:
-    DEVELOPMENT_TEAM: ""
-    CODE_SIGN_STYLE: Automatic
-    MARKETING_VERSION: 1.0.0
-    CURRENT_PROJECT_VERSION: 1
+# Run XcodeGen
+echo "🛠 Running XcodeGen..."
+xcodegen generate --spec "$CONFIGS_DIR/project.yml" --project "$BUILD_DIR"
 
-targets:
-  YeelightControl:
-    type: application
-    platform: iOS
-    sources:
-      - path: Sources/App
-        name: App
-      - path: Sources/Models
-        name: Models
-      - path: Sources/Views
-        name: Views
-      - path: Sources/Controllers
-        name: Controllers
-      - path: Sources/Utils
-        name: Utils
-      - path: Sources/Extensions
-        name: Extensions
-      - path: Sources/Services
-        name: Services
-    info:
-      path: Sources/App/Info.plist
-      properties:
-        UILaunchScreen: {}
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol
-        TARGETED_DEVICE_FAMILY: 1
-        ENABLE_PREVIEWS: YES
-
-  YeelightWidget:
-    type: app-extension
-    platform: iOS
-    dependencies:
-      - target: YeelightControl
-    sources:
-      - path: Sources/Widget
-    info:
-      path: Sources/Widget/Info.plist
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.widget
-        TARGETED_DEVICE_FAMILY: 1
-        ENABLE_PREVIEWS: YES
-
-  YeelightControlTests:
-    type: bundle.unit-test
-    platform: iOS
-    sources:
-      - path: Tests/YeelightControlTests
-    dependencies:
-      - target: YeelightControl
-    settings:
-      base:
-        BUNDLE_LOADER: $(TEST_HOST)
-        TEST_HOST: $(BUILT_PRODUCTS_DIR)/YeelightControl.app/YeelightControl
-
-schemes:
-  YeelightControl:
-    build:
-      targets:
-        YeelightControl: all
-        YeelightWidget: all
-    run:
-      config: Debug
-      commandLineArguments:
-        "-FIRDebugEnabled": true
-    profile:
-      config: Release
-    analyze:
-      config: Debug
-    archive:
-      config: Release
-    test:
-      config: Debug
-      gatherCoverageData: true
-      targets:
-        - name: YeelightControlTests
-          parallelizable: true
-          randomExecutionOrder: true
-EOL
-
-# Generate Xcode project
-echo "🛠️ Generating Xcode project..."
-xcodegen generate
-
-echo "✨ Project setup complete!"
+echo "✅ Setup complete!"
 
 # Try to open the Xcode project
 if [ -d "YeelightControl.xcodeproj" ]; then
