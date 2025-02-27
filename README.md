@@ -145,21 +145,20 @@ YeelightControl/
 │
 ├── Resources/        # App resources
 │   ├── Assets/       # Images and assets
-│   ├── Configs/      # Configuration files
-│   │   ├── Package.swift  # Swift package definition
-│   │   └── project.yml    # XcodeGen configuration
 │   └── Localization/ # Localization files
 │
 ├── Scripts/         # Development scripts
-│   ├── setup_xcode_project.sh  # Generate Xcode project
-│   ├── cleanup.sh              # Clean temporary files
-│   ├── reorganize.sh           # Maintain project structure
+│   ├── setup_xcode_project.sh  # Generate Xcode project and configs
+│   ├── reorganize.sh           # Clean and maintain project structure
 │   └── git_push.sh            # Git push helper
 │
 ├── Tests/          # Test files
 │   └── YeelightControlTests/  # Unit tests
 │
 └── .github/        # GitHub configuration
+
+Note: Configuration files (project.yml, Package.swift) are generated 
+      in Resources/Configs/ by setup_xcode_project.sh
 ```
 
 ### Development Scripts
@@ -175,6 +174,8 @@ I've provided several utility scripts to help maintain the project:
    - Sets up main app and widget targets
    - Configures build settings
    - Creates initial SwiftUI views
+   - Generates configuration files in Resources/Configs/
+   - Sets up proper scheme configurations
 
 2. **Project Cleanup and Reorganization**
    ```bash
@@ -214,17 +215,17 @@ I've designed the development workflow to be smooth and maintainable:
    # Install required tools
    brew install xcodegen
    
-   # Generate project
+   # Generate project and configs
    ./Scripts/setup_xcode_project.sh
    ```
 
 2. **Daily Development**
    - Work directly in the `/Sources` directory
    - All source code changes should be made in the appropriate `/Sources` subdirectories
-   - The `/Build` directory is temporary and automatically generated
+   - The `/Build` and `/Resources/Configs` directories are temporary and automatically generated
    - Run `./Scripts/setup_xcode_project.sh` when you need to test in Xcode
    - Use your preferred editor to modify source files
-   - Changes are tracked in git from the `/Sources` and `/Resources` directories
+   - Changes are tracked in git from the `/Sources` and `/Resources` directories (except `/Resources/Configs`)
 
 3. **Before Committing**
    ```bash
