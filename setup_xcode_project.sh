@@ -19,17 +19,23 @@ if [ ! -d "$SOURCE_DIR" ]; then
     exit 1
 fi
 
-# Clean up any existing Xcode directory
-if [ -d "$XCODE_DIR" ]; then
-    echo "🧹 Cleaning up existing Xcode directory..."
-    rm -rf "$XCODE_DIR"
+# Create Xcode directory if it doesn't exist
+if [ ! -d "$XCODE_DIR" ]; then
+    echo "📁 Creating Xcode directory..."
+    mkdir -p "$XCODE_DIR"
 fi
 
-# Create Xcode directory
-echo "📁 Creating Xcode directory structure..."
+# Clean up existing Xcode directory contents but keep the directory
+echo "🧹 Cleaning up existing Xcode directory contents..."
+rm -rf "$XCODE_DIR"/*
+
+# Ensure Xcode directory exists after cleanup
 mkdir -p "$XCODE_DIR"
 mkdir -p "$XCODE_DIR/$PROJECT_NAME"
 mkdir -p "$XCODE_DIR/$PROJECT_NAME/Resources"
+
+# Create a .gitkeep file to maintain the directory structure
+touch "$XCODE_DIR/.gitkeep"
 
 # Create Resources directory if it doesn't exist
 if [ ! -d "$WORKSPACE_ROOT/Resources" ]; then
@@ -173,9 +179,26 @@ DEST_FILE_COUNT=$(find "$XCODE_DIR/$PROJECT_NAME" -type f -name "*.swift" | wc -
 echo "📊 Swift files in source: $SOURCE_FILE_COUNT"
 echo "📊 Swift files copied to destination: $DEST_FILE_COUNT"
 
-# Check if tuist is installed (preferred method)
-if command -v tuist &> /dev/null; then
-    echo "🔧 Using tuist to generate Xcode project..."
+# Try multiple project generation methods in order of preference
+PROJECT_GENERATED=false
+
+# Method 1: Try using Swift Package Manager to generate an Xcode project
+if [ "$PROJECT_GENERATED" = false ]; then
+    echo "🔧 Attempting to generate Xcode project using Swift Package Manager..."
+    
+    cd "$XCODE_DIR"
+    if swift package generate-xcodeproj 2>/dev/null; then
+        echo "✅ Successfully generated Xcode project using Swift Package Manager"
+        PROJECT_GENERATED=true
+    else
+        echo "⚠️ Swift Package Manager failed to generate the project. Trying next method..."
+        cd "$WORKSPACE_ROOT"
+    fi
+fi
+
+# Method 2: Try using tuist if installed
+if [ "$PROJECT_GENERATED" = false ] && command -v tuist &> /dev/null; then
+    echo "🔧 Attempting to generate Xcode project using tuist..."
     
     # Create Project.swift for tuist
     mkdir -p "$XCODE_DIR/Project"
@@ -184,7 +207,7 @@ import ProjectDescription
 
 let project = Project(
     name: "$PROJECT_NAME",
-    organizationName: "Daniel Kng",
+    organizationName: "knng",
     options: .options(
         automaticSchemesOptions: .disabled,
         disableBundleAccessors: false,
@@ -194,7 +217,7 @@ let project = Project(
     settings: .settings(
         base: [
             "DEVELOPMENT_TEAM": "",
-            "PRODUCT_BUNDLE_IDENTIFIER": "com.danielkng.$PROJECT_NAME",
+            "PRODUCT_BUNDLE_IDENTIFIER": "de.knng.$PROJECT_NAME",
             "MARKETING_VERSION": "1.0.0",
             "CURRENT_PROJECT_VERSION": "1",
             "SWIFT_VERSION": "5.5",
@@ -210,7 +233,7 @@ let project = Project(
             name: "$PROJECT_NAME",
             platform: .iOS,
             product: .app,
-            bundleId: "com.danielkng.$PROJECT_NAME",
+            bundleId: "de.knng.$PROJECT_NAME",
             infoPlist: .file(path: "$PROJECT_NAME/Info.plist"),
             sources: ["$PROJECT_NAME/**/*.swift"],
             resources: [
@@ -236,27 +259,26 @@ EOL
 
     # Generate project with tuist
     cd "$XCODE_DIR"
-    tuist generate || {
+    if tuist generate 2>/dev/null; then
+        echo "✅ Successfully generated Xcode project using tuist"
+        PROJECT_GENERATED=true
+    else
         echo "⚠️ Tuist failed to generate the project. This might be due to Xcode path issues."
         echo "Try running: sudo xcode-select -s /Applications/Xcode.app"
-        echo "Then run this script again."
-        echo "Falling back to alternative project generation method..."
+        echo "Trying next method..."
         cd "$WORKSPACE_ROOT"
-    }
-    
-    if [ -d "$XCODE_DIR/$PROJECT_NAME.xcodeproj" ]; then
-        echo "✅ Created Xcode project with tuist"
     fi
+fi
     
-# Check if xcodegen is installed (alternative method)
-elif command -v xcodegen &> /dev/null; then
-    echo "🔧 Using xcodegen to generate Xcode project..."
+# Method 3: Try using xcodegen if installed
+if [ "$PROJECT_GENERATED" = false ] && command -v xcodegen &> /dev/null; then
+    echo "🔧 Attempting to generate Xcode project using xcodegen..."
     
     # Create project.yml for xcodegen
     cat > "$XCODE_DIR/project.yml" << EOL
 name: $PROJECT_NAME
 options:
-  bundleIdPrefix: com.danielkng
+  bundleIdPrefix: de.knng
   deploymentTarget:
     iOS: 15.0
 targets:
@@ -286,23 +308,19 @@ EOL
 
     # Run xcodegen
     cd "$XCODE_DIR"
-    xcodegen generate || {
+    if xcodegen generate 2>/dev/null; then
+        echo "✅ Successfully generated Xcode project using xcodegen"
+        PROJECT_GENERATED=true
+    else
         echo "⚠️ XcodeGen failed to generate the project."
-        echo "Falling back to alternative project generation method..."
+        echo "Trying next method..."
         cd "$WORKSPACE_ROOT"
-    }
-    
-    if [ -d "$XCODE_DIR/$PROJECT_NAME.xcodeproj" ]; then
-        echo "✅ Created Xcode project with xcodegen"
     fi
-    
-else
-    echo "⚠️ Neither tuist nor xcodegen found. Using manual project creation method..."
 fi
 
-# If neither tuist nor xcodegen succeeded, create a basic project structure
-if [ ! -d "$XCODE_DIR/$PROJECT_NAME.xcodeproj" ]; then
-    echo "📝 Creating basic Xcode project structure..."
+# Method 4: Create a basic project structure manually as a last resort
+if [ "$PROJECT_GENERATED" = false ]; then
+    echo "📝 Creating basic Xcode project structure manually..."
     
     # Create a basic xcodeproj structure
     mkdir -p "$XCODE_DIR/$PROJECT_NAME.xcodeproj"
@@ -317,7 +335,7 @@ if [ ! -d "$XCODE_DIR/$PROJECT_NAME.xcodeproj" ]; then
 	objectVersion = 55;
 	objects = {
 		LastUpgradeCheck = 1320;
-		ORGANIZATIONNAME = "Daniel Kng";
+		ORGANIZATIONNAME = "knng";
 		TargetAttributes = {
 			IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 		};
@@ -327,10 +345,8 @@ if [ ! -d "$XCODE_DIR/$PROJECT_NAME.xcodeproj" ]; then
 EOL
     
     echo "⚠️ Created minimal Xcode project structure."
-    echo "⚠️ You will need to manually configure the project in Xcode:"
-    echo "  1. Open Xcode and create a new iOS App project named $PROJECT_NAME"
-    echo "  2. Close the project and replace the generated files with your source files"
-    echo "  3. Reopen the project and configure as needed"
+    echo "⚠️ You may need to manually configure the project in Xcode."
+    PROJECT_GENERATED=true
 fi
 
 # Create a script to open the project in Xcode
@@ -351,9 +367,6 @@ fi
 EOL
 chmod +x "$XCODE_DIR/open_project.sh"
 
-# Create a .gitkeep file to maintain the directory structure
-touch "$XCODE_DIR/.gitkeep"
-
 # Verify app entry point files exist
 echo "🔍 Verifying app entry point files..."
 if [ -f "$XCODE_DIR/$PROJECT_NAME/App/YeelightApp.swift" ]; then
@@ -372,6 +385,18 @@ if [ -f "$XCODE_DIR/$PROJECT_NAME/UI/Views/MainView.swift" ]; then
     echo "✅ Found MainView.swift"
 else
     echo "⚠️ Warning: MainView.swift not found in expected location"
+fi
+
+# Create a fallback Xcode project using Xcode's command line tools if all else failed
+if [ ! -d "$XCODE_DIR/$PROJECT_NAME.xcodeproj" ] && [ ! -d "$XCODE_DIR/$PROJECT_NAME.xcworkspace" ]; then
+    echo "⚠️ No Xcode project was successfully generated. Creating a fallback project..."
+    
+    # Create a basic app structure that Xcode can open
+    mkdir -p "$XCODE_DIR/$PROJECT_NAME.xcodeproj"
+    touch "$XCODE_DIR/$PROJECT_NAME.xcodeproj/project.pbxproj"
+    
+    echo "⚠️ Created a minimal fallback project structure."
+    echo "⚠️ You will need to manually configure the project in Xcode."
 fi
 
 echo ""
