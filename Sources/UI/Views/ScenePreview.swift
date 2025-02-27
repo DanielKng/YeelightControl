@@ -1,14 +1,120 @@
 import SwiftUI
 
 struct ScenePreview: View {
-    let scene: YeelightManager.Scene
-    let devices: [YeelightDevice]
-    @StateObject private var deviceManager = YeelightManager.shared
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var yeelightManager: YeelightManager
+    
+    let scene: Scene
     @State private var isPlaying = false
-    @State private var previewTimer: Timer?
-    @State private var currentStep = 0
+    @State private var showingError = false
+    @State private var errorMessage = ""
     
     var body: some View {
+        UnifiedDetailView(
+            title: scene.name,
+            subtitle: "\(scene.devices.count) devices",
+            headerContent: {
+                VStack(spacing: 16) {
+                    Image(systemName: scene.icon)
+                        .font(.system(size: 48))
+                        .foregroundColor(.accentColor)
+                    
+                    Text(scene.description ?? "No description")
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding(.vertical)
+            },
+            mainContent: {
+                UnifiedListView(
+                    title: "Device States",
+                    items: scene.devices,
+                    emptyStateMessage: "No devices in this scene"
+                ) { device in
+                    DeviceStateRow(device: device)
+                }
+            },
+            onEdit: {
+                // Handle edit action
+            },
+            onDelete: {
+                // Handle delete action
+            },
+            onShare: {
+                // Handle share action
+            }
+        )
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: toggleScene) {
+                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        .imageScale(.large)
+                }
+            }
+        }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage)
+        }
+    }
+    
+    private func toggleScene() {
+        do {
+            if isPlaying {
+                try yeelightManager.stopScene(scene)
+            } else {
+                try yeelightManager.playScene(scene)
+            }
+            isPlaying.toggle()
+        } catch {
+            errorMessage = error.localizedDescription
+            showingError = true
+        }
+    }
+}
+
+struct DeviceStateRow: View {
+    let device: Device
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "lightbulb.fill")
+                .foregroundColor(device.isOn ? .yellow : .gray)
+            
+            VStack(alignment: .leading) {
+                Text(device.name)
+                    .font(.headline)
+                
+                HStack {
+                    if device.isOn {
+                        Text("Brightness: \(device.brightness)%")
+                        if device.colorTemperature > 0 {
+                            Text("• Temp: \(device.colorTemperature)K")
+                        }
+                        if device.color != nil {
+                            Circle()
+                                .fill(Color(device.color!))
+                                .frame(width: 12, height: 12)
+                        }
+                    } else {
+                        Text("Off")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .font(.caption)
+            }
+            
+            Spacer()
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+#Preview {
+    NavigationView {
+        ScenePreview(scene: Scene.preview)
         VStack(spacing: 20) {
             // Preview visualization
             ZStack {

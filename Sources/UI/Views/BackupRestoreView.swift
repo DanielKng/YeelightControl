@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import Foundation
 
 struct BackupData: Codable {
     let settings: [String: Any]
@@ -9,26 +10,23 @@ struct BackupData: Codable {
     let version: Int = 1
     
     enum CodingKeys: String, CodingKey {
-        case settings, scenes, groups, automations, version
+        case settings
+        case scenes
+        case automations
     }
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        settings = try container.decode([String: AnyDecodable].self, forKey: .settings)
-            .mapValues { $0.value }
+        settings = try container.decode([String: AnyCodable].self, forKey: .settings)
         scenes = try container.decode([DeviceStorage.SavedScene].self, forKey: .scenes)
-        groups = try container.decode([DeviceGroupManager.DeviceGroup].self, forKey: .groups)
         automations = try container.decode([Automation].self, forKey: .automations)
-        version = try container.decode(Int.self, forKey: .version)
     }
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(settings.mapValues(AnyEncodable.init), forKey: .settings)
+        try container.encode(settings as [String: AnyCodable], forKey: .settings)
         try container.encode(scenes, forKey: .scenes)
-        try container.encode(groups, forKey: .groups)
         try container.encode(automations, forKey: .automations)
-        try container.encode(version, forKey: .version)
     }
 }
 

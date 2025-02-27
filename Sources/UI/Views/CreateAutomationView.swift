@@ -147,7 +147,7 @@ struct CreateAutomationView: View {
                 }
             }
             .sheet(isPresented: $showingSceneSelector) {
-                SceneSelector(selectedScene: $selectedScene)
+                ScenePickerView(selectedScene: $selectedScene)
             }
             .sheet(isPresented: $showingLocationPicker) {
                 LocationPicker(selectedLocation: $selectedLocation)

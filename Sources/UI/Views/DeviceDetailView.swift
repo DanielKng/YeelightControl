@@ -15,76 +15,50 @@ struct DeviceDetailView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Header with device status
-                    DeviceHeader(device: device, manager: manager)
-                    
-                    // Tab selector
-                    Picker("Mode", selection: $selectedTab) {
-                        Text("Basic").tag(Tab.basic)
-                        Text("Color").tag(Tab.color)
-                        Text("Effects").tag(Tab.effects)
-                        Text("Scenes").tag(Tab.scenes)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    
-                    // Content based on selected tab
-                    Group {
-                        switch selectedTab {
-                        case .basic:
-                            BasicControls(device: device, manager: manager)
-                        case .color:
-                            ColorControls(device: device, manager: manager)
-                        case .effects:
-                            EffectsView(device: device, manager: manager)
-                        case .scenes:
-                            ScenesView(device: device, manager: manager)
-                        }
-                    }
-                    .padding(.horizontal)
+        UnifiedDetailView(
+            title: device.name,
+            subtitle: device.isOn ? "Connected - On" : "Connected - Off",
+            onEdit: { showingNameEdit = true },
+            onDelete: {
+                Task {
+                    await manager.removeDevice(device)
+                    dismiss()
                 }
             }
-            .navigationTitle(device.name)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(action: { showingNameEdit = true }) {
-                            Label("Rename", systemImage: "pencil")
-                        }
-                        
-                        Button(action: { showingAdvancedSettings = true }) {
-                            Label("Advanced Settings", systemImage: "gear")
-                        }
-                        
-                        Button(role: .destructive, action: {
-                            manager.clearDevices()
-                            dismiss()
-                        }) {
-                            Label("Forget Device", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
+        ) {
+            // Header
+            DeviceHeader(device: device, manager: manager)
+        } content: {
+            VStack(spacing: 20) {
+                // Tab selector
+                UnifiedTabSelector(
+                    selection: $selectedTab,
+                    tabs: [
+                        .init("Basic", icon: "slider.horizontal.3", tag: Tab.basic),
+                        .init("Color", icon: "paintpalette", tag: Tab.color),
+                        .init("Effects", icon: "sparkles", tag: Tab.effects),
+                        .init("Scenes", icon: "theatermasks", tag: Tab.scenes)
+                    ],
+                    style: .underlined
+                )
                 
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") { dismiss() }
+                // Content based on selected tab
+                Group {
+                    switch selectedTab {
+                    case .basic:
+                        BasicControls(device: device, manager: manager)
+                    case .color:
+                        ColorControls(device: device, manager: manager)
+                    case .effects:
+                        EffectsView(device: device, manager: manager)
+                    case .scenes:
+                        ScenesView(device: device, manager: manager)
+                    }
                 }
             }
-            .alert("Rename Device", isPresented: $showingNameEdit) {
-                TextField("Device Name", text: $tempName)
-                Button("Cancel", role: .cancel) { }
-                Button("Save") {
-                    manager.setName(device, name: tempName)
-                }
-            }
-            .sheet(isPresented: $showingAdvancedSettings) {
-                AdvancedSettingsView(device: device, manager: manager)
-            }
+        }
+        .sheet(isPresented: $showingNameEdit) {
+            EditDeviceNameView(device: device, manager: manager)
         }
     }
 }

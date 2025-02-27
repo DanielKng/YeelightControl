@@ -122,63 +122,78 @@ Need more help? Check the [full troubleshooting guide](https://github.com/Daniel
 
 ### Project Structure
 
-I've designed YeelightControl with a unique project structure that separates source code from the Xcode build environment:
+I've designed YeelightControl with a clean and modular project structure:
 
 ```
 YeelightControl/
-├── Sources/        # Main source code (development happens here)
-│   ├── App/          # Main app setup
+├── Sources/           # Main source code
 │   ├── Core/         # Core functionality
-│   │   ├── Networking/   # Network operations
-│   │   ├── Device/      # Device management
-│   │   ├── Utils/       # Utilities
-│   │   ├── Background/  # Background tasks
-│   │   └── Storage/     # Data persistence
+│   │   ├── Analytics/     # Analytics tracking
+│   │   ├── Background/    # Background tasks
+│   │   ├── Configuration/ # App configuration
+│   │   ├── Device/       # Device management
+│   │   ├── Effect/       # Effect implementations
+│   │   ├── Error/        # Error handling
+│   │   ├── Location/     # Location services
+│   │   ├── Network/      # Network operations
+│   │   ├── Notification/ # Notification handling
+│   │   ├── Permission/   # Permission management
+│   │   ├── Scene/        # Scene core logic
+│   │   ├── Security/     # Security features
+│   │   ├── Services/     # Core services
+│   │   ├── State/        # State management
+│   │   └── Storage/      # Data persistence
+│   │
 │   ├── Features/     # Main features
-│   │   ├── Scenes/      # Scene management
-│   │   ├── Rooms/       # Room organization
-│   │   ├── Effects/     # Light effects
-│   │   ├── Groups/      # Group management
-│   │   └── Automation/  # Automation system
-│   ├── UI/           # UI components
-│   └── Widget/       # Widget extension
+│   │   ├── Automation/   # Automation system
+│   │   ├── Effects/      # Light effects
+│   │   ├── Rooms/        # Room organization
+│   │   └── Scenes/       # Scene management
+│   │
+│   ├── UI/          # UI layer
+│   │   ├── Components/   # Reusable UI components
+│   │   └── Views/        # Screen views
+│   │
+│   └── Tests/       # Test files
 │
-├── Xcode/         # Generated Xcode project (for building only)
-│   ├── YeelightControl/
-│   ├── YeelightControl.xcodeproj/
-│   └── YeelightControl.xcworkspace/
-│
-└── setup_xcode_project.sh  # Script to generate Xcode project from Sources
+├── Resources/       # App resources
+├── Frameworks/      # External frameworks
+└── setup_xcode_project.sh  # Script to generate Xcode project
 ```
 
-This separation allows for:
-- Clean source code management without Xcode project file noise
-- Easy script-based project generation
-- Better git workflow with fewer conflicts
-- Simplified CI/CD integration
+This structure provides:
+- Clear separation of concerns between core functionality and features
+- Modular architecture for easy maintenance and testing
+- Centralized UI components for consistent design
+- Dedicated test directory for comprehensive testing
 
 ### Development Workflow
 
-1. Make changes to files in the `/Sources` directory
-2. Run `./setup_xcode_project.sh` to update the Xcode project
-3. Open the generated workspace in `/Xcode` to build and run
+1. Clone the repository and navigate to the project directory
+2. Run `./reorganize.sh` to ensure proper directory structure
+3. Run `./setup_xcode_project.sh` to generate the Xcode project
+4. Open the project and start development
 
 ### Technical Highlights
 
-- **SwiftUI Framework**: I've built the app with modern declarative UI
-- **Combine Framework**: I've used reactive programming for state management
-- **Background Tasks**: I've implemented reliable background updates
-- **WidgetKit**: I've created home screen widgets for quick control
-- **Network Discovery**: I've added automatic device detection using Bonjour
-- **Async/Await**: I've utilized modern concurrency for network operations
+- **SwiftUI Framework**: Modern declarative UI with the latest iOS features
+- **Combine Framework**: Reactive programming for robust state management
+- **Core Services**: Modular core services architecture for maintainability
+- **Analytics Integration**: Built-in analytics for usage insights
+- **Security Layer**: Dedicated security features for data protection
+- **State Management**: Centralized state handling with Combine
+- **Network Layer**: Robust networking with async/await
+- **UI Components**: Reusable component library for consistent design
+- **Automated Testing**: Comprehensive test suite in dedicated test directory
 
 ### Module Documentation
 
 For detailed documentation on specific modules, see:
-- [Device Module Documentation](Sources/Core/Device/DEVICE_MODULE.md)
-- [Scenes Feature Documentation](Sources/Features/Scenes/SCENES_FEATURE.md)
-
-> **Note**: To avoid build conflicts, all module-specific README files have been renamed to follow the pattern `MODULE_README.md` or given unique names like `DEVICE_MODULE.md`. This prevents the "Multiple commands produce README.md" error during build.
+- [Analytics Documentation](Sources/Core/Analytics/README.md)
+- [Device Documentation](Sources/Core/Device/README.md)
+- [Network Documentation](Sources/Core/Network/README.md)
+- [Security Documentation](Sources/Core/Security/README.md)
+- [Services Documentation](Sources/Core/Services/README.md)
 
 ### Building from Source
 
@@ -189,18 +204,18 @@ For detailed documentation on specific modules, see:
 - iOS 15.0+
 - Xcode 13.0+
 - Swift 5.5+
-- xcodegen (`brew install xcodegen`)
 
 #### Steps
-1. Clone my repository
+1. Clone the repository
 ```bash
 git clone https://github.com/DanielKng/YeelightControl.git
 cd YeelightControl
 ```
 
-2. Install xcodegen if you haven't already
+2. Run the reorganization script
 ```bash
-brew install xcodegen
+chmod +x ./reorganize.sh
+./reorganize.sh
 ```
 
 3. Generate the Xcode project
@@ -209,44 +224,26 @@ chmod +x ./setup_xcode_project.sh
 ./setup_xcode_project.sh
 ```
 
-4. Open the project
-```bash
-cd Xcode
-./open_project.sh
-```
-
-> **Important**: The `/Xcode` directory is generated by the setup script and is NOT tracked by Git. 
-> Do not manually commit any files from this directory as they are automatically generated.
-
-5. Configure signing and build
+4. Open the generated Xcode project and build
 
 #### Troubleshooting Project Generation
-If you encounter issues with the generated Xcode project:
+If you encounter issues with the project generation:
 
-1. Verify xcodegen is installed correctly:
+1. Ensure all scripts have proper permissions:
 ```bash
-xcodegen --version
+chmod +x ./*.sh
 ```
 
-2. If xcodegen is not found, install it:
-```bash
-brew install xcodegen
-```
+2. If you see build errors:
+   - Clean the build folder (Cmd + Shift + K in Xcode)
+   - Clean the build cache (Cmd + Shift + Alt + K in Xcode)
+   - Delete derived data and rebuild
 
-3. If you see an error about Xcode's Info.plist:
-```
-Couldn't find Xcode's Info.plist at /Library/Contents/Info.plist
-```
-Run the following command to set your Xcode path correctly:
-```bash
-sudo xcode-select -s /Applications/Xcode.app
-```
-Then run the setup script again.
+3. For any other issues:
+   - Check the console output for specific error messages
+   - Ensure all required dependencies are properly installed
+   - Verify your Xcode installation is up to date
 
-4. If issues persist, you can create a new Xcode project manually:
-   - Create a new iOS App project with SwiftUI interface in Xcode
-   - Add the source files from the `/Sources` directory
-   - Configure the Info.plist with required permissions for network and microphone access
 </details>
 
 ## 👥 Contributing

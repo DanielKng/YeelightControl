@@ -17,67 +17,80 @@ struct DeviceSetupView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                // Progress indicator
-                StepIndicator(currentStep: setupStep)
-                    .padding(.top)
-                
-                ScrollView {
-                    VStack(spacing: 30) {
-                        switch setupStep {
-                        case .naming:
-                            NamingStep(deviceName: $deviceName, device: device)
-                        case .room:
-                            RoomSelectionStep(
-                                selectedRoom: $selectedRoom,
-                                rooms: roomManager.rooms
+            UnifiedSettingsView(
+                title: "Device Setup",
+                sections: [
+                    SettingsSection(
+                        header: "Device Information",
+                        items: [
+                            SettingsItem(
+                                title: "Device Name",
+                                subtitle: "Enter a name for your device",
+                                icon: "textbox",
+                                type: .custom(AnyView(
+                                    TextField("Device Name", text: $deviceName)
+                                        .textFieldStyle(.roundedBorder)
+                                ))
+                            ),
+                            SettingsItem(
+                                title: "IP Address",
+                                icon: "network",
+                                type: .value(device.ip)
                             )
-                        case .testing:
-                            TestingStep(
-                                device: device,
-                                manager: manager,
-                                isTestingConnection: $isTestingConnection
+                        ]
+                    ),
+                    SettingsSection(
+                        header: "Room Assignment",
+                        items: roomManager.rooms.map { room in
+                            SettingsItem(
+                                title: room.name,
+                                icon: room.icon,
+                                type: .toggle(isOn: Binding(
+                                    get: { selectedRoom == room.id },
+                                    set: { if $0 { selectedRoom = room.id } }
+                                ))
                             )
-                        case .complete:
-                            CompleteStep(deviceName: deviceName)
                         }
-                    }
-                    .padding()
-                }
-                
-                // Navigation buttons
-                if setupStep != .complete {
-                    HStack {
-                        Button("Back") {
-                            withAnimation {
-                                moveBack()
-                            }
+                    ),
+                    SettingsSection(
+                        header: "Connection Test",
+                        items: [
+                            SettingsItem(
+                                title: "Test Connection",
+                                subtitle: "Verify device connectivity",
+                                icon: "antenna.radiowaves.left.and.right",
+                                type: .button {
+                                    isTestingConnection = true
+                                    Task {
+                                        try? await manager.testConnection(device)
+                                        isTestingConnection = false
+                                        setupStep = .complete
+                                    }
+                                }
+                            )
+                        ]
+                    )
+                ],
+                footer: "Make sure your device is connected to the same network as your phone."
+            )
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if setupStep == .complete {
+                        Button("Done") {
+                            saveDeviceSetup()
+                            dismiss()
                         }
-                        .disabled(setupStep == .naming)
-                        
-                        Spacer()
-                        
-                        Button(setupStep == .testing ? "Complete" : "Next") {
-                            withAnimation {
-                                moveForward()
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!canMoveForward)
+                        .disabled(deviceName.isEmpty)
                     }
-                    .padding()
-                } else {
-                    Button("Done") {
-                        saveDeviceSetup()
-                        dismiss()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .padding()
                 }
             }
-            .navigationTitle("Setup New Device")
-            .navigationBarTitleDisplayMode(.inline)
-            .interactiveDismissDisabled()
+            .overlay {
+                if isTestingConnection {
+                    ProgressView("Testing connection...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(.ultraThinMaterial)
+                }
+            }
         }
     }
     

@@ -7,20 +7,16 @@ struct HelpView: View {
     
     enum HelpTopic: String, CaseIterable {
         case gettingStarted = "Getting Started"
-        case deviceSetup = "Device Setup"
+        case basicControls = "Basic Controls"
         case scenes = "Scenes"
-        case automations = "Automations"
-        case troubleshooting = "Troubleshooting"
-        case advanced = "Advanced Features"
+        case advanced = "Advanced"
         
         var icon: String {
             switch self {
             case .gettingStarted: return "star"
-            case .deviceSetup: return "plus.circle"
+            case .basicControls: return "slider.horizontal.3"
             case .scenes: return "theatermasks"
-            case .automations: return "clock"
-            case .troubleshooting: return "exclamationmark.triangle"
-            case .advanced: return "gear"
+            case .advanced: return "gearshape.2"
             }
         }
         
@@ -29,115 +25,69 @@ struct HelpView: View {
             case .gettingStarted:
                 return [
                     HelpSection(
-                        title: "Welcome to YeelightControl",
-                        content: "YeelightControl is a powerful app for managing your Yeelight smart lighting devices. This guide will help you get started with the basic features.",
+                        title: "Welcome to Yeelight Control",
+                        content: "Get started with your smart lighting:",
                         steps: [
-                            "Make sure your Yeelight devices are connected to your WiFi network",
-                            "Enable LAN Control in the official Yeelight app",
-                            "Launch YeelightControl and allow local network access",
-                            "Your devices will be discovered automatically"
+                            "Connect your Yeelight devices to your WiFi network",
+                            "Enable LAN Control in the Yeelight app",
+                            "Open this app and discover your devices",
+                            "Start controlling your lights"
                         ]
                     ),
                     HelpSection(
-                        title: "Basic Controls",
-                        content: "Learn how to control your lights:",
+                        title: "Device Discovery",
+                        content: "Finding your devices:",
                         steps: [
-                            "Tap a device to access detailed controls",
-                            "Use the power toggle to turn lights on/off",
-                            "Adjust brightness with the slider",
-                            "Change colors or color temperature"
+                            "Ensure devices are on the same network",
+                            "Tap 'Search for Devices' in the main view",
+                            "Wait for devices to appear",
+                            "Tap a device to start controlling"
                         ]
                     )
                 ]
-            case .deviceSetup:
+            case .basicControls:
                 return [
                     HelpSection(
-                        title: "Adding New Devices",
-                        content: "To add a new Yeelight device:",
+                        title: "Light Controls",
+                        content: "Basic light operations:",
                         steps: [
-                            "Set up the device using the official Yeelight app",
-                            "Connect it to your WiFi network",
-                            "Enable LAN Control in device settings",
-                            "Open YeelightControl and tap 'Discover Devices'"
+                            "Toggle power on/off",
+                            "Adjust brightness",
+                            "Change color temperature",
+                            "Select RGB colors"
                         ]
                     ),
                     HelpSection(
-                        title: "Device Organization",
-                        content: "Keep your devices organized:",
+                        title: "Device Management",
+                        content: "Managing your devices:",
                         steps: [
-                            "Create rooms to group devices",
-                            "Name your devices for easy identification",
-                            "Arrange devices in your preferred order",
-                            "Use tags for better organization"
+                            "Rename devices",
+                            "Group devices together",
+                            "Remove devices",
+                            "Update device settings"
                         ]
                     )
                 ]
             case .scenes:
                 return [
                     HelpSection(
-                        title: "Creating Scenes",
-                        content: "Scenes let you save and recall lighting configurations:",
+                        title: "Scene Creation",
+                        content: "Create custom scenes:",
                         steps: [
-                            "Choose between basic, preset, or custom scenes",
-                            "Select the devices to include",
-                            "Configure colors, brightness, and effects",
-                            "Save the scene with a memorable name"
+                            "Choose scene type",
+                            "Select devices",
+                            "Configure settings",
+                            "Save and apply scenes"
                         ]
                     ),
                     HelpSection(
-                        title: "Multi-Device Effects",
-                        content: "Create coordinated lighting effects:",
+                        title: "Scene Management",
+                        content: "Managing your scenes:",
                         steps: [
-                            "Select multiple devices",
-                            "Choose from various effect types",
-                            "Customize colors and timing",
-                            "Preview and save your creation"
-                        ]
-                    )
-                ]
-            case .automations:
-                return [
-                    HelpSection(
-                        title: "Setting Up Automations",
-                        content: "Automate your lighting with triggers and actions:",
-                        steps: [
-                            "Choose a trigger (time, location, etc.)",
-                            "Select the devices to control",
-                            "Configure the desired action",
-                            "Enable/disable as needed"
-                        ]
-                    ),
-                    HelpSection(
-                        title: "Trigger Types",
-                        content: "Available automation triggers:",
-                        steps: [
-                            "Time-based triggers",
-                            "Sunrise/Sunset triggers",
-                            "Location-based triggers",
-                            "Device connection triggers"
-                        ]
-                    )
-                ]
-            case .troubleshooting:
-                return [
-                    HelpSection(
-                        title: "Common Issues",
-                        content: "Solutions for common problems:",
-                        steps: [
-                            "Ensure devices are powered on and connected to WiFi",
-                            "Check that LAN Control is enabled",
-                            "Verify network permissions in app settings",
-                            "Try restarting problematic devices"
-                        ]
-                    ),
-                    HelpSection(
-                        title: "Network Issues",
-                        content: "Resolving network-related problems:",
-                        steps: [
-                            "Confirm devices are on the same network as your phone",
-                            "Check WiFi signal strength",
-                            "Restart your router if needed",
-                            "Use the Network Diagnostics tool"
+                            "Edit existing scenes",
+                            "Schedule scenes",
+                            "Delete scenes",
+                            "Share scenes"
                         ]
                     )
                 ]
@@ -177,29 +127,39 @@ struct HelpView: View {
     
     var body: some View {
         NavigationSplitView {
-            List(selection: $selectedTopic) {
-                ForEach(HelpTopic.allCases, id: \.self) { topic in
-                    Label(topic.rawValue, systemImage: topic.icon)
-                        .tag(topic)
-                }
+            UnifiedListView(
+                title: "Help Topics",
+                items: HelpTopic.allCases,
+                emptyStateMessage: ""
+            ) { topic in
+                Label(topic.rawValue, systemImage: topic.icon)
+                    .tag(topic)
+                    .foregroundColor(topic == selectedTopic ? .accentColor : .primary)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedTopic = topic
+                    }
             }
-            .navigationTitle("Help")
             .searchable(text: $searchText, prompt: "Search help topics")
         } detail: {
             if let topic = selectedTopic {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        ForEach(topic.content) { section in
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text(section.title)
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                                
-                                Text(section.content)
-                                    .font(.body)
-                                
-                                VStack(alignment: .leading, spacing: 8) {
-                                    ForEach(section.steps, id: \.self) { step in
+                UnifiedDetailView(
+                    title: topic.rawValue,
+                    mainContent: {
+                        VStack(alignment: .leading, spacing: 24) {
+                            ForEach(topic.content) { section in
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text(section.title)
+                                        .font(.title2)
+                                        .fontWeight(.semibold)
+                                    
+                                    Text(section.content)
+                                        .font(.body)
+                                    
+                                    UnifiedListView(
+                                        items: section.steps,
+                                        emptyStateMessage: ""
+                                    ) { step in
                                         HStack(alignment: .top) {
                                             Image(systemName: "circle.fill")
                                                 .font(.system(size: 6))
@@ -208,20 +168,17 @@ struct HelpView: View {
                                         }
                                     }
                                 }
-                                .padding(.leading, 4)
-                            }
-                            .padding(.horizontal)
-                            
-                            if section.id != topic.content.last?.id {
-                                Divider()
-                                    .padding(.horizontal)
+                                .padding(.horizontal)
+                                
+                                if section.id != topic.content.last?.id {
+                                    Divider()
+                                        .padding(.horizontal)
+                                }
                             }
                         }
+                        .padding(.vertical)
                     }
-                    .padding(.vertical)
-                }
-                .navigationTitle(topic.rawValue)
-                .navigationBarTitleDisplayMode(.inline)
+                )
             } else {
                 ContentUnavailableView(
                     "Select a Topic",

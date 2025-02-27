@@ -1,170 +1,262 @@
 #!/bin/bash
 
-# YeelightControl Xcode Project Generator
-PROJECT_NAME="YeelightControl"
-WORKSPACE_ROOT="$(pwd)"
-SOURCE_DIR="$WORKSPACE_ROOT/Sources"
-XCODE_DIR="$WORKSPACE_ROOT/Xcode"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-echo "🚀 Setting up Xcode project for $PROJECT_NAME..."
-
-# Verify Xcode installation
-if [ ! -d "/Applications/Xcode.app" ]; then
-    echo -e "${RED}Error: Xcode.app not found${NC}"
+# Check if Xcode is installed
+if ! command -v xcodebuild &> /dev/null; then
+    echo "Error: Xcode is not installed"
     exit 1
 fi
 
-# Clean and create directories
-rm -rf "$XCODE_DIR"
+# Check if xcodegen is installed
+if ! command -v xcodegen &> /dev/null; then
+    echo "Error: xcodegen is not installed. Please install it using 'brew install xcodegen'"
+    exit 1
+fi
+
+# Directory setup
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR="$SCRIPT_DIR"
+XCODE_DIR="$PROJECT_DIR/Xcode"
+SOURCES_DIR="$PROJECT_DIR/Sources"
+
+# Create Xcode directory if it doesn't exist
 mkdir -p "$XCODE_DIR"
 
-# Copy source files
-echo "📂 Copying source files..."
-cp -R "$SOURCE_DIR" "$XCODE_DIR/Sources"
+# Clean up previous Xcode project files but keep any user-specific settings
+if [ -d "$XCODE_DIR/YeelightControl.xcodeproj" ]; then
+    rm -rf "$XCODE_DIR/YeelightControl.xcodeproj"
+fi
 
-# Create project.yml
-echo "📝 Creating project configuration..."
-cat > "$XCODE_DIR/project.yml" << EOL
+# Remove old Sources directory in Xcode folder if it exists
+if [ -d "$XCODE_DIR/Sources" ]; then
+    rm -rf "$XCODE_DIR/Sources"
+fi
+
+# Copy Sources directory to Xcode folder
+echo "Copying source files to Xcode directory..."
+cp -R "$SOURCES_DIR" "$XCODE_DIR/"
+
+# Remove existing project.yml if it exists
+rm -f "$XCODE_DIR/project.yml"
+
+# Create new project.yml configuration
+cat << 'EOL' > "$XCODE_DIR/project.yml"
 name: YeelightControl
 options:
-  createIntermediateGroups: true
-  bundleIdPrefix: com.yeelightcontrol
+  bundleIdPrefix: de.knng.app.yeelightcontrol
   deploymentTarget:
-    iOS: 17.0
-  xcodeVersion: "15.0"
-packages:
-  SwiftLint:
-    url: https://github.com/realm/SwiftLint
-    from: 0.54.0
+    iOS: 15.0
+  xcodeVersion: "14.0"
+  groupSortPosition: top
+  generateEmptyDirectories: true
+  platform: iOS
+  defaultConfig: Debug
+
 settings:
   base:
-    DEVELOPMENT_TEAM: ""
-    CODE_SIGN_STYLE: Automatic
-    CODE_SIGN_IDENTITY: "Apple Development"
-    SWIFT_VERSION: "5.9"
-    GENERATE_INFOPLIST_FILE: YES
-    MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "1"
+    SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+    TARGETED_DEVICE_FAMILY: 1
+    SUPPORTS_MACCATALYST: NO
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+    SUPPORTS_VISION_OS: NO
+    IPHONEOS_DEPLOYMENT_TARGET: 15.0
+    ENABLE_MACCATALYST: NO
+    DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: NO
+
 targets:
   YeelightControl:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
-    sources:
-      - Sources/App
-      - Sources/Core
-      - Sources/Features
-      - Sources/UI
-      - Sources/Widget
-    info:
-      path: Sources/App/Info.plist
-      properties:
-        CFBundleDisplayName: YeelightControl
-        LSApplicationCategoryType: "public.app-category.utilities"
-        NSLocalNetworkUsageDescription: "YeelightControl needs access to your local network to discover and control Yeelight devices"
-        UIApplicationSceneManifest:
-          UIApplicationSupportsMultipleScenes: false
-          UISceneConfigurations: {}
-        UILaunchScreen: {}
-        UISupportedInterfaceOrientations:
-          - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
-        UISupportedInterfaceOrientations~ipad:
-          - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationPortraitUpsideDown
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
+    sources: 
+      - path: Sources/App
+    dependencies:
+      - target: Core
+        embed: true
+      - target: Features
+        embed: true
+      - target: UI
+        embed: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.yeelightcontrol.app
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        TARGETED_DEVICE_FAMILY: "1,2"
-        ENABLE_PREVIEWS: YES
-    preBuildScripts:
-      - name: SwiftLint
-        script: |
-          if which swiftlint > /dev/null; then
-            swiftlint
-          else
-            echo "warning: SwiftLint not installed"
-          fi
+        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_BGTaskSchedulerPermittedIdentifiers: ["de.knng.app.yeelightcontrol.refresh"]
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "YeelightControl needs access to your local network to discover and control Yeelight devices."
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_VISION_OS: NO
+        ENABLE_MACCATALYST: NO
+
+  Core:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Sources/Core
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.core
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0
+        DEFINES_MODULE: YES
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_VISION_OS: NO
+        ENABLE_MACCATALYST: NO
+
+  Features:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Sources/Features
+    dependencies:
+      - target: Core
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.features
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0
+        DEFINES_MODULE: YES
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_VISION_OS: NO
+        ENABLE_MACCATALYST: NO
+
+  UI:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Sources/UI
+    dependencies:
+      - target: Core
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.ui
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0
+        DEFINES_MODULE: YES
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_VISION_OS: NO
+        ENABLE_MACCATALYST: NO
+
+  Widget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Sources/Widget
+    dependencies:
+      - target: Core
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.widget
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0
+        INFOPLIST_KEY_CFBundleDisplayName: YeelightControl
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME: WidgetBackground
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_VISION_OS: NO
+        ENABLE_MACCATALYST: NO
+
+  YeelightControlTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Sources/Tests/UnitTests
+    dependencies:
+      - target: YeelightControl
+      - target: Core
+      - target: Features
+      - target: UI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.tests
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_VISION_OS: NO
+        ENABLE_MACCATALYST: NO
+
 schemes:
   YeelightControl:
     build:
       targets:
         YeelightControl: all
+        Core: [run, test]
+        Features: [run, test]
+        UI: [run, test]
+        Widget: [run, test]
     run:
       config: Debug
+      environmentVariables:
+        OS_ACTIVITY_MODE: disable
+      target: YeelightControl
+    test:
+      config: Debug
+      targets:
+        - YeelightControlTests
+      environmentVariables:
+        OS_ACTIVITY_MODE: disable
     profile:
       config: Release
     analyze:
       config: Debug
     archive:
       config: Release
+      customArchiveName: YeelightControl
+      revealArchiveInOrganizer: true
+
+  Widget:
+    build:
+      targets:
+        Widget: all
+        Core: [run, test]
+    run:
+      config: Debug
+      target: Widget
+
+default:
+  scheme: YeelightControl
 EOL
 
-# Create Info.plist directory
-mkdir -p "$XCODE_DIR/Sources/App"
-cat > "$XCODE_DIR/Sources/App/Info.plist" << EOL
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
-    <key>CFBundleExecutable</key>
-    <string>\$(EXECUTABLE_NAME)</string>
-    <key>CFBundleIdentifier</key>
-    <string>\$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>\$(PRODUCT_NAME)</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>\$(MARKETING_VERSION)</string>
-    <key>CFBundleVersion</key>
-    <string>\$(CURRENT_PROJECT_VERSION)</string>
-    <key>LSRequiresIPhoneOS</key>
-    <true/>
-</dict>
-</plist>
-EOL
+# Generate new Xcode project
+cd "$XCODE_DIR" && xcodegen generate
 
-# Generate project using xcodegen
-echo "🔨 Generating Xcode project..."
-cd "$XCODE_DIR"
-if ! command -v xcodegen &> /dev/null; then
-    echo -e "${RED}Error: xcodegen not found. Please install it with:${NC}"
-    echo "brew install xcodegen"
-    exit 1
-fi
-
-if xcodegen generate; then
-    echo -e "${GREEN}✅ Successfully generated Xcode project${NC}"
-    
-    # Create helper script
-    cat > "open_project.sh" << EOL
-#!/bin/bash
-open YeelightControl.xcodeproj
-EOL
-    chmod +x "open_project.sh"
-    
-    echo ""
-    echo "🎉 Project setup complete!"
-    echo ""
-    echo "To open the project:"
-    echo "  cd $XCODE_DIR"
-    echo "  ./open_project.sh"
+if [ $? -eq 0 ]; then
+    echo "Project setup complete. Opening Xcode project..."
+    open "$XCODE_DIR/YeelightControl.xcodeproj"
 else
-    echo -e "${RED}❌ Failed to generate Xcode project${NC}"
+    echo "Error: Failed to generate Xcode project"
     exit 1
 fi 

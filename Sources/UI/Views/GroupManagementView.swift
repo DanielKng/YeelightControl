@@ -10,21 +10,20 @@ struct GroupManagementView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(groupManager.groups) { group in
-                    GroupRow(
-                        group: group,
-                        deviceManager: deviceManager,
-                        groupManager: groupManager
-                    )
+            UnifiedListView(
+                title: "Device Groups",
+                items: groupManager.groups,
+                emptyStateMessage: "No device groups created yet",
+                onDelete: { group in
+                    groupManager.deleteGroup(group)
                 }
-                .onDelete { indexSet in
-                    for index in indexSet {
-                        groupManager.deleteGroup(groupManager.groups[index])
-                    }
-                }
+            ) { group in
+                GroupRow(
+                    group: group,
+                    deviceManager: deviceManager,
+                    groupManager: groupManager
+                )
             }
-            .navigationTitle("Device Groups")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingCreateGroup = true }) {

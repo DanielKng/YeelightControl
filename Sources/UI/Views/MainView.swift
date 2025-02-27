@@ -8,98 +8,82 @@ struct MainView: View {
     /// Access to the Yeelight device manager
     @EnvironmentObject private var yeelightManager: YeelightManager
     
-    /// Currently selected tab index
-    @State private var selectedTab = 0
+    /// Currently selected tab
+    @State private var selectedTab = Tab.lights
+    
+    // MARK: - Types
+    
+    enum Tab {
+        case lights, scenes, automation, effects, settings
+        
+        var title: String {
+            switch self {
+            case .lights: return "Lights"
+            case .scenes: return "Scenes"
+            case .automation: return "Automation"
+            case .effects: return "Effects"
+            case .settings: return "Settings"
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .lights: return "lightbulb.fill"
+            case .scenes: return "theatermasks.fill"
+            case .automation: return "timer"
+            case .effects: return "waveform.path.ecg"
+            case .settings: return "gear"
+            }
+        }
+        
+        var view: some View {
+            NavigationView {
+                switch self {
+                case .lights:
+                    LightsView()
+                        .navigationTitle("My Lights")
+                case .scenes:
+                    ScenesView()
+                        .navigationTitle("Scenes")
+                case .automation:
+                    AutomationView()
+                        .navigationTitle("Automation")
+                case .effects:
+                    EffectsView()
+                        .navigationTitle("Effects")
+                case .settings:
+                    SettingsView()
+                        .navigationTitle("Settings")
+                }
+            }
+        }
+    }
     
     // MARK: - Body
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // MARK: Lights Tab
-            NavigationView {
-                LightsView()
-                    .navigationTitle("My Lights")
-                    .navigationBarItems(trailing: refreshButton)
-            }
-            .tabItem {
-                Label("Lights", systemImage: "lightbulb.fill")
-            }
-            .tag(0)
+        VStack(spacing: 0) {
+            // Content
+            selectedTab.view
             
-            // MARK: Scenes Tab
-            NavigationView {
-                ScenesView()
-                    .navigationTitle("Scenes")
-            }
-            .tabItem {
-                Label("Scenes", systemImage: "theatermasks.fill")
-            }
-            .tag(1)
-            
-            // MARK: Automation Tab
-            NavigationView {
-                AutomationView()
-                    .navigationTitle("Automation")
-            }
-            .tabItem {
-                Label("Automation", systemImage: "timer")
-            }
-            .tag(2)
-            
-            // MARK: Effects Tab
-            NavigationView {
-                EffectsView()
-                    .navigationTitle("Effects")
-            }
-            .tabItem {
-                Label("Effects", systemImage: "waveform.path.ecg")
-            }
-            .tag(3)
-            
-            // MARK: Settings Tab
-            NavigationView {
-                SettingsView()
-                    .navigationTitle("Settings")
-            }
-            .tabItem {
-                Label("Settings", systemImage: "gear")
-            }
-            .tag(4)
+            // Tab bar
+            UnifiedTabSelector(
+                selection: $selectedTab,
+                tabs: [
+                    .init("Lights", icon: "lightbulb.fill", tag: Tab.lights),
+                    .init("Scenes", icon: "theatermasks.fill", tag: Tab.scenes),
+                    .init("Automation", icon: "timer", tag: Tab.automation),
+                    .init("Effects", icon: "waveform.path.ecg", tag: Tab.effects),
+                    .init("Settings", icon: "gear", tag: Tab.settings)
+                ],
+                style: .underlined
+            )
+            .padding(.vertical, 8)
+            .background(.bar)
         }
-        .accentColor(.blue)
         .onAppear {
             // Start device discovery when the main view appears
             yeelightManager.startDiscovery()
-            
-            // Configure tab bar appearance
-            configureTabBarAppearance()
-        }
-    }
-    
-    // MARK: - UI Components
-    
-    /// Button that refreshes device discovery
-    private var refreshButton: some View {
-        Button(action: {
-            yeelightManager.startDiscovery()
-        }) {
-            Image(systemName: "arrow.clockwise")
-                .imageScale(.large)
-                .accessibilityLabel("Refresh devices")
-        }
-    }
-    
-    // MARK: - Helper Methods
-    
-    /// Configures the appearance of the tab bar
-    private func configureTabBarAppearance() {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithDefaultBackground()
-        UITabBar.appearance().standardAppearance = appearance
-        
-        // iOS 15+ specific appearance settings
-        if #available(iOS 15.0, *) {
-            UITabBar.appearance().scrollEdgeAppearance = appearance
         }
     }
 }

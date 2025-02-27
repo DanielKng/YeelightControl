@@ -31,19 +31,16 @@ struct SceneCreator: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Tab selector
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach([Tab.basic, .preset, .custom, .multiDevice], id: \.name) { tab in
-                            TabButton(
-                                title: tab.name,
-                                icon: tab.icon,
-                                isSelected: selectedTab == tab,
-                                action: { selectedTab = tab }
-                            )
-                        }
-                    }
-                    .padding(.horizontal)
-                }
+                UnifiedTabSelector(
+                    selection: $selectedTab,
+                    tabs: [
+                        .init("Basic", icon: "lightbulb", tag: Tab.basic),
+                        .init("Presets", icon: "theatermasks", tag: Tab.preset),
+                        .init("Custom", icon: "wand.and.stars", tag: Tab.custom),
+                        .init("Multi-Device", icon: "lightbulb.2", tag: Tab.multiDevice)
+                    ],
+                    style: .pills
+                )
                 .padding(.vertical, 8)
                 .background(.bar)
                 
@@ -79,60 +76,50 @@ struct SceneCreator: View {
     }
 }
 
-struct TabButton: View {
-    let title: String
-    let icon: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.title3)
-                Text(title)
-                    .font(.caption)
-            }
-            .frame(width: 80)
-            .padding(.vertical, 8)
-            .background(isSelected ? .orange.opacity(0.2) : .clear)
-            .foregroundStyle(isSelected ? .orange : .primary)
-            .cornerRadius(8)
-        }
-    }
-}
-
 struct PresetSceneView: View {
-    @StateObject private var deviceManager = YeelightManager.shared
+    @EnvironmentObject private var yeelightManager: YeelightManager
     @State private var selectedPreset: ScenePreset?
-    @State private var selectedDevices: Set<String> = []
+    @State private var selectedDevices: Set<Device> = []
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Device selection
-                Section {
-                    Text("Select Devices")
-                        .font(.headline)
-                    EnhancedDeviceSelectionList(selectedDevices: $selectedDevices)
-                }
-                
-                // Preset grid
-                LazyVGrid(columns: [
-                    GridItem(.adaptive(minimum: 150), spacing: 16)
-                ], spacing: 16) {
-                    ForEach(ScenePreset.presets) { preset in
-                        PresetCard(
-                            preset: preset,
-                            isSelected: selectedPreset?.id == preset.id,
-                            action: { selectedPreset = preset }
-                        )
+        VStack(spacing: 16) {
+            // Device selection
+            UnifiedListView(
+                title: "Select Devices",
+                items: Array(yeelightManager.devices),
+                emptyStateMessage: "No devices found"
+            ) { device in
+                DeviceSelectionRow(
+                    device: device,
+                    isSelected: selectedDevices.contains(device)
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if selectedDevices.contains(device) {
+                        selectedDevices.remove(device)
+                    } else {
+                        selectedDevices.insert(device)
                     }
                 }
-                .padding(.horizontal)
             }
-            .padding(.vertical)
+            
+            // Preset grid
+            UnifiedGridView(
+                title: "Select Preset",
+                items: ScenePreset.presets,
+                columns: [GridItem(.adaptive(minimum: 150), spacing: 16)],
+                spacing: 16,
+                emptyStateMessage: "No presets available"
+            ) { preset in
+                PresetCard(
+                    preset: preset,
+                    isSelected: selectedPreset?.id == preset.id,
+                    action: { selectedPreset = preset }
+                )
+            }
+            .padding(.horizontal)
         }
+        .padding(.vertical)
     }
 }
 
@@ -170,58 +157,78 @@ struct PresetCard: View {
 }
 
 struct CustomSceneView: View {
-    @StateObject private var deviceManager = YeelightManager.shared
-    @State private var selectedDevices: Set<String> = []
+    @EnvironmentObject private var yeelightManager: YeelightManager
+    @State private var selectedDevices: Set<Device> = []
     @State private var flowParams = YeelightDevice.FlowParams()
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Device selection
-                Section {
-                    Text("Select Devices")
-                        .font(.headline)
-                    EnhancedDeviceSelectionList(selectedDevices: $selectedDevices)
+        VStack(spacing: 16) {
+            // Device selection
+            UnifiedListView(
+                title: "Select Devices",
+                items: Array(yeelightManager.devices),
+                emptyStateMessage: "No devices found"
+            ) { device in
+                DeviceSelectionRow(
+                    device: device,
+                    isSelected: selectedDevices.contains(device)
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if selectedDevices.contains(device) {
+                        selectedDevices.remove(device)
+                    } else {
+                        selectedDevices.insert(device)
+                    }
                 }
-                
-                // Flow effect editor
-                FlowEffectEditor(params: $flowParams)
-                    .padding(.horizontal)
             }
-            .padding(.vertical)
+            
+            // Flow effect editor
+            FlowEffectEditor(params: $flowParams)
+                .padding(.horizontal)
         }
+        .padding(.vertical)
     }
 }
 
 struct MultiDeviceSceneView: View {
-    @StateObject private var deviceManager = YeelightManager.shared
-    @State private var selectedDevices: Set<String> = []
+    @EnvironmentObject private var yeelightManager: YeelightManager
+    @State private var selectedDevices: Set<Device> = []
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Device selection
-                Section {
-                    Text("Select Devices")
-                        .font(.headline)
-                    EnhancedDeviceSelectionList(selectedDevices: $selectedDevices)
-                }
-                
-                if selectedDevices.count >= 2 {
-                    // Multi-device effect editor
-                    MultiDeviceEffectEditor(devices: selectedDevices.compactMap { ip in
-                        deviceManager.devices.first { $0.ip == ip }
-                    })
-                    .padding(.horizontal)
-                } else {
-                    ContentUnavailableView(
-                        "Select Multiple Devices",
-                        systemImage: "lightbulb.2",
-                        description: Text("Select at least 2 devices to create a multi-device scene")
-                    )
+        VStack(spacing: 16) {
+            // Device selection
+            UnifiedListView(
+                title: "Select Devices",
+                items: Array(yeelightManager.devices),
+                emptyStateMessage: "No devices found"
+            ) { device in
+                DeviceSelectionRow(
+                    device: device,
+                    isSelected: selectedDevices.contains(device)
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if selectedDevices.contains(device) {
+                        selectedDevices.remove(device)
+                    } else {
+                        selectedDevices.insert(device)
+                    }
                 }
             }
-            .padding(.vertical)
+            
+            if selectedDevices.count >= 2 {
+                // Multi-device effect editor
+                MultiDeviceEffectEditor(devices: Array(selectedDevices))
+                    .padding(.horizontal)
+            } else {
+                ContentUnavailableView(
+                    "Select Multiple Devices",
+                    systemImage: "lightbulb.2",
+                    description: Text("Select at least 2 devices to create a multi-device scene")
+                )
+            }
         }
+        .padding(.vertical)
     }
 } 

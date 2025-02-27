@@ -6,71 +6,107 @@ struct NetworkDiagnosticsView: View {
     @State private var showingExportOptions = false
     
     var body: some View {
-        List {
-            Section("Current Status") {
-                StatusRow(
-                    title: "Connection",
-                    value: networkMonitor.isConnected ? "Connected" : "Disconnected",
-                    icon: networkMonitor.isConnected ? "wifi" : "wifi.slash",
-                    color: networkMonitor.isConnected ? .green : .red
-                )
-                
-                StatusRow(
-                    title: "Type",
-                    value: networkMonitor.connectionType.description,
-                    icon: networkMonitor.connectionType.icon,
-                    color: .blue
-                )
-            }
-            
-            if let wifi = networkMonitor.wifiDetails {
-                Section("WiFi Details") {
-                    LabeledContent("Network", value: wifi.ssid)
-                    LabeledContent("IP Address", value: wifi.ipAddress)
-                    LabeledContent("Subnet Mask", value: wifi.subnet)
-                    
-                    HStack {
-                        Text("Signal Strength")
-                        Spacer()
-                        SignalStrengthIndicator(strength: wifi.strength)
+        UnifiedDetailView(
+            title: "Network Diagnostics",
+            mainContent: {
+                VStack(spacing: 16) {
+                    // Current Status
+                    UnifiedListView(
+                        title: "Current Status",
+                        items: [
+                            StatusItem(
+                                title: "Connection",
+                                value: networkMonitor.isConnected ? "Connected" : "Disconnected",
+                                icon: networkMonitor.isConnected ? "wifi" : "wifi.slash",
+                                color: networkMonitor.isConnected ? .green : .red
+                            ),
+                            StatusItem(
+                                title: "Type",
+                                value: networkMonitor.connectionType.description,
+                                icon: networkMonitor.connectionType.icon,
+                                color: .blue
+                            )
+                        ],
+                        emptyStateMessage: ""
+                    ) { item in
+                        StatusRow(
+                            title: item.title,
+                            value: item.value,
+                            icon: item.icon,
+                            color: item.color
+                        )
                     }
                     
-                    LabeledContent("Frequency", value: String(format: "%.1f GHz", wifi.frequency))
-                }
-            }
-            
-            Section("Network Statistics") {
-                ForEach(Array(networkMonitor.interfaceStatistics), id: \.key) { interface, stats in
-                    NavigationLink {
-                        InterfaceStatsView(interface: interface, stats: stats)
-                    } label: {
-                        VStack(alignment: .leading) {
-                            Text(interface)
-                            Text("\(formatBytes(stats.bytesIn)) received")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    // WiFi Details
+                    if let wifi = networkMonitor.wifiDetails {
+                        UnifiedListView(
+                            title: "WiFi Details",
+                            items: [
+                                ("Network", wifi.ssid),
+                                ("IP Address", wifi.ipAddress),
+                                ("Subnet Mask", wifi.subnet),
+                                ("Signal Strength", ""),
+                                ("Frequency", String(format: "%.1f GHz", wifi.frequency))
+                            ],
+                            emptyStateMessage: ""
+                        ) { item in
+                            if item.0 == "Signal Strength" {
+                                HStack {
+                                    Text(item.0)
+                                    Spacer()
+                                    SignalStrengthIndicator(strength: wifi.strength)
+                                }
+                            } else {
+                                HStack {
+                                    Text(item.0)
+                                    Spacer()
+                                    Text(item.1)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                         }
                     }
-                }
-            }
-            
-            Section("Diagnostics") {
-                Button(action: runDiagnostics) {
-                    HStack {
-                        Text("Run Network Tests")
-                        Spacer()
-                        if isRefreshing {
-                            ProgressView()
+                    
+                    // Network Statistics
+                    UnifiedListView(
+                        title: "Network Statistics",
+                        items: Array(networkMonitor.interfaceStatistics),
+                        emptyStateMessage: "No statistics available"
+                    ) { interface, stats in
+                        NavigationLink {
+                            InterfaceStatsView(interface: interface, stats: stats)
+                        } label: {
+                            VStack(alignment: .leading) {
+                                Text(interface)
+                                Text("\(formatBytes(stats.bytesIn)) received")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
-                }
-                
-                Button(action: { showingExportOptions = true }) {
-                    Label("Export Diagnostics", systemImage: "square.and.arrow.up")
+                    
+                    // Diagnostics
+                    VStack(spacing: 12) {
+                        Button(action: runDiagnostics) {
+                            HStack {
+                                Text("Run Network Tests")
+                                Spacer()
+                                if isRefreshing {
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        
+                        Button(action: { showingExportOptions = true }) {
+                            Label("Export Diagnostics", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding()
                 }
             }
-        }
-        .navigationTitle("Network Diagnostics")
+        )
         .refreshable {
             await refreshDiagnostics()
         }
@@ -113,7 +149,6 @@ struct NetworkDiagnosticsView: View {
     private func runDiagnostics() {
         isRefreshing = true
         
-        // Run network tests
         Task {
             await refreshDiagnostics()
             isRefreshing = false
@@ -121,7 +156,6 @@ struct NetworkDiagnosticsView: View {
     }
     
     private func refreshDiagnostics() async {
-        // Implement network tests here
         try? await Task.sleep(nanoseconds: 1_000_000_000)
     }
     
@@ -164,6 +198,14 @@ struct NetworkDiagnosticsView: View {
     }
 }
 
+struct StatusItem: Identifiable {
+    let id = UUID()
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+}
+
 struct StatusRow: View {
     let title: String
     let value: String
@@ -172,9 +214,13 @@ struct StatusRow: View {
     
     var body: some View {
         HStack {
-            Label(title, systemImage: icon)
-                .foregroundStyle(color)
+            Image(systemName: icon)
+                .foregroundColor(color)
+            
+            Text(title)
+            
             Spacer()
+            
             Text(value)
                 .foregroundStyle(.secondary)
         }

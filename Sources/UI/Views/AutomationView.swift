@@ -5,17 +5,18 @@ struct AutomationView: View {
     @State private var showingAddAutomation = false
     
     var body: some View {
-        List {
-            ForEach(automationManager.automations) { automation in
-                AutomationRow(automation: automation)
-            }
-            .onDelete { indexSet in
+        UnifiedListView(
+            title: "Automations",
+            items: automationManager.automations,
+            emptyStateMessage: "No automations found",
+            onDelete: { indexSet in
                 for index in indexSet {
                     automationManager.removeAutomation(automationManager.automations[index])
                 }
             }
+        ) { automation in
+            AutomationRow(automation: automation)
         }
-        .navigationTitle("Automations")
         .toolbar {
             Button(action: { showingAddAutomation = true }) {
                 Image(systemName: "plus")
@@ -44,98 +45,52 @@ struct AutomationRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: triggerIcon)
-                    .foregroundStyle(.orange)
+                Image(systemName: automation.trigger.icon)
+                    .foregroundColor(.accentColor)
+                
                 Text(automation.name)
                     .font(.headline)
+                
                 Spacer()
+                
                 Toggle("", isOn: .constant(automation.isEnabled))
                     .labelsHidden()
             }
             
-            Text(triggerDescription)
+            Text(automation.trigger.description)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundColor(.secondary)
             
-            // Action preview
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack {
-                    ForEach(automation.actions, id: \.self) { action in
-                        ActionChip(action: action)
+            if !automation.devices.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(automation.devices) { device in
+                            DeviceChip(device: device)
+                        }
                     }
                 }
             }
         }
-        .padding(.vertical, 4)
-    }
-    
-    private var triggerIcon: String {
-        switch automation.trigger {
-        case .time:
-            return "clock.fill"
-        case .location:
-            return "location.fill"
-        case .sunset:
-            return "sunset.fill"
-        case .sunrise:
-            return "sunrise.fill"
-        }
-    }
-    
-    private var triggerDescription: String {
-        switch automation.trigger {
-        case .time(let date):
-            let formatter = DateFormatter()
-            formatter.timeStyle = .short
-            return "Runs at \(formatter.string(from: date))"
-        case .location(let location):
-            return "Location based trigger: \(location.name)"
-        case .sunset:
-            return "Runs at sunset"
-        case .sunrise:
-            return "Runs at sunrise"
-        }
+        .padding(.vertical, 8)
     }
 }
 
-struct ActionChip: View {
-    let action: Automation.Action
+struct DeviceChip: View {
+    let device: Device
     
     var body: some View {
-        HStack {
-            Image(systemName: actionIcon)
-            Text(actionDescription)
+        HStack(spacing: 4) {
+            Image(systemName: "lightbulb.fill")
+                .imageScale(.small)
+                .foregroundColor(device.isOn ? .yellow : .gray)
+            
+            Text(device.name)
+                .font(.caption)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color(.systemGray6))
+        .background(Color(.tertiarySystemFill))
         .cornerRadius(8)
-    }
-    
-    private var actionIcon: String {
-        switch action {
-        case .setPower:
-            return "lightbulb.fill"
-        case .setScene:
-            return "theatermasks.fill"
-        case .setBrightness:
-            return "sun.max.fill"
-        case .setGroup:
-            return "lightbulb.2.fill"
-        }
-    }
-    
-    private var actionDescription: String {
-        switch action {
-        case .setPower(let deviceIPs, let on):
-            return "\(on ? "Turn On" : "Turn Off") (\(deviceIPs.count) devices)"
-        case .setScene(let deviceIPs, _):
-            return "Apply Scene (\(deviceIPs.count) devices)"
-        case .setBrightness(let deviceIPs, let level):
-            return "Set Brightness: \(level)% (\(deviceIPs.count) devices)"
-        case .setGroup(_, _):
-            return "Apply to Group"
-        }
     }
 }
 

@@ -12,46 +12,49 @@ struct DetailContentView: View {
     
     var body: some View {
         NavigationStack {
-            ZStack {
-                if yeelightManager.devices.isEmpty {
-                    EmptyStateView(isDiscovering: $isDiscovering) {
-                        startDiscovery()
-                    }
-                } else {
-                    List {
-                        Section {
-                            ForEach(yeelightManager.devices) { device in
-                                DeviceRow(device: device, manager: yeelightManager)
+            UnifiedDetailView(
+                title: "My Lights",
+                mainContent: {
+                    ZStack {
+                        if yeelightManager.devices.isEmpty {
+                            EmptyStateView(isDiscovering: $isDiscovering) {
+                                startDiscovery()
                             }
-                        } header: {
-                            Text("Connected Devices")
-                        } footer: {
-                            Text("Tap a device to access detailed controls")
-                        }
-                        
-                        Section {
-                            Button(action: startDiscovery) {
-                                HStack {
-                                    Text("Search for More Devices")
-                                    Spacer()
-                                    if isDiscovering {
-                                        ProgressView()
+                        } else {
+                            VStack(spacing: 16) {
+                                UnifiedListView(
+                                    title: "Connected Devices",
+                                    items: yeelightManager.devices,
+                                    emptyStateMessage: "No devices found",
+                                    footer: "Tap a device to access detailed controls"
+                                ) { device in
+                                    DeviceRow(device: device, manager: yeelightManager)
+                                }
+                                
+                                Button(action: startDiscovery) {
+                                    HStack {
+                                        Text("Search for More Devices")
+                                        Spacer()
+                                        if isDiscovering {
+                                            ProgressView()
+                                        }
                                     }
                                 }
+                                .buttonStyle(.bordered)
+                                .disabled(isDiscovering)
+                                .padding(.horizontal)
                             }
-                            .disabled(isDiscovering)
+                        }
+                        
+                        if isDiscovering {
+                            ProgressView("Discovering devices...")
+                                .progressViewStyle(.circular)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(.ultraThinMaterial)
                         }
                     }
                 }
-                
-                if isDiscovering {
-                    ProgressView("Discovering devices...")
-                        .progressViewStyle(.circular)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(.ultraThinMaterial)
-                }
-            }
-            .navigationTitle("My Lights")
+            )
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {

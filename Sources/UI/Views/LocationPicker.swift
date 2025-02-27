@@ -3,168 +3,228 @@ import MapKit
 import CoreLocation
 
 struct LocationPicker: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var selectedLocation: Automation.Location?
-    @StateObject private var locationManager = LocationManager()
-    
-    @State private var locationName = ""
-    @State private var radius: Double = 100
-    @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-    )
-    @State private var selectedCoordinate: CLLocationCoordinate2D?
-    @State private var searchResults: [MKMapItem] = []
+    @Binding var coordinate: CLLocationCoordinate2D
+    @Binding var radius: Double
+    @State private var region: MKCoordinateRegion
     @State private var searchText = ""
-    @State private var mapView: MKMapView?
+    @State private var searchResults: [MKMapItem] = []
+    @State private var isSearching = false
+    @State private var showingSearchResults = false
+    @State private var showingPermissionAlert = false
+    
+    private let minimumRadius: Double = 50
+    private let maximumRadius: Double = 1000
+    
+    init(coordinate: Binding<CLLocationCoordinate2D>, radius: Binding<Double>) {
+        self._coordinate = coordinate
+        self._radius = radius
+        
+        // Initialize region with the current coordinate
+        let span = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        self._region = State(initialValue: MKCoordinateRegion(center: coordinate.wrappedValue, span: span))
+    }
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Search bar
-                SearchBar(
-                    text: $searchText,
-                    placeholder: "Search location",
-                    onSubmit: performSearch
-                )
+        VStack(spacing: 0) {
+            // Search bar
+            searchBar
+            
+            // Map view
+            ZStack {
+                MapView(region: $region, coordinate: $coordinate, radius: radius)
+                    .edgesIgnoringSafeArea(.all)
+                
+                // Center indicator
+                Image(systemName: "mappin.circle.fill")
+                    .font(.title)
+                    .foregroundColor(.accentColor)
+                
+                // Radius control
+                VStack {
+                    Spacer()
+                    radiusControl
+                }
                 .padding()
-                
-                // Search results
-                if !searchResults.isEmpty {
-                    List(searchResults, id: \.self) { item in
-                        Button {
-                            selectLocation(item)
-                        } label: {
-                            VStack(alignment: .leading) {
-                                Text(item.name ?? "")
-                                    .font(.headline)
-                                Text(item.placemark.title ?? "")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .frame(height: 200)
-                }
-                
-                // Map
-                MapViewRepresentable(
-                    region: $region,
-                    selectedCoordinate: $selectedCoordinate,
-                    radius: radius,
-                    locationName: locationName,
-                    onMapTap: handleMapTap
-                )
-                
-                // Location details
-                Form {
-                    Section {
-                        TextField("Location Name", text: $locationName)
-                        
-                        VStack(alignment: .leading) {
-                            Text("Radius: \(Int(radius))m")
-                            Slider(value: $radius, in: 50...500)
-                        }
-                    }
-                }
-                .frame(height: 150)
             }
-            .navigationTitle("Select Location")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        if let coordinate = selectedCoordinate {
-                            selectedLocation = Automation.Location(
-                                coordinate: coordinate,
-                                radius: radius,
-                                name: locationName
-                            )
-                            dismiss()
-                        }
-                    }
-                    .disabled(locationName.isEmpty || selectedCoordinate == nil)
+        }
+        .onAppear {
+            checkLocationAuthorization()
+        }
+        .sheet(isPresented: $showingSearchResults) {
+            searchResultsList
+        }
+        .alert("Location Access Required", isPresented: $showingPermissionAlert) {
+            Button("Settings", role: .none) {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
                 }
             }
-            .onAppear {
-                if let location = locationManager.location {
-                    region.center = location.coordinate
-                }
-            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please enable location access in Settings to use this feature.")
         }
     }
     
-    private func handleMapTap(_ coordinate: CLLocationCoordinate2D) {
-        selectedCoordinate = coordinate
-        region.center = coordinate
-        reverseGeocode(coordinate)
+    private var searchBar: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            
+            TextField("Search location", text: $searchText)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .autocapitalization(.none)
+                .onChange(of: searchText) { _ in
+                    performSearch()
+                }
+            
+            if !searchText.isEmpty {
+                Button(action: {
+                    searchText = ""
+                    searchResults = []
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Button(action: {
+                requestCurrentLocation()
+            }) {
+                Image(systemName: "location.fill")
+                    .foregroundColor(.accentColor)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+    }
+    
+    private var radiusControl: some View {
+        VStack(spacing: 8) {
+            Text("Radius: \(Int(radius))m")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Slider(
+                value: $radius,
+                in: minimumRadius...maximumRadius,
+                step: 50
+            )
+            .frame(maxWidth: 200)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(10)
+        .shadow(radius: 2)
+    }
+    
+    private var searchResultsList: some View {
+        NavigationView {
+            List(searchResults, id: \.self) { item in
+                Button(action: {
+                    selectLocation(item)
+                }) {
+                    VStack(alignment: .leading) {
+                        Text(item.name ?? "Unknown location")
+                            .font(.headline)
+                        if let address = item.placemark.formattedAddress {
+                            Text(address)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Search Results")
+            .navigationBarItems(trailing: Button("Done") {
+                showingSearchResults = false
+            })
+        }
+    }
+    
+    private func checkLocationAuthorization() {
+        switch services.locationManager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            if let location = services.locationManager.currentLocation {
+                region.center = location.coordinate
+                coordinate = location.coordinate
+            }
+        case .denied, .restricted:
+            showingPermissionAlert = true
+        case .notDetermined:
+            services.locationManager.requestWhenInUseAuthorization()
+        @unknown default:
+            break
+        }
+    }
+    
+    private func requestCurrentLocation() {
+        services.locationManager.requestLocation()
     }
     
     private func performSearch() {
+        guard !searchText.isEmpty else {
+            searchResults = []
+            return
+        }
+        
+        isSearching = true
+        
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = searchText
         request.region = region
         
-        MKLocalSearch(request: request).start { response, error in
-            guard let response = response else { return }
-            searchResults = response.mapItems
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            isSearching = false
+            
+            if let error = error {
+                services.logger.error("Location search failed: \(error.localizedDescription)", category: .system)
+                return
+            }
+            
+            searchResults = response?.mapItems ?? []
+            if !searchResults.isEmpty {
+                showingSearchResults = true
+            }
         }
     }
     
     private func selectLocation(_ item: MKMapItem) {
-        locationName = item.name ?? ""
-        selectedCoordinate = item.placemark.coordinate
-        region.center = item.placemark.coordinate
-        searchResults.removeAll()
+        coordinate = item.placemark.coordinate
+        region.center = coordinate
+        showingSearchResults = false
         searchText = ""
-    }
-    
-    private func reverseGeocode(_ coordinate: CLLocationCoordinate2D) {
-        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        CLGeocoder().reverseGeocodeLocation(location) { placemarks, error in
-            if let placemark = placemarks?.first {
-                locationName = placemark.name ?? placemark.locality ?? ""
-            }
-        }
+        searchResults = []
     }
 }
 
-// MARK: - Map View Representable
-struct MapViewRepresentable: UIViewRepresentable {
+struct MapView: UIViewRepresentable {
     @Binding var region: MKCoordinateRegion
-    @Binding var selectedCoordinate: CLLocationCoordinate2D?
+    @Binding var coordinate: CLLocationCoordinate2D
     let radius: Double
-    let locationName: String
-    let onMapTap: (CLLocationCoordinate2D) -> Void
     
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = true
-        
-        let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
-        mapView.addGestureRecognizer(tapGesture)
-        
         return mapView
     }
     
-    func updateUIView(_ mapView: MKMapView, context: Context) {
-        mapView.setRegion(region, animated: true)
-        mapView.removeAnnotations(mapView.annotations)
-        mapView.removeOverlays(mapView.overlays)
+    func updateUIView(_ view: MKMapView, context: Context) {
+        view.setRegion(region, animated: true)
         
-        if let coordinate = selectedCoordinate {
-            let annotation = MKPointAnnotation()
-            annotation.coordinate = coordinate
-            annotation.title = locationName
-            mapView.addAnnotation(annotation)
-            
-            let circle = MKCircle(center: coordinate, radius: radius)
-            mapView.addOverlay(circle)
-        }
+        // Remove existing overlays and annotations
+        view.removeOverlays(view.overlays)
+        view.removeAnnotations(view.annotations.filter { !($0 is MKUserLocation) })
+        
+        // Add circle overlay for radius
+        let circle = MKCircle(center: coordinate, radius: radius)
+        view.addOverlay(circle)
+        
+        // Add pin annotation
+        let annotation = MKPointAnnotation()
+        annotation.coordinate = coordinate
+        view.addAnnotation(annotation)
     }
     
     func makeCoordinator() -> Coordinator {
@@ -172,93 +232,46 @@ struct MapViewRepresentable: UIViewRepresentable {
     }
     
     class Coordinator: NSObject, MKMapViewDelegate {
-        let parent: MapViewRepresentable
+        var parent: MapView
         
-        init(_ parent: MapViewRepresentable) {
+        init(_ parent: MapView) {
             self.parent = parent
-        }
-        
-        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
-            let mapView = gesture.view as! MKMapView
-            let point = gesture.location(in: mapView)
-            let coordinate = mapView.convert(point, toCoordinateFrom: mapView)
-            parent.onMapTap(coordinate)
         }
         
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let circle = overlay as? MKCircle {
                 let renderer = MKCircleRenderer(circle: circle)
-                renderer.fillColor = UIColor.systemRed.withAlphaComponent(0.2)
-                renderer.strokeColor = UIColor.systemRed
+                renderer.fillColor = UIColor.accentColor.withAlphaComponent(0.2)
+                renderer.strokeColor = UIColor.accentColor
                 renderer.lineWidth = 2
                 return renderer
             }
             return MKOverlayRenderer(overlay: overlay)
         }
         
-        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            if annotation is MKUserLocation {
-                return nil
-            }
-            
-            let identifier = "Location"
-            var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier)
-            
-            if annotationView == nil {
-                annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
-                annotationView?.canShowCallout = true
-            } else {
-                annotationView?.annotation = annotation
-            }
-            
-            return annotationView
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            parent.region = mapView.region
         }
     }
 }
 
-struct MapPin: Identifiable {
-    let id = UUID()
-    let coordinate: CLLocationCoordinate2D
-}
-
-class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
-    private let manager = CLLocationManager()
-    @Published var location: CLLocation?
-    
-    override init() {
-        super.init()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.requestWhenInUseAuthorization()
-        manager.startUpdatingLocation()
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        location = locations.first
-    }
-}
-
-struct SearchBar: View {
-    @Binding var text: String
-    let placeholder: String
-    let onSubmit: () -> Void
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.roundedBorder)
-                .submitLabel(.search)
-                .onSubmit(onSubmit)
-            
-            if !text.isEmpty {
-                Button(action: { text = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-            }
+extension MKPlacemark {
+    var formattedAddress: String? {
+        guard let subThoroughfare = subThoroughfare ?? thoroughfare,
+              let locality = locality else { return nil }
+        
+        var components = [String]()
+        
+        if let thoroughfare = thoroughfare {
+            components.append("\(subThoroughfare) \(thoroughfare)")
         }
+        
+        components.append(locality)
+        
+        if let administrativeArea = administrativeArea {
+            components.append(administrativeArea)
+        }
+        
+        return components.joined(separator: ", ")
     }
 } 

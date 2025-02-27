@@ -64,76 +64,111 @@ struct FlowEffectEditor: View {
                 )
             }
         }
+        
+        var description: String {
+            switch self {
+            case .candlelight:
+                return "A warm, flickering light"
+            case .sunrise:
+                return "A gradual transition from night to day"
+            case .disco:
+                return "A colorful light show"
+            case .pulse:
+                return "A pulsating light"
+            case .strobe:
+                return "A flashing light"
+            }
+        }
     }
     
     var body: some View {
-        Form {
-            Section("Presets") {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(FlowPreset.allCases, id: \.rawValue) { preset in
-                            VStack {
-                                Image(systemName: "waveform")
-                                    .font(.title)
-                                    .foregroundColor(selectedPreset == preset ? .accentColor : .secondary)
+        UnifiedDetailView(
+            title: "Flow Effect",
+            mainContent: {
+                VStack(spacing: 16) {
+                    // Presets
+                    UnifiedListView(
+                        title: "Presets",
+                        items: FlowPreset.allCases,
+                        emptyStateMessage: ""
+                    ) { preset in
+                        HStack {
+                            VStack(alignment: .leading) {
                                 Text(preset.rawValue)
+                                    .font(.headline)
+                                Text(preset.description)
                                     .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.secondary.opacity(0.1))
-                            )
-                            .onTapGesture {
-                                selectedPreset = preset
-                                params = preset.params
+                            
+                            Spacer()
+                            
+                            if preset == selectedPreset {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedPreset = preset
+                            params = preset.params
+                        }
+                    }
+                    
+                    // Flow Settings
+                    UnifiedListView(
+                        title: "Flow Settings",
+                        items: [
+                            ("Repeat Count", "count"),
+                            ("End Action", "action")
+                        ],
+                        emptyStateMessage: ""
+                    ) { item in
+                        if item.1 == "count" {
+                            Picker("Repeat Count", selection: $params.count) {
+                                Text("Forever").tag(0)
+                                ForEach(1...10, id: \.self) { count in
+                                    Text("\(count) times").tag(count)
+                                }
+                            }
+                        } else {
+                            Picker("End Action", selection: $params.action) {
+                                Text("Recover").tag(YeelightDevice.FlowAction.recover)
+                                Text("Stay").tag(YeelightDevice.FlowAction.stay)
+                                Text("Turn Off").tag(YeelightDevice.FlowAction.off)
                             }
                         }
                     }
+                    
+                    // Transitions
+                    UnifiedListView(
+                        title: "Transitions",
+                        items: params.transitions.indices,
+                        emptyStateMessage: "No transitions added",
+                        onDelete: { indexSet in
+                            params.transitions.remove(atOffsets: indexSet)
+                        },
+                        onMove: { from, to in
+                            params.transitions.move(fromOffsets: from, toOffset: to)
+                        }
+                    ) { index in
+                        TransitionRow(
+                            transition: $params.transitions[index],
+                            onTap: {
+                                editingColorIndex = index
+                                showingColorPicker = true
+                            }
+                        )
+                    }
+                    
+                    Button("Add Transition") {
+                        params.transitions.append(.init(duration: 1000, mode: .brightness(level: 100)))
+                    }
+                    .buttonStyle(.bordered)
                     .padding(.horizontal)
                 }
-                .listRowInsets(EdgeInsets())
             }
-            
-            Section("Flow Settings") {
-                Picker("Repeat Count", selection: $params.count) {
-                    Text("Forever").tag(0)
-                    ForEach(1...10, id: \.self) { count in
-                        Text("\(count) times").tag(count)
-                    }
-                }
-                
-                Picker("End Action", selection: $params.action) {
-                    Text("Recover").tag(YeelightDevice.FlowAction.recover)
-                    Text("Stay").tag(YeelightDevice.FlowAction.stay)
-                    Text("Turn Off").tag(YeelightDevice.FlowAction.off)
-                }
-            }
-            
-            Section("Transitions") {
-                ForEach(params.transitions.indices, id: \.self) { index in
-                    TransitionRow(
-                        transition: $params.transitions[index],
-                        onTap: {
-                            editingColorIndex = index
-                            showingColorPicker = true
-                        }
-                    )
-                }
-                .onDelete { indexSet in
-                    params.transitions.remove(atOffsets: indexSet)
-                }
-                .onMove { from, to in
-                    params.transitions.move(fromOffsets: from, toOffset: to)
-                }
-                
-                Button("Add Transition") {
-                    params.transitions.append(.init(duration: 1000, mode: .brightness(level: 100)))
-                }
-            }
-        }
-        .navigationTitle("Flow Effect")
-        .navigationBarTitleDisplayMode(.inline)
+        )
         .sheet(isPresented: $showingColorPicker) {
             if let index = editingColorIndex {
                 ColorPickerSheet(transition: $params.transitions[index])
@@ -192,54 +227,67 @@ struct ColorPickerSheet: View {
     
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    Picker("Mode", selection: $mode) {
-                        Text("RGB").tag(ColorMode.rgb)
-                        Text("Temperature").tag(ColorMode.temperature)
-                        Text("Brightness").tag(ColorMode.brightness)
-                    }
-                    .pickerStyle(.segmented)
-                }
-                
-                Section {
-                    switch mode {
-                    case .rgb:
-                        ColorPicker("Color", selection: $selectedColor)
-                    case .temperature:
-                        VStack(alignment: .leading) {
-                            HStack {
-                                Text("Temperature")
-                                Spacer()
-                                Text("\(Int(temperature))K")
+            UnifiedDetailView(
+                title: "Edit Transition",
+                mainContent: {
+                    VStack(spacing: 16) {
+                        // Mode Selection
+                        Picker("Mode", selection: $mode) {
+                            Text("RGB").tag(ColorMode.rgb)
+                            Text("Temperature").tag(ColorMode.temperature)
+                            Text("Brightness").tag(ColorMode.brightness)
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        
+                        // Color Settings
+                        UnifiedListView(
+                            title: "Color Settings",
+                            items: [()] as [()] ,
+                            emptyStateMessage: ""
+                        ) { _ in
+                            switch mode {
+                            case .rgb:
+                                ColorPicker("Color", selection: $selectedColor)
+                            case .temperature:
+                                VStack(alignment: .leading) {
+                                    HStack {
+                                        Text("Temperature")
+                                        Spacer()
+                                        Text("\(Int(temperature))K")
+                                    }
+                                    Slider(value: $temperature, in: 1700...6500)
+                                }
+                            case .brightness:
+                                VStack(alignment: .leading) {
+                                    HStack {
+                                        Text("Brightness")
+                                        Spacer()
+                                        Text("\(Int(brightness))%")
+                                    }
+                                    Slider(value: $brightness, in: 1...100)
+                                }
                             }
-                            Slider(value: $temperature, in: 1700...6500)
                         }
-                    case .brightness:
-                        VStack(alignment: .leading) {
-                            HStack {
-                                Text("Brightness")
-                                Spacer()
-                                Text("\(Int(brightness))%")
+                        
+                        // Duration
+                        UnifiedListView(
+                            title: "Duration",
+                            items: [()] as [()] ,
+                            emptyStateMessage: ""
+                        ) { _ in
+                            VStack(alignment: .leading) {
+                                HStack {
+                                    Text("Duration")
+                                    Spacer()
+                                    Text("\(Int(duration))ms")
+                                }
+                                Slider(value: $duration, in: 50...5000)
                             }
-                            Slider(value: $brightness, in: 1...100)
                         }
                     }
                 }
-                
-                Section {
-                    VStack(alignment: .leading) {
-                        HStack {
-                            Text("Duration")
-                            Spacer()
-                            Text("\(Int(duration))ms")
-                        }
-                        Slider(value: $duration, in: 50...5000)
-                    }
-                }
-            }
-            .navigationTitle("Edit Transition")
-            .navigationBarTitleDisplayMode(.inline)
+            )
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

@@ -1,115 +1,110 @@
 import SwiftUI
 
 struct CreateGroupView: View {
-    @ObservedObject var groupManager: DeviceGroupManager
-    @ObservedObject var deviceManager: YeelightManager
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var yeelightManager: YeelightManager
     
     @State private var groupName = ""
-    @State private var selectedIcon = "lightbulb.fill"
-    @State private var selectedDevices: Set<String> = []
-    @State private var syncMode: DeviceGroupManager.DeviceGroup.SyncMode = .mirror
-    
-    let icons = [
-        "lightbulb.fill",
-        "lightbulb.2.fill",
-        "lamp.desk.fill",
-        "lamp.floor.fill",
-        "light.recessed",
-        "light.strip.2",
-        "sparkles",
-        "wand.and.stars",
-        "party.popper.fill",
-        "theatermasks.fill"
-    ]
+    @State private var selectedDevices: Set<Device> = []
+    @State private var showingError = false
+    @State private var errorMessage = ""
     
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Group Details") {
-                    TextField("Group Name", text: $groupName)
-                    
-                    Picker("Sync Mode", selection: $syncMode) {
-                        Text("Mirror").tag(DeviceGroupManager.DeviceGroup.SyncMode.mirror)
-                        Text("Alternate").tag(DeviceGroupManager.DeviceGroup.SyncMode.alternate)
-                        Text("Wave").tag(DeviceGroupManager.DeviceGroup.SyncMode.wave)
-                        Text("Random").tag(DeviceGroupManager.DeviceGroup.SyncMode.random)
-                    }
-                }
+        NavigationView {
+            VStack(spacing: 16) {
+                // Group name input
+                UnifiedTextField(
+                    text: $groupName,
+                    placeholder: "Group Name",
+                    icon: "tag",
+                    clearButton: true
+                )
+                .padding(.horizontal)
                 
-                Section("Icon") {
-                    LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: 60))
-                    ], spacing: 20) {
-                        ForEach(icons, id: \.self) { icon in
-                            IconButton(
-                                icon: icon,
-                                isSelected: selectedIcon == icon,
-                                action: { selectedIcon = icon }
-                            )
-                        }
-                    }
-                    .padding(.vertical)
-                }
-                
-                Section("Devices") {
-                    ForEach(deviceManager.devices) { device in
-                        HStack {
-                            Image(systemName: device.isOn ? "lightbulb.fill" : "lightbulb")
-                                .foregroundStyle(device.isOn ? .orange : .secondary)
-                            
-                            VStack(alignment: .leading) {
-                                Text(device.name)
-                                Text(device.ip)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Toggle("", isOn: Binding(
-                                get: { selectedDevices.contains(device.ip) },
-                                set: { isSelected in
-                                    if isSelected {
-                                        selectedDevices.insert(device.ip)
-                                    } else {
-                                        selectedDevices.remove(device.ip)
-                                    }
-                                }
-                            ))
-                            .labelsHidden()
+                // Device selection
+                UnifiedListView(
+                    title: "Select Devices",
+                    items: Array(yeelightManager.devices),
+                    emptyStateMessage: "No devices found"
+                ) { device in
+                    DeviceSelectionRow(
+                        device: device,
+                        isSelected: selectedDevices.contains(device)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if selectedDevices.contains(device) {
+                            selectedDevices.remove(device)
+                        } else {
+                            selectedDevices.insert(device)
                         }
                     }
                 }
+                
+                Spacer()
             }
             .navigationTitle("Create Group")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        createGroup()
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
                         dismiss()
                     }
-                    .disabled(!isValid)
                 }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Create") {
+                        createGroup()
+                    }
+                    .disabled(groupName.isEmpty || selectedDevices.isEmpty)
+                }
+            }
+            .alert("Error", isPresented: $showingError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage)
             }
         }
     }
     
-    private var isValid: Bool {
-        !groupName.isEmpty && selectedDevices.count >= 2
-    }
-    
     private func createGroup() {
-        let devices = deviceManager.devices.filter { selectedDevices.contains($0.ip) }
-        groupManager.createGroup(
-            name: groupName,
-            icon: selectedIcon,
-            devices: devices,
-            syncMode: syncMode
-        )
+        do {
+            try yeelightManager.createGroup(name: groupName, devices: Array(selectedDevices))
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+            showingError = true
+        }
     }
+}
+
+struct DeviceSelectionRow: View {
+    let device: Device
+    let isSelected: Bool
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "lightbulb.fill")
+                .foregroundColor(device.isOn ? .yellow : .gray)
+            
+            VStack(alignment: .leading) {
+                Text(device.name)
+                    .font(.headline)
+                Text(device.ipAddress)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .foregroundColor(isSelected ? .accentColor : .secondary)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+#Preview {
+    CreateGroupView()
+        .environmentObject(YeelightManager.shared)
 } 

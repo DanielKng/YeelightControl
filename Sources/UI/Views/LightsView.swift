@@ -10,60 +10,116 @@ struct LightsView: View {
     @State private var error: YeelightManager.NetworkError?
     @State private var showingError = false
     @SceneStorage("LightsView.scrollPosition") private var scrollPosition: String?
+    @State private var currentPage = 0
+    @State private var isRefreshing = false
+    @State private var searchText = ""
     
-    private let refreshTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+    private let devicesPerPage = 12
+    private let refreshDebouncer = Debouncer(delay: 0.5)
+    
+    private var filteredDevices: [YeelightDevice] {
+        let devices = selectedRoom.map { roomId in
+            manager.devices.filter { $0.roomId == roomId }
+        } ?? manager.devices
+        
+        guard !searchText.isEmpty else { return devices }
+        
+        return devices.filter { device in
+            device.name.localizedCaseInsensitiveContains(searchText) ||
+            device.ip.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
+    private var paginatedDevices: [YeelightDevice] {
+        let startIndex = currentPage * devicesPerPage
+        let endIndex = min(startIndex + devicesPerPage, filteredDevices.count)
+        return Array(filteredDevices[startIndex..<endIndex])
+    }
+    
+    private var totalPages: Int {
+        (filteredDevices.count + devicesPerPage - 1) / devicesPerPage
+    }
     
     var body: some View {
         ScrollView {
             ScrollViewReader { proxy in
                 VStack(spacing: 24) {
-                    // Room selector
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            Button(action: { selectedRoom = nil }) {
-                                RoomTab(
-                                    icon: "house.fill",
-                                    name: "All Rooms",
-                                    isSelected: selectedRoom == nil
-                                )
-                            }
-                            
-                            ForEach(roomManager.rooms) { room in
-                                Button(action: { selectedRoom = room.id }) {
-                                    RoomTab(
-                                        icon: room.icon,
-                                        name: room.name,
-                                        isSelected: selectedRoom == room.id
-                                    )
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
+                    // Search bar
+                    UnifiedSearchBar(
+                        text: $searchText,
+                        placeholder: "Search devices"
+                    )
+                    .padding(.horizontal)
                     
-                    // Device grid
-                    LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: 160), spacing: 16)
-                    ], spacing: 16) {
-                        ForEach(filteredDevices) { device in
+                    // Room selector
+                    UnifiedTabSelector(
+                        selection: Binding(
+                            get: { selectedRoom ?? UUID() },
+                            set: { selectedRoom = $0 == UUID() ? nil : $0 }
+                        ),
+                        tabs: [
+                            .init("All Rooms", icon: "house.fill", tag: UUID()),
+                        ] + roomManager.rooms.map { room in
+                            .init(room.name, icon: room.icon, tag: room.id)
+                        },
+                        style: .pills
+                    )
+                    
+                    if filteredDevices.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "lightbulb.slash")
+                                .font(.system(size: 48))
+                                .foregroundStyle(.secondary)
+                            
+                            Text(searchText.isEmpty ? "No devices found" : "No matching devices")
+                                .font(.headline)
+                            
+                            Button(action: startDiscovery) {
+                                Text("Discover Devices")
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding()
+                    } else {
+                        UnifiedGridView(
+                            title: "My Lights",
+                            items: paginatedDevices,
+                            columns: Int(UIScreen.main.bounds.width / 160),
+                            spacing: 16,
+                            emptyStateMessage: "No devices found",
+                            onRefresh: {
+                                await refreshDevices()
+                            }
+                        ) { device in
                             DeviceCard(device: device)
                                 .id(device.ip)
                                 .onTapGesture {
                                     // Navigate to device detail
                                 }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("\(device.name) \(device.isOn ? "On" : "Off")")
+                                .accessibilityValue("Brightness \(device.brightness)%")
                         }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
                 }
                 .onChange(of: selectedRoom) { _ in
+                    currentPage = 0
                     withAnimation {
                         proxy.scrollTo(scrollPosition)
                     }
                 }
+                .onChange(of: searchText) { _ in
+                    currentPage = 0
+                }
             }
         }
+        .searchable(text: $searchText, prompt: "Search devices")
         .refreshable {
+            isRefreshing = true
             await refreshDevices()
+            isRefreshing = false
         }
         .overlay {
             if isDiscovering {
@@ -79,9 +135,18 @@ struct LightsView: View {
                     Button(action: { showingRoomEditor = true }) {
                         Label("Manage Rooms", systemImage: "folder")
                     }
+                    .accessibilityLabel("Open room management")
                     
                     Button(action: startDiscovery) {
                         Label("Discover Devices", systemImage: "magnifyingglass")
+                    }
+                    .accessibilityLabel("Start device discovery")
+                    
+                    if let error = error {
+                        Button(action: showErrorDetails) {
+                            Label("Show Error Details", systemImage: "exclamationmark.triangle")
+                        }
+                        .accessibilityLabel("Show error details")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -91,15 +156,24 @@ struct LightsView: View {
         .onAppear {
             startDiscovery()
         }
-        .onReceive(refreshTimer) { _ in
-            Task {
-                await refreshDevices()
+        .onChange(of: manager.devices) { _ in
+            refreshDebouncer.debounce {
+                Task {
+                    await refreshDevices()
+                }
             }
         }
-        .alert("Error", isPresented: $showingError, presenting: error) { _ in
+        .alert("Error", isPresented: $showingError, presenting: error) { error in
             Button("OK", role: .cancel) {}
             Button("Retry") {
                 startDiscovery()
+            }
+            if error.isNetworkError {
+                Button("Network Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
             }
         } message: { error in
             Text(error.localizedDescription)
@@ -109,30 +183,34 @@ struct LightsView: View {
         }
     }
     
-    private var filteredDevices: [YeelightDevice] {
-        guard let selectedRoom = selectedRoom else {
-            return manager.devices
+    private func showErrorDetails() {
+        showingError = true
+    }
+    
+    private func handleError(_ error: Error) {
+        if let networkError = error as? YeelightManager.NetworkError {
+            self.error = networkError
+        } else {
+            self.error = .discoveryFailed(error)
         }
+        showingError = true
         
-        guard let room = roomManager.rooms.first(where: { $0.id == selectedRoom }) else {
-            return []
-        }
-        
-        return manager.devices.filter { room.deviceIPs.contains($0.ip) }
+        // Log error for debugging
+        Logger.shared.error("Device discovery error: \(error.localizedDescription)")
     }
     
     private func startDiscovery() {
+        guard !isDiscovering else { return }
         isDiscovering = true
         
         Task {
             do {
-                try await manager.startDiscovery()
-            } catch let networkError as YeelightManager.NetworkError {
-                error = networkError
-                showingError = true
+                try await withTimeout(30) {
+                    try await manager.startDiscovery()
+                }
+                error = nil
             } catch {
-                error = .discoveryFailed(error)
-                showingError = true
+                handleError(error)
             }
             isDiscovering = false
         }
@@ -140,44 +218,30 @@ struct LightsView: View {
     
     private func refreshDevices() async {
         do {
-            try await manager.refreshDevices()
+            try await withTimeout(10) {
+                try await manager.refreshDevices()
+            }
+            error = nil
         } catch {
-            self.error = .discoveryFailed(error)
-            showingError = true
+            handleError(error)
         }
     }
 }
 
 // MARK: - Supporting Views
-struct RoomTab: View {
-    let icon: String
-    let name: String
-    let isSelected: Bool
-    
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-            Text(name)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(isSelected ? .orange : Color(.systemGray6))
-        .foregroundStyle(isSelected ? .white : .primary)
-        .cornerRadius(20)
-    }
-}
 
 struct DeviceCard: View {
     @ObservedObject var device: YeelightDevice
+    @Environment(\.scenePhase) private var scenePhase
+    private let haptics = UIImpactFeedbackGenerator(style: .light)
     
     var body: some View {
         VStack(spacing: 16) {
-            // Device icon
             Image(systemName: device.isOn ? "lightbulb.fill" : "lightbulb")
                 .font(.system(size: 40))
                 .foregroundStyle(device.isOn ? .orange : .gray)
+                .accessibilityLabel(device.isOn ? "Light is on" : "Light is off")
             
-            // Device name and status
             VStack(spacing: 4) {
                 Text(device.name)
                     .font(.headline)
@@ -188,7 +252,6 @@ struct DeviceCard: View {
                     .foregroundStyle(.secondary)
             }
             
-            // Brightness slider
             VStack(alignment: .leading, spacing: 4) {
                 Text("Brightness")
                     .font(.caption)
@@ -197,17 +260,47 @@ struct DeviceCard: View {
                 Slider(
                     value: Binding(
                         get: { Double(device.brightness) },
-                        set: { device.brightness = Int($0) }
+                        set: { newValue in
+                            haptics.impactOccurred()
+                            device.brightness = Int(newValue)
+                        }
                     ),
                     in: 1...100,
                     step: 1
                 )
+                .accessibilityValue("\(device.brightness) percent")
             }
         }
         .padding()
         .background(Color(.systemBackground).opacity(0.8))
         .cornerRadius(12)
         .shadow(radius: 5)
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                Task {
+                    try? await device.updateState()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Supporting Types
+
+class Debouncer {
+    private let delay: TimeInterval
+    private var workItem: DispatchWorkItem?
+    
+    init(delay: TimeInterval) {
+        self.delay = delay
+    }
+    
+    func debounce(action: @escaping () -> Void) {
+        workItem?.cancel()
+        workItem = DispatchWorkItem(block: action)
+        if let workItem = workItem {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+        }
     }
 }
 
