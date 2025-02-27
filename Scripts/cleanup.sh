@@ -12,6 +12,12 @@ if [ -d "$PROJECT_ROOT/Build" ]; then
     rm -rf "$PROJECT_ROOT/Build"/*
 fi
 
+# Clean root level generated files
+echo "🗑️ Cleaning generated files..."
+rm -f "$PROJECT_ROOT"/*.xcodeproj
+rm -f "$PROJECT_ROOT"/*.xcworkspace
+rm -f "$PROJECT_ROOT"/Package.resolved
+
 # Clean DerivedData
 echo "🗑️ Cleaning Xcode DerivedData..."
 rm -rf ~/Library/Developer/Xcode/DerivedData/*YeelightControl*
