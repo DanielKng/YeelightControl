@@ -26,7 +26,10 @@ if [ -d "$XCODE_DIR" ]; then
 fi
 
 # Create Xcode directory
+echo "📁 Creating Xcode directory structure..."
 mkdir -p "$XCODE_DIR"
+mkdir -p "$XCODE_DIR/$PROJECT_NAME"
+mkdir -p "$XCODE_DIR/$PROJECT_NAME/Resources"
 
 # Create Resources directory if it doesn't exist
 if [ ! -d "$WORKSPACE_ROOT/Resources" ]; then
@@ -37,9 +40,6 @@ fi
 
 # Method 1: Create a new Xcode project using Xcode's command line tools
 echo "📝 Creating new Xcode project..."
-
-# Create a new Xcode project using Swift UI template
-mkdir -p "$XCODE_DIR/$PROJECT_NAME"
 
 # Create Info.plist
 echo "📄 Creating Info.plist..."
@@ -99,7 +99,6 @@ EOL
 
 # Create LaunchScreen.storyboard
 echo "📱 Creating LaunchScreen.storyboard..."
-mkdir -p "$XCODE_DIR/$PROJECT_NAME/Resources"
 cat > "$XCODE_DIR/$PROJECT_NAME/Resources/LaunchScreen.storyboard" << EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="21507" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
@@ -166,7 +165,6 @@ EOL
 
 # Copy source files
 echo "📂 Copying source files..."
-mkdir -p "$XCODE_DIR/$PROJECT_NAME"
 rsync -av --exclude='.DS_Store' --exclude='.git' "$SOURCE_DIR/" "$XCODE_DIR/$PROJECT_NAME/"
 
 # Count files copied for verification
@@ -238,9 +236,17 @@ EOL
 
     # Generate project with tuist
     cd "$XCODE_DIR"
-    tuist generate
+    tuist generate || {
+        echo "⚠️ Tuist failed to generate the project. This might be due to Xcode path issues."
+        echo "Try running: sudo xcode-select -s /Applications/Xcode.app"
+        echo "Then run this script again."
+        echo "Falling back to alternative project generation method..."
+        cd "$WORKSPACE_ROOT"
+    }
     
-    echo "✅ Created Xcode project with tuist"
+    if [ -d "$XCODE_DIR/$PROJECT_NAME.xcodeproj" ]; then
+        echo "✅ Created Xcode project with tuist"
+    fi
     
 # Check if xcodegen is installed (alternative method)
 elif command -v xcodegen &> /dev/null; then
@@ -280,15 +286,23 @@ EOL
 
     # Run xcodegen
     cd "$XCODE_DIR"
-    xcodegen generate
+    xcodegen generate || {
+        echo "⚠️ XcodeGen failed to generate the project."
+        echo "Falling back to alternative project generation method..."
+        cd "$WORKSPACE_ROOT"
+    }
     
-    echo "✅ Created Xcode project with xcodegen"
+    if [ -d "$XCODE_DIR/$PROJECT_NAME.xcodeproj" ]; then
+        echo "✅ Created Xcode project with xcodegen"
+    fi
     
 else
     echo "⚠️ Neither tuist nor xcodegen found. Using manual project creation method..."
-    
-    # Create a basic project structure that can be opened in Xcode
-    # This is a fallback method that will require manual configuration in Xcode
+fi
+
+# If neither tuist nor xcodegen succeeded, create a basic project structure
+if [ ! -d "$XCODE_DIR/$PROJECT_NAME.xcodeproj" ]; then
+    echo "📝 Creating basic Xcode project structure..."
     
     # Create a basic xcodeproj structure
     mkdir -p "$XCODE_DIR/$PROJECT_NAME.xcodeproj"
@@ -329,9 +343,16 @@ elif [ -d "$PROJECT_NAME.xcodeproj" ]; then
     open "$PROJECT_NAME.xcodeproj"
 else
     echo "No Xcode project or workspace found."
+    echo "You may need to create a new project manually in Xcode:"
+    echo "  1. Create a new iOS App project with SwiftUI interface"
+    echo "  2. Add your source files from the $PROJECT_NAME directory"
+    echo "  3. Configure the Info.plist with required permissions"
 fi
 EOL
 chmod +x "$XCODE_DIR/open_project.sh"
+
+# Create a .gitkeep file to maintain the directory structure
+touch "$XCODE_DIR/.gitkeep"
 
 # Verify app entry point files exist
 echo "🔍 Verifying app entry point files..."
@@ -367,7 +388,11 @@ echo "  brew install xcodegen    # or"
 echo "  brew install tuist"
 echo "  Then run this script again"
 echo ""
-echo "Option 2: Create a new project manually in Xcode"
+echo "Option 2: Set Xcode path if you see Info.plist errors:"
+echo "  sudo xcode-select -s /Applications/Xcode.app"
+echo "  Then run this script again"
+echo ""
+echo "Option 3: Create a new project manually in Xcode"
 echo "  1. Create a new iOS App project with SwiftUI interface"
 echo "  2. Add your source files from the Sources directory"
 echo "  3. Configure the Info.plist with required permissions"
