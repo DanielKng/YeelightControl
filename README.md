@@ -210,9 +210,12 @@ I've designed the development workflow to be smooth and maintainable:
    ```
 
 2. **Daily Development**
-   - Work in Xcode as normal
-   - Use SwiftUI previews for rapid development
-   - Changes are tracked in Sources and Resources
+   - Work directly in the `/Sources` directory
+   - All source code changes should be made in the appropriate `/Sources` subdirectories
+   - The `/Build` directory is temporary and automatically generated
+   - Run `./Scripts/setup_xcode_project.sh` when you need to test in Xcode
+   - Use your preferred editor to modify source files
+   - Changes are tracked in git from the `/Sources` and `/Resources` directories
 
 3. **Before Committing**
    ```bash
