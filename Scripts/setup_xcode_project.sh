@@ -222,7 +222,7 @@ EOL
 
 # Create project.yml
 echo "📝 Creating XcodeGen configuration..."
-cat > "$CONFIGS_DIR/project.yml" << 'EOL'
+cat > "project.yml" << 'EOL'
 name: YeelightControl
 options:
   bundleIdPrefix: de.knng.app
@@ -245,19 +245,12 @@ targets:
     platform: iOS
     sources:
       - path: Sources/App
-        name: App
       - path: Sources/Models
-        name: Models
       - path: Sources/Views
-        name: Views
       - path: Sources/Controllers
-        name: Controllers
       - path: Sources/Utils
-        name: Utils
       - path: Sources/Extensions
-        name: Extensions
       - path: Sources/Services
-        name: Services
     info:
       path: Resources/Configs/App-Info.plist
     settings:
@@ -273,7 +266,6 @@ targets:
       - target: YeelightControl
     sources:
       - path: Sources/Widget
-        name: Widget
     info:
       path: Resources/Configs/Widget-Info.plist
     settings:
@@ -305,8 +297,7 @@ EOL
 
 # Run XcodeGen
 echo "🛠 Running XcodeGen..."
-cd "$PROJECT_ROOT"
-xcodegen generate --spec "$CONFIGS_DIR/project.yml" --project "$BUILD_DIR"
+xcodegen generate
 
 echo "✅ Setup complete!"
 
