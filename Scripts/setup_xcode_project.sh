@@ -223,40 +223,6 @@ settings:
     MARKETING_VERSION: 1.0.0
     CURRENT_PROJECT_VERSION: 1
 
-schemes:
-  YeelightControl:
-    build:
-      targets:
-        YeelightControl: all
-    run:
-      config: Debug
-      commandLineArguments:
-        "-FIRDebugEnabled": true
-    profile:
-      config: Release
-    analyze:
-      config: Debug
-    archive:
-      config: Release
-    test:
-      config: Debug
-      gatherCoverageData: true
-      targets:
-        - YeelightControlTests
-    
-  YeelightWidget:
-    build:
-      targets:
-        YeelightWidget: all
-    run:
-      config: Debug
-    profile:
-      config: Release
-    analyze:
-      config: Debug
-    archive:
-      config: Release
-
 targets:
   YeelightControl:
     type: application
@@ -285,7 +251,6 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol
         TARGETED_DEVICE_FAMILY: 1
         ENABLE_PREVIEWS: YES
-        DEVELOPMENT_TEAM: ""
 
   YeelightWidget:
     type: app-extension
@@ -301,7 +266,38 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.widget
         TARGETED_DEVICE_FAMILY: 1
         ENABLE_PREVIEWS: YES
-        DEVELOPMENT_TEAM: ""
+
+  YeelightControlTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: YeelightControl
+
+schemes:
+  YeelightControl:
+    build:
+      targets:
+        YeelightControl: all
+        YeelightWidget: all
+    run:
+      config: Debug
+      commandLineArguments:
+        "-FIRDebugEnabled": true
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - name: YeelightControlTests
+          parallelizable: true
+          randomExecutionOrder: true
 EOL
 
 # Generate Xcode project
@@ -309,10 +305,11 @@ echo "🛠️ Generating Xcode project..."
 xcodegen generate
 
 echo "✨ Project setup complete!"
-echo "Opening Xcode project..."
 
+# Try to open the Xcode project
 if [ -d "YeelightControl.xcodeproj" ]; then
-    open "YeelightControl.xcodeproj"
+    echo "Opening Xcode project..."
+    open YeelightControl.xcodeproj
 else
     echo "Error: Xcode project not found"
     exit 1
