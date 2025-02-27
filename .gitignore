@@ -19,6 +19,9 @@ xcuserdata/
 !*.xcodeproj/xcshareddata/
 !*.xcworkspace/contents.xcworkspacedata
 
+# Track XcodeGen configuration
+!project.yml
+
 ## Build generated
 build/
 DerivedData/
@@ -288,4 +291,27 @@ temp_backup/
 
 # YeelightControl specific
 Xcode/build/
-Resources/Screenshots/*.png 
+Resources/Screenshots/*.png
+
+# Generated files
+Resources/Configs/
+project.yml
+
+# CocoaPods
+*.xcconfig
+Podfile.lock
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
+
+# Build directory
+Build/
+
+# Temporary files
+*.swp
+*.swo
+*~
+
+# Backup files
+temp_backup/ 
