@@ -146,6 +146,8 @@ YeelightControl/
 ├── Resources/        # App resources
 │   ├── Assets/       # Images and assets
 │   ├── Configs/      # Configuration files
+│   │   ├── Package.swift  # Swift package definition
+│   │   └── project.yml    # XcodeGen configuration
 │   └── Localization/ # Localization files
 │
 ├── Scripts/         # Development scripts
