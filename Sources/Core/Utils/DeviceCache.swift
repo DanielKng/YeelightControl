@@ -2,6 +2,7 @@ import Foundation
 
 class DeviceCache {
     static let shared = DeviceCache()
+    private let debugSettings = DebugSettings.shared
     private let cache = NSCache<NSString, CachedDevice>()
     private let fileManager = FileManager.default
     private let cacheDirectory: URL
@@ -20,13 +21,17 @@ class DeviceCache {
         
         self.cacheDirectory = directory
         
-        // Clean old cache files on init
-        cleanOldCacheFiles()
+        // Clean old cache files on init if debugging is enabled
+        if debugSettings.deviceCacheDebugging {
+            cleanOldCacheFiles()
+        }
     }
     
     // MARK: - Cache Management
     
     func cacheDevice(_ device: YeelightDevice) {
+        guard debugSettings.deviceCacheDebugging else { return }
+        
         let cachedDevice = CachedDevice(
             ip: device.ip,
             port: device.port,

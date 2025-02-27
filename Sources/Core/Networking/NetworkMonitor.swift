@@ -12,6 +12,7 @@ class NetworkMonitor: ObservableObject {
     
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "NetworkMonitor")
+    private let debugSettings = DebugSettings.shared
     
     struct WiFiDetails {
         let ssid: String
@@ -41,7 +42,7 @@ class NetworkMonitor: ObservableObject {
     
     init() {
         setupMonitoring()
-        startInterfaceMonitoring()
+        setupDebugObserver()
     }
     
     private func setupMonitoring() {
@@ -62,6 +63,32 @@ class NetworkMonitor: ObservableObject {
         }
         
         monitor.start(queue: queue)
+    }
+    
+    private func setupDebugObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(debugSettingsChanged),
+            name: UserDefaults.didChangeNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func debugSettingsChanged() {
+        if debugSettings.networkMonitoring {
+            startMonitoring()
+        } else {
+            stopMonitoring()
+        }
+    }
+    
+    func startMonitoring() {
+        guard debugSettings.networkMonitoring else { return }
+        startInterfaceMonitoring()
+    }
+    
+    private func stopMonitoring() {
+        // Implementation needed to stop monitoring
     }
     
     private func updateConnectionType(_ path: NWPath) {

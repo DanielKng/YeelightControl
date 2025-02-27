@@ -2,6 +2,7 @@ import Foundation
 
 class ConnectionLogger {
     static let shared = ConnectionLogger()
+    private let debugSettings = DebugSettings.shared
     private let maxEntries = 1000
     
     struct ConnectionEvent: Codable {
@@ -30,6 +31,8 @@ class ConnectionLogger {
     }
     
     func logEvent(_ event: String, deviceIP: String? = nil, status: ConnectionEvent.Status, details: String? = nil) {
+        guard debugSettings.connectionLogging else { return }
+        
         let entry = ConnectionEvent(
             timestamp: Date(),
             event: event,

@@ -8,6 +8,9 @@ import BackgroundTasks
 struct YeelightApp: App {
     // MARK: - Properties
     
+    /// Debug settings manager
+    @StateObject private var debugSettings = DebugSettings.shared
+    
     /// Main manager for Yeelight devices
     @StateObject private var yeelightManager = YeelightManager.shared
     
@@ -28,7 +31,7 @@ struct YeelightApp: App {
     init() {
         // Register background tasks for device state refresh
         BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: "com.yeelight.refresh",
+            forTaskWithIdentifier: "de.knng.yeelightcontrol.refresh",
             using: nil
         ) { task in
             self.handleAppRefresh(task: task as! BGAppRefreshTask)
@@ -48,9 +51,12 @@ struct YeelightApp: App {
                 .environmentObject(deviceStorage)
                 .environmentObject(sceneManager)
                 .environmentObject(backgroundRefreshManager)
+                .environmentObject(debugSettings)
                 .onAppear {
-                    // Start network monitoring when app appears
-                    networkMonitor.startMonitoring()
+                    // Start network monitoring only if enabled in debug settings
+                    if debugSettings.networkMonitoring {
+                        networkMonitor.startMonitoring()
+                    }
                     
                     // Load saved devices from persistent storage
                     deviceStorage.loadDevices()

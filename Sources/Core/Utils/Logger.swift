@@ -3,6 +3,7 @@ import SwiftUI
 
 class Logger: ObservableObject {
     static let shared = Logger()
+    private let debugSettings = DebugSettings.shared
     
     // MARK: - Configuration
     private let maxFileSize = 10 * 1024 * 1024 // 10MB
@@ -15,10 +16,6 @@ class Logger: ObservableObject {
     
     // MARK: - Properties
     @Published private(set) var logs: [LogEntry] = []
-    @AppStorage("debugMode") private var debugMode = false
-    @AppStorage("logToFile") private var logToFile = false
-    @AppStorage("logLevel") private var minimumLogLevel = LogEntry.Level.info.rawValue
-    
     private let fileManager = FileManager.default
     private let queue = DispatchQueue(label: "com.yeelight.logger")
     private let maxMemoryLogs = 1000
@@ -46,6 +43,10 @@ class Logger: ObservableObject {
     }
     
     func log(_ message: String, level: LogEntry.Level = .info, category: LogEntry.Category = .general, file: String = #file, line: Int = #line, function: String = #function) {
+        // Only log if appropriate debug settings are enabled
+        guard level.rawValue >= debugSettings.logLevel else { return }
+        if level == .debug && !debugSettings.debugMode { return }
+        
         let entry = LogEntry(
             timestamp: Date(),
             message: message,
@@ -56,15 +57,12 @@ class Logger: ObservableObject {
             sourceFunction: function
         )
         
-        guard level.rawValue >= minimumLogLevel else { return }
-        if level == .debug && !debugMode { return }
-        
         DispatchQueue.main.async {
             self.logs.append(entry)
             self.trimLogsIfNeeded()
         }
         
-        if logToFile {
+        if debugSettings.logToFile {
             queue.async { self.writeToFile(entry) }
         }
     }
