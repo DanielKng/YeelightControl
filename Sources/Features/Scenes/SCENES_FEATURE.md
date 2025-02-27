@@ -1,4 +1,4 @@
-# Scenes Feature README
+# Scenes Feature Documentation
 
 This directory contains the implementation of the Scenes feature in YeelightControl.
 

@@ -172,6 +172,12 @@ This separation allows for:
 - **Network Discovery**: I've added automatic device detection using Bonjour
 - **Async/Await**: I've utilized modern concurrency for network operations
 
+### Module Documentation
+
+For detailed documentation on specific modules, see:
+- [Device Module Documentation](Sources/Core/Device/DEVICE_MODULE.md)
+- [Scenes Feature Documentation](Sources/Features/Scenes/SCENES_FEATURE.md)
+
 ### Building from Source
 
 <details>

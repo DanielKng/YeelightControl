@@ -1,4 +1,4 @@
-# Device Module README
+# Device Module Documentation
 
 This directory contains the core device management functionality for YeelightControl.
 
