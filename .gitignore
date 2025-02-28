@@ -315,4 +315,19 @@ Build/
 *~
 
 # Backup files
-temp_backup/ 
+temp_backup/
+
+### Build ###
+Build/
+DerivedData/
+
+### Generated Files ###
+Sources/Core/Core.h
+Sources/Core/Core.modulemap
+Sources/UI/UI.h
+Sources/UI/UI.modulemap
+
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride 
