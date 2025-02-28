@@ -1,9 +1,9 @@
 # Testing Guide
 
 ## Quick Links
-- 📚 [API Reference](../reference/api-reference.md#error-handling)
+- 📚 [API Reference](../reference/api-reference.md#testing)
 - 🔧 [Troubleshooting](troubleshooting.md)
-- 📝 [Example Code](../examples/basic-control/README.md)
+- 📝 [Example Code](../examples/testing/README.md)
 
 ## Table of Contents
 - [Overview](#overview)
@@ -247,6 +247,6 @@ jobs:
 
 ## Additional Resources
 - [XCTest Documentation](https://developer.apple.com/documentation/xctest)
-- [Testing Tips & Tricks](../examples/error-handling/README.md)
-- [UI Testing Guide](../examples/basic-control/README.md)
-- [Performance Testing Best Practices](../reference/api-reference.md#best-practices) 
+- [Testing Tips & Tricks](../examples/testing/README.md#best-practices)
+- [UI Testing Guide](../examples/testing/README.md#ui-tests)
+- [Performance Testing Best Practices](../reference/api-reference.md#testing) 

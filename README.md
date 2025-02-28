@@ -86,25 +86,52 @@ A modern iOS app for controlling Yeelight smart lighting devices. Built with Swi
 
 ### Guides
 - [Getting Started Guide](docs/guides/getting-started.md)
-- [Security Best Practices](docs/guides/security.md)
-- [Troubleshooting](docs/guides/troubleshooting.md)
+- [Security Guide](docs/guides/security.md)
+- [Testing Guide](docs/guides/testing.md)
+- [Troubleshooting Guide](docs/guides/troubleshooting.md)
+- [Migration Guide](docs/guides/migration.md)
+- [UI Guidelines](docs/guides/ui-guidelines.md)
+- [Widget Setup Guide](docs/guides/widget-setup.md)
 
 ### API Reference
+- [Overview](docs/reference/api-reference.md#overview)
 - [Core APIs](docs/reference/api-reference.md#core-apis)
+  - [Device Management](docs/reference/api-reference.md#device-management)
+  - [Effect Management](docs/reference/api-reference.md#effect-management)
+  - [Scene Management](docs/reference/api-reference.md#scene-management)
 - [Feature APIs](docs/reference/api-reference.md#feature-apis)
+  - [Automation](docs/reference/api-reference.md#automation)
+  - [Room Management](docs/reference/api-reference.md#room-management)
 - [UI Components](docs/reference/api-reference.md#ui-components)
+- [Widget Integration](docs/reference/api-reference.md#widget-integration)
+- [Error Handling](docs/reference/api-reference.md#error-handling)
+- [Best Practices](docs/reference/api-reference.md#best-practices)
+- [Testing](docs/reference/api-reference.md#testing)
 
 ### Examples
 - [Basic Device Control](docs/examples/basic-control/README.md)
 - [Lighting Effects](docs/examples/effects/README.md)
 - [Scene Management](docs/examples/scenes/README.md)
+- [Error Handling](docs/examples/error-handling/README.md)
+- [Testing](docs/examples/testing/README.md)
+- [UI Examples](docs/examples/ui/README.md)
+- [Widget Examples](docs/examples/widget/README.md)
+- [Automation](docs/examples/automation/README.md)
+- [Room Management](docs/examples/rooms/README.md)
 
 ### Module Documentation
 - [Core Module](Sources/Core/README.md)
+  - [Device API](Sources/Core/Device/README.md)
+  - [Effects API](Sources/Core/Effects/README.md)
+  - [Scenes API](Sources/Core/Scenes/README.md)
+  - [Error Types](Sources/Core/Errors/README.md)
 - [Features Module](Sources/Features/README.md)
+  - [Automation](Sources/Features/Automation/README.md)
+  - [Room Management](Sources/Features/Rooms/README.md)
 - [UI Module](Sources/UI/README.md)
 - [Tests Module](Sources/Tests/README.md)
 - [Widget Module](Sources/Widget/README.md)
+- [App Module](Sources/App/README.md)
 
 ## Project Structure
 
