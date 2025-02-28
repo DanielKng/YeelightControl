@@ -189,6 +189,33 @@ protocol SceneManaging {
 }
 ```
 
+### Testing
+```swift
+protocol TestingProtocol {
+    /// Run unit tests for a specific component
+    /// - Parameter component: Component to test
+    /// - Returns: Test results
+    /// - Throws: TestError if tests fail
+    func runTests(for component: Component) async throws -> TestResults
+    
+    /// Run integration tests
+    /// - Parameter configuration: Test configuration
+    /// - Returns: Test results
+    /// - Throws: TestError if tests fail
+    func runIntegrationTests(
+        configuration: TestConfiguration
+    ) async throws -> TestResults
+    
+    /// Run performance tests
+    /// - Parameter metrics: Metrics to measure
+    /// - Returns: Performance results
+    /// - Throws: TestError if tests fail
+    func runPerformanceTests(
+        metrics: [PerformanceMetric]
+    ) async throws -> PerformanceResults
+}
+```
+
 ## Feature APIs
 
 ### Automation
@@ -585,9 +612,6 @@ protocol SecureCommunication {
 
 ### Support Channels
 - GitHub Issues: Report bugs and feature requests
-- Discord Community: Real-time support and discussions
-- Stack Overflow: Technical Q&A
-- Email Support: enterprise@yeelightcontrol.com
 
 ### Sample Code
 - [Basic Device Control](../examples/basic-control)
@@ -596,9 +620,24 @@ protocol SecureCommunication {
 - [Error Handling](../examples/error-handling)
 - [Security Implementation](../examples/security)
 
-### Updates and Maintenance
-- Regular security updates
-- Quarterly feature releases
-- Monthly bug fixes
-- LTS (Long Term Support) versions available
-- Deprecation notices with 6-month grace period
+### Support
+For technical support and assistance:
+- GitHub Issues: Report bugs and feature requests
+- Documentation: Refer to module README files
+
+### Best Practices
+- Follow the provided protocols and interfaces
+- Handle errors appropriately
+- Implement proper error recovery
+- Use appropriate logging levels
+- Follow rate limiting guidelines
+- Maintain type safety
+
+### Documentation
+For detailed information about specific topics, please refer to the module README files:
+- [Core Module](../Sources/Core/README.md)
+- [Features Module](../Sources/Features/README.md)
+- [UI Module](../Sources/UI/README.md)
+- [Tests Module](../Sources/Tests/README.md)
+- [Widget Module](../Sources/Widget/README.md)
+- [App Module](../Sources/App/README.md)
