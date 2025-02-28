@@ -25,6 +25,7 @@ mkdir -p "$CONFIGS_DIR"
 
 # Clean up previous build files
 if [ -d "$BUILD_DIR" ]; then
+    echo "🧹 Cleaning build directory..."
     rm -rf "$BUILD_DIR"/*
 fi
 
@@ -47,9 +48,13 @@ import SwiftUI
 
 @main
 struct YeelightControlApp: App {
+    // Initialize the YeelightManager as a StateObject to persist across view updates
+    @StateObject private var yeelightManager = YeelightManager.shared
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainView()
+                .environmentObject(yeelightManager)
         }
     }
 }
@@ -220,9 +225,9 @@ final class YeelightControlTests: XCTestCase {
 }
 EOL
 
-# Create project.yml
+# Create project.yml in the Build directory
 echo "📝 Creating XcodeGen configuration..."
-cat > "project.yml" << 'EOL'
+cat > "$BUILD_DIR/project.yml" << 'EOL'
 name: YeelightControl
 options:
   bundleIdPrefix: de.knng.app
@@ -244,15 +249,15 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: Sources/App
-      - path: Sources/Models
-      - path: Sources/Views
-      - path: Sources/Controllers
-      - path: Sources/Utils
-      - path: Sources/Extensions
-      - path: Sources/Services
+      - path: ../Sources/App
+      - path: ../Sources/Models
+      - path: ../Sources/Views
+      - path: ../Sources/Controllers
+      - path: ../Sources/Utils
+      - path: ../Sources/Extensions
+      - path: ../Sources/Services
     info:
-      path: Resources/Configs/App-Info.plist
+      path: ../Resources/Configs/App-Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol
@@ -265,9 +270,9 @@ targets:
     dependencies:
       - target: YeelightControl
     sources:
-      - path: Sources/Widget
+      - path: ../Sources/Widget
     info:
-      path: Resources/Configs/Widget-Info.plist
+      path: ../Resources/Configs/Widget-Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.widget
@@ -278,7 +283,7 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: Tests
+      - path: ../Tests
     dependencies:
       - target: YeelightControl
 
@@ -295,16 +300,23 @@ schemes:
           randomExecutionOrder: true
 EOL
 
-# Run XcodeGen
+# Run XcodeGen in the Build directory
 echo "🛠 Running XcodeGen..."
+cd "$BUILD_DIR"
 xcodegen generate
 
-echo "✅ Setup complete!"
+# Check if we're in CI environment
+IS_CI=false
+if [ -n "${CI}" ] || [ -n "${GITHUB_ACTIONS}" ] || [ -n "${GITLAB_CI}" ] || [ -n "${JENKINS_URL}" ]; then
+    IS_CI=true
+fi
 
-# Try to open the Xcode project only if we have a GUI
-if [ -d "YeelightControl.xcodeproj" ] && [ -n "$DISPLAY" ]; then
-    echo "Opening Xcode project..."
-    open YeelightControl.xcodeproj
+# Try to open the Xcode project if not in CI and if we have a GUI
+if [ "$IS_CI" = false ] && [ -d "YeelightControl.xcodeproj" ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then  # Check if we're on macOS
+        echo "Opening Xcode project..."
+        open YeelightControl.xcodeproj
+    fi
 fi
 
 # Verify generated files
@@ -315,5 +327,7 @@ ls -la YeelightControl.xcodeproj
 echo -e "\nConfig files:"
 ls -la "$CONFIGS_DIR"
 
-echo -e "\nProject.yml content:"
-cat project.yml 
+echo -e "\nBuild directory content:"
+ls -la "$BUILD_DIR"
+
+echo "✅ Setup complete!" 
