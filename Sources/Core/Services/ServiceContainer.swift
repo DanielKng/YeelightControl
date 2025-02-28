@@ -1,102 +1,83 @@
 import Foundation
 import SwiftUI
-import Combine
 
 /// Container for all services used in the app
-@MainActor
-public final class ServiceContainer: ObservableObject {
+final class ServiceContainer {
     /// Shared instance of the service container
-    public static let shared = ServiceContainer()
+    static let shared = ServiceContainer()
     
     // MARK: - Core Services
     
     /// Logger service for app-wide logging
-    @Published private(set) var logger: UnifiedLogger
+    let logger: UnifiedLogger
     
     /// Network manager for handling all network operations
-    @Published private(set) var networkManager: UnifiedNetworkManager
+    let networkManager: UnifiedNetworkManager
     
     /// Yeelight device manager
-    @Published private(set) var yeelightManager: UnifiedYeelightManager
+    let yeelightManager: UnifiedYeelightManager
     
     /// Background task manager
-    @Published private(set) var backgroundManager: UnifiedBackgroundManager
+    let backgroundManager: UnifiedBackgroundManager
     
     /// Effect manager for visual effects
-    @Published private(set) var effectManager: UnifiedEffectManager
+    let effectManager: UnifiedEffectManager
     
     // MARK: - Services
-    @Published private(set) var storageManager: UnifiedStorageManager
-    @Published private(set) var configManager: UnifiedConfigurationManager
-    @Published private(set) var errorManager: UnifiedErrorHandler
-    @Published private(set) var connectionManager: UnifiedConnectionManager
-    @Published private(set) var stateManager: UnifiedStateManager
-    @Published private(set) var deviceManager: UnifiedDeviceManager
-    @Published private(set) var roomManager: UnifiedRoomManager
-    @Published private(set) var automationManager: UnifiedAutomationManager
-    @Published private(set) var locationManager: UnifiedLocationManager
-    @Published private(set) var themeManager: UnifiedThemeManager
-    @Published private(set) var sceneManager: UnifiedSceneManager
-    @Published private(set) var notificationManager: UnifiedNotificationManager
-    @Published private(set) var permissionManager: UnifiedPermissionManager
-    @Published private(set) var securityManager: UnifiedSecurityManager
-    @Published private(set) var analyticsManager: UnifiedAnalyticsManager
+    let storage: StorageManaging
+    let config: ConfigurationManaging
+    let errorHandler: ErrorHandling
+    let connectionManager: ConnectionManaging
+    let stateManager: StateManaging
+    let deviceManager: DeviceManaging
+    let roomManager: RoomManaging
+    let automationManager: AutomationManaging
+    let locationManager: LocationManaging
+    let themeManager: ThemeManaging
+    let sceneManager: SceneManaging
+    let analyticsManager: AnalyticsManaging
+    let notificationManager: NotificationManaging
+    let permissionManager: PermissionManaging
+    let securityManager: SecurityManaging
     
     // MARK: - Initialization
     
     private init() {
-        // Initialize core services
-        storageManager = UnifiedStorageManager.shared
-        networkManager = UnifiedNetworkManager.shared
-        stateManager = UnifiedStateManager.shared
-        deviceManager = UnifiedDeviceManager.shared
-        sceneManager = UnifiedSceneManager.shared
-        effectManager = UnifiedEffectManager.shared
-        backgroundManager = UnifiedBackgroundManager.shared
-        notificationManager = UnifiedNotificationManager.shared
-        permissionManager = UnifiedPermissionManager.shared
-        analyticsManager = UnifiedAnalyticsManager.shared
-        securityManager = UnifiedSecurityManager.shared
-        errorManager = UnifiedErrorHandler.shared
+        // Initialize core services first
+        self.storage = UnifiedStorageManager()
+        self.config = UnifiedConfigurationManager(storage: self.storage)
+        self.logger = UnifiedLogger(services: self)
+        self.errorHandler = UnifiedErrorHandler(storage: self.storage)
         
-        // Setup dependencies
-        networkManager.messageHandler = deviceManager
-        deviceManager.stateManager = stateManager
-        deviceManager.networkManager = networkManager
-        deviceManager.storageManager = storageManager
-        
-        sceneManager.deviceManager = deviceManager
-        sceneManager.storageManager = storageManager
-        
-        effectManager.deviceManager = deviceManager
-        effectManager.storageManager = storageManager
-        
-        backgroundManager.deviceManager = deviceManager
-        backgroundManager.sceneManager = sceneManager
-        backgroundManager.effectManager = effectManager
-        
-        notificationManager.deviceManager = deviceManager
-        notificationManager.sceneManager = sceneManager
-        
-        errorManager.storageManager = storageManager
+        // Initialize network-dependent services
+        self.networkManager = UnifiedNetworkManager(services: self)
+        self.connectionManager = UnifiedConnectionManager(services: self)
         
         // Initialize state management
         self.stateManager = UnifiedStateManager(services: self)
         
         // Initialize device managers that depend on network
         self.yeelightManager = UnifiedYeelightManager(services: self)
-        self.connectionManager = UnifiedConnectionManager(services: self)
+        self.deviceManager = UnifiedDeviceManager(services: self)
         
         // Initialize location and permission services
         self.locationManager = UnifiedLocationManager(services: self)
+        self.permissionManager = UnifiedPermissionManager(services: self)
         
         // Initialize feature managers
         self.roomManager = UnifiedRoomManager(services: self)
         self.automationManager = UnifiedAutomationManager(services: self)
+        self.sceneManager = UnifiedSceneManager(services: self)
+        
+        // Initialize UI and background services
+        self.backgroundManager = UnifiedBackgroundManager(services: self)
+        self.effectManager = UnifiedEffectManager(services: self)
         self.themeManager = UnifiedThemeManager(services: self)
         
-        // Initialize config manager
-        self.configManager = UnifiedConfigurationManager(storageManager: storageManager)
+        // Initialize auxiliary services
+        self.analyticsManager = UnifiedAnalyticsManager(services: self)
+        self.notificationManager = UnifiedNotificationManager(services: self)
+        self.securityManager = UnifiedSecurityManager(services: self)
         
         setupObservers()
     }
