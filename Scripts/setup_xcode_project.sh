@@ -254,6 +254,7 @@ options:
   indentWidth: 4
   tabWidth: 4
   defaultConfig: Debug
+  transitivelyLinkDependencies: true
 
 settings:
   base:
@@ -268,6 +269,8 @@ settings:
     ENABLE_TESTABILITY: YES
     SWIFT_OPTIMIZATION_LEVEL: "-Onone"
     SWIFT_STRICT_CONCURRENCY: complete
+    ALWAYS_SEARCH_USER_PATHS: NO
+    FRAMEWORK_SEARCH_PATHS: $(inherited) $(PLATFORM_DIR)/Developer/Library/Frameworks
 
 targets:
   Core:
@@ -285,9 +288,12 @@ targets:
         DEFINES_MODULE: YES
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_NAME: Core
-        SKIP_INSTALL: YES
         SWIFT_INSTALL_OBJC_HEADER: NO
         CLANG_ENABLE_MODULES: NO
+        CURRENT_PROJECT_VERSION: 1
+        VERSIONING_SYSTEM: apple-generic
+        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
+        SKIP_INSTALL: NO
     dependencies:
       - framework: SwiftUI
       - framework: Foundation
@@ -313,9 +319,12 @@ targets:
         DEFINES_MODULE: YES
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_NAME: UI
-        SKIP_INSTALL: YES
         SWIFT_INSTALL_OBJC_HEADER: NO
         CLANG_ENABLE_MODULES: NO
+        CURRENT_PROJECT_VERSION: 1
+        VERSIONING_SYSTEM: apple-generic
+        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
+        SKIP_INSTALL: NO
     dependencies:
       - target: Core
       - framework: SwiftUI
@@ -335,9 +344,12 @@ targets:
         DEFINES_MODULE: YES
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_NAME: Features
-        SKIP_INSTALL: YES
         SWIFT_INSTALL_OBJC_HEADER: NO
         CLANG_ENABLE_MODULES: NO
+        CURRENT_PROJECT_VERSION: 1
+        VERSIONING_SYSTEM: apple-generic
+        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
+        SKIP_INSTALL: NO
     dependencies:
       - target: Core
       - target: UI
@@ -361,6 +373,7 @@ targets:
         DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
         DEFINES_MODULE: YES
         GENERATE_INFOPLIST_FILE: YES
+        LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/Frameworks @loader_path/Frameworks
     dependencies:
       - target: Core
         embed: true
@@ -387,6 +400,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_INSTALL_OBJC_HEADER: NO
         CLANG_ENABLE_MODULES: NO
+        LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks
     dependencies:
       - target: Core
       - target: UI
@@ -402,6 +416,8 @@ schemes:
         Features: [run, test]
         YeelightControl: all
         YeelightWidget: [run, test]
+      parallelizeBuild: true
+      buildImplicitDependencies: true
     run:
       config: Debug
       environmentVariables:
