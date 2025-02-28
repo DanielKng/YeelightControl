@@ -64,72 +64,51 @@ A modern iOS app for controlling Yeelight smart lighting devices. Built with Swi
 
 ```
 Sources/
-├── App/                    # Main app entry point
+├── App/                    # Main app target and entry point
 ├── Core/                   # Core functionality and services
-│   ├── Analytics/         # Analytics tracking
-│   ├── Background/        # Background task handling
-│   ├── Configuration/     # App configuration
-│   ├── Device/           # Device management
-│   ├── Effect/           # Effect handling
-│   ├── Error/            # Centralized error handling
-│   ├── Location/         # Location services
-│   ├── Network/          # Network communication
-│   ├── Notification/     # Push notifications
-│   ├── Permission/       # Permission handling
-│   ├── Scene/            # Scene management
-│   ├── Security/         # Security features
-│   ├── Services/         # Core service protocols
-│   ├── State/            # State management
-│   └── Storage/          # Data persistence
+│   ├── Services/          # Core service protocols and implementations
+│   ├── Models/            # Core data models
+│   └── Utils/             # Utility functions and extensions
 │
 ├── Features/              # Feature-specific implementations
 │   ├── Automation/       # Automation features
 │   ├── Effects/          # Light effects
-│   ├── Rooms/            # Room management
 │   └── Scenes/           # Scene management
 │
 ├── UI/                    # UI components and views
 │   ├── Components/       # Reusable UI components
 │   └── Views/            # Feature-specific views
-│       ├── DeviceViews/
-│       ├── SceneViews/
-│       └── EffectViews/
+│
+├── Extensions/            # Swift and Framework extensions
+├── Utils/                 # Shared utilities
+├── Controllers/           # View controllers and coordinators
+├── Models/                # Shared data models
+├── Views/                 # Common view components
 │
 ├── Tests/                 # Test files
-│   └── UITests/          # UI Tests
+│   ├── UITests/          # UI Tests
+│   └── UnitTests/        # Unit Tests
 │
 └── Widget/                # Widget extension
 ```
 
 ## 🏗 Architecture
 
-The project follows a clean, modular architecture with clear separation of concerns:
+The project follows a modular architecture with clear separation of concerns:
 
 ### Core Module
-> Foundation of the application, containing essential services and managers.
-
-- **Device Management** - Device discovery and control
-- **Error Handling** - Centralized error management
-- **Storage** - Data persistence layer
-- **Network** - Communication protocols
-- **Security** - Authentication and encryption
+- **Services Layer** - Core business logic and protocols
+- **Models** - Shared data models
+- **Utils** - Common utilities and helpers
 
 ### Features Module
-> Self-contained feature implementations building on core functionality.
-
 - **Automation** - Scheduling and triggers
-- **Scenes** - Lighting scene management
 - **Effects** - Dynamic lighting effects
-- **Rooms** - Space organization
+- **Scenes** - Lighting scene management
 
 ### UI Module
-> SwiftUI views and components organized by feature.
-
 - **Components** - Reusable UI elements
 - **Views** - Feature-specific interfaces
-  - Device management
-  - Scene creation
-  - Effect configuration
 
 ## 🚀 Getting Started
 
@@ -141,24 +120,43 @@ The project follows a clean, modular architecture with clear separation of conce
 
 ### Installation
 
-1. **Clone and Setup**
+1. **Clone the Repository**
    ```bash
-   # Clone repository
    git clone https://github.com/DanielKng/YeelightControl.git
    cd YeelightControl
-
-   # Make scripts executable
-   chmod +x Scripts/*.sh
    ```
 
-2. **Project Generation**
+2. **Generate Xcode Project**
    ```bash
-   # Clean and organize
-   ./Scripts/reorganize.sh
-
-   # Generate Xcode project
    ./Scripts/setup_xcode_project.sh
    ```
+   This script will:
+   - Create the necessary build directory structure
+   - Set up symlinks for source files
+   - Generate the Xcode project using XcodeGen
 
-3. **Open in Xcode**
+3. **Open and Build**
+   ```bash
+   open Build/YeelightControl.xcodeproj
    ```
+
+## 🧪 Testing
+
+The project includes both UI and Unit tests:
+
+```bash
+cd Build
+xcodebuild test -scheme YeelightControl -destination "platform=iOS Simulator,name=iPhone 16 Pro Max"
+```
+
+## 📦 Continuous Integration
+
+GitHub Actions automatically builds and tests the project on every push and pull request to the main branch. The workflow:
+- Sets up the macOS environment
+- Installs dependencies
+- Generates the Xcode project
+- Builds and tests the app
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
