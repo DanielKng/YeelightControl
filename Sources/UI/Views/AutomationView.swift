@@ -1,82 +1,122 @@
 import SwiftUI
 
 struct AutomationView: View {
-    @StateObject private var automationManager = AutomationManager.shared
+    // MARK: - Environment
+    
+    @EnvironmentObject private var automationManager: UnifiedAutomationManager
+    @EnvironmentObject private var yeelightManager: UnifiedYeelightManager
+    
+    // MARK: - State
+    
     @State private var showingAddAutomation = false
+    @State private var selectedAutomation: Automation?
+    @State private var showingDeleteAlert = false
+    
+    // MARK: - Body
     
     var body: some View {
-        UnifiedListView(
-            title: "Automations",
-            items: automationManager.automations,
-            emptyStateMessage: "No automations found",
-            onDelete: { indexSet in
-                for index in indexSet {
-                    automationManager.removeAutomation(automationManager.automations[index])
+        List {
+            Section {
+                ForEach(automationManager.automations) { automation in
+                    AutomationRow(automation: automation) {
+                        selectedAutomation = automation
+                    }
+                }
+                .onDelete { indexSet in
+                    if let index = indexSet.first {
+                        selectedAutomation = automationManager.automations[index]
+                        showingDeleteAlert = true
+                    }
+                }
+            } header: {
+                if automationManager.automations.isEmpty {
+                    Text("No automations created yet")
+                        .foregroundColor(.secondary)
                 }
             }
-        ) { automation in
-            AutomationRow(automation: automation)
         }
+        .navigationTitle("Automations")
         .toolbar {
-            Button(action: { showingAddAutomation = true }) {
-                Image(systemName: "plus")
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showingAddAutomation = true
+                } label: {
+                    Image(systemName: "plus")
+                }
             }
         }
         .sheet(isPresented: $showingAddAutomation) {
-            NavigationStack {
-                AutomationEditor(manager: YeelightManager.shared)
+            NavigationView {
+                CreateAutomationView(devices: yeelightManager.devices)
             }
         }
-        .overlay {
-            if automationManager.automations.isEmpty {
-                ContentUnavailableView(
-                    "No Automations",
-                    systemImage: "clock.arrow.2.circlepath",
-                    description: Text("Add automations to control your lights automatically")
-                )
+        .sheet(item: $selectedAutomation) { automation in
+            NavigationView {
+                AutomationEditor(automation: automation, devices: yeelightManager.devices)
             }
+        }
+        .alert("Delete Automation", isPresented: $showingDeleteAlert, presenting: selectedAutomation) { automation in
+            Button("Delete", role: .destructive) {
+                automationManager.deleteAutomation(automation)
+                selectedAutomation = nil
+            }
+            Button("Cancel", role: .cancel) {
+                selectedAutomation = nil
+            }
+        } message: { automation in
+            Text("Are you sure you want to delete '\(automation.name)'?")
         }
     }
 }
 
+// MARK: - Supporting Views
+
 struct AutomationRow: View {
     let automation: Automation
+    let onEdit: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Button {
+            onEdit()
+        } label: {
             HStack {
-                Image(systemName: automation.trigger.icon)
-                    .foregroundColor(.accentColor)
-                
-                Text(automation.name)
-                    .font(.headline)
-                
-                Spacer()
-                
-                Toggle("", isOn: .constant(automation.isEnabled))
-                    .labelsHidden()
-            }
-            
-            Text(automation.trigger.description)
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            if !automation.devices.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(automation.devices) { device in
-                            DeviceChip(device: device)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: automation.trigger.icon)
+                            .foregroundColor(.accentColor)
+                        
+                        Text(automation.name)
+                            .font(.headline)
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: .constant(automation.isEnabled))
+                            .labelsHidden()
+                    }
+                    
+                    Text(automation.trigger.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if !automation.devices.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(automation.devices) { device in
+                                    DeviceChip(device: device)
+                                }
+                            }
                         }
                     }
                 }
             }
+            .padding(.vertical, 8)
         }
-        .padding(.vertical, 8)
+        .buttonStyle(.plain)
     }
 }
 
 struct DeviceChip: View {
-    let device: Device
+    let device: UnifiedYeelightDevice
     
     var body: some View {
         HStack(spacing: 4) {
@@ -94,8 +134,12 @@ struct DeviceChip: View {
     }
 }
 
+// MARK: - Preview
+
 #Preview {
-    NavigationStack {
+    NavigationView {
         AutomationView()
+            .environmentObject(ServiceContainer.shared.automationManager)
+            .environmentObject(ServiceContainer.shared.yeelightManager)
     }
 } 
