@@ -156,14 +156,14 @@ YeelightControl/
 │   │
 │   ├── UI/          # User interface
 │   │   ├── Components/   # Reusable UI components
-│   │   ├── Views/        # Main views
-│   │   └── Widgets/      # Widget components
+│   │   └── Views/        # Main views
 │   │
 │   ├── Tests/       # Test files
 │   │   └── UITests/      # UI test cases
 │   │
 │   └── Widget/      # Widget extension
-│       └── YeelightWidget.swift
+│       ├── DeviceControlWidget.swift  # Home screen widget implementation
+│       └── WidgetBundle.swift         # Widget bundle configuration
 │
 └── Resources/       # Project resources
     └── Screenshots/ # App screenshots
