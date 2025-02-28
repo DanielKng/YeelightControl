@@ -51,40 +51,74 @@ Each module's documentation provides:
 
 #### DeviceManager
 ```swift
+/// Protocol defining core device management functionality
+/// Responsible for device discovery, connection management, and basic device control
 protocol DeviceManaging {
-    /// Discover available devices on the network
+    /// Discovers and returns a list of available Yeelight devices on the local network
+    /// - Returns: Array of discovered Device objects
+    /// - Throws: DeviceError if discovery fails or network is unavailable
     func discoverDevices() async throws -> [Device]
     
-    /// Connect to a specific device
+    /// Establishes connection with a specific device
+    /// - Parameter deviceId: Unique identifier of the target device
+    /// - Throws: DeviceError.connectionFailed if connection cannot be established
     func connect(to deviceId: String) async throws
     
-    /// Disconnect from a device
+    /// Safely disconnects from a specified device
+    /// - Parameter deviceId: Unique identifier of the device to disconnect from
+    /// - Throws: DeviceError if disconnection fails or device is not connected
     func disconnect(from deviceId: String) async throws
     
-    /// Get device state
+    /// Retrieves current state of a specified device
+    /// - Parameter deviceId: Unique identifier of the target device
+    /// - Returns: DeviceState containing current power, brightness, color, and other properties
+    /// - Throws: DeviceError if state cannot be retrieved
     func getState(for deviceId: String) async throws -> DeviceState
     
-    /// Set device power state
+    /// Controls power state of a specified device
+    /// - Parameters:
+    ///   - isOn: Boolean indicating desired power state (true = on, false = off)
+    ///   - deviceId: Unique identifier of the target device
+    /// - Throws: DeviceError if power state cannot be set
     func setPower(_ isOn: Bool, for deviceId: String) async throws
     
-    /// Set device brightness (0.0 - 1.0)
+    /// Adjusts brightness level of a specified device
+    /// - Parameters:
+    ///   - level: Float value between 0.0 (off) and 1.0 (maximum brightness)
+    ///   - deviceId: Unique identifier of the target device
+    /// - Throws: DeviceError if brightness cannot be set
     func setBrightness(_ level: Float, for deviceId: String) async throws
     
-    /// Set device color (RGB)
+    /// Sets RGB color of a specified device
+    /// - Parameters:
+    ///   - color: Color object representing desired RGB values
+    ///   - deviceId: Unique identifier of the target device
+    /// - Throws: DeviceError if color cannot be set
     func setColor(_ color: Color, for deviceId: String) async throws
 }
 ```
 
 #### YeelightManager
 ```swift
+/// Protocol for Yeelight-specific device management functionality
+/// Handles low-level device communication and advanced features
 protocol YeelightManaging {
-    /// Send raw command to device
+    /// Sends raw command to device using Yeelight protocol
+    /// - Parameters:
+    ///   - command: YeelightCommand object containing command details
+    ///   - deviceId: Unique identifier of the target device
+    /// - Throws: DeviceError if command fails or device is unreachable
     func sendCommand(_ command: YeelightCommand, to deviceId: String) async throws
     
-    /// Get device capabilities
+    /// Retrieves supported features and limitations of a device
+    /// - Parameter deviceId: Unique identifier of the target device
+    /// - Returns: DeviceCapabilities object detailing supported features
+    /// - Throws: DeviceError if capabilities cannot be retrieved
     func getCapabilities(for deviceId: String) async throws -> DeviceCapabilities
     
-    /// Update device firmware
+    /// Initiates firmware update process for a device
+    /// - Parameter deviceId: Unique identifier of the target device
+    /// - Throws: DeviceError if update fails or is not available
     func updateFirmware(for deviceId: String) async throws
 }
 ```
@@ -93,17 +127,29 @@ protocol YeelightManaging {
 
 #### EffectManager
 ```swift
+/// Protocol for managing lighting effects across devices
+/// Handles creation, application, and management of lighting effects
 protocol EffectManaging {
-    /// Apply effect to device(s)
+    /// Applies specified effect to one or more devices
+    /// - Parameters:
+    ///   - effect: Effect object containing effect parameters and timing
+    ///   - devices: Array of device IDs to apply the effect to
+    /// - Throws: EffectError if effect cannot be applied
     func apply(_ effect: Effect, to devices: [String]) async throws
     
-    /// Stop current effect
+    /// Stops currently running effect on specified devices
+    /// - Parameter devices: Array of device IDs to stop effects on
+    /// - Throws: EffectError if effect cannot be stopped
     func stop(on devices: [String]) async throws
     
-    /// Get available effects
+    /// Returns list of predefined and custom effects available for use
+    /// - Returns: Array of available Effect objects
     func getAvailableEffects() -> [Effect]
     
-    /// Create custom effect
+    /// Creates new custom effect based on provided parameters
+    /// - Parameter parameters: EffectParameters defining effect behavior
+    /// - Returns: Newly created Effect object
+    /// - Throws: EffectError if parameters are invalid
     func createEffect(parameters: EffectParameters) throws -> Effect
 }
 ```
@@ -112,21 +158,34 @@ protocol EffectManaging {
 
 #### SceneManager
 ```swift
+/// Protocol for managing lighting scenes across multiple devices
+/// Handles creation, modification, and activation of predefined lighting configurations
 protocol SceneManaging {
-    /// Create new scene
-    func createScene(_ scene: Scene) async throws
+    /// Creates new scene with specified configuration
+    /// - Parameters:
+    ///   - name: Unique name for the scene
+    ///   - devices: Array of device configurations for the scene
+    ///   - schedule: Optional scheduling parameters for automatic activation
+    /// - Returns: Newly created Scene object
+    /// - Throws: SceneError if creation fails or name conflicts
+    func createScene(name: String, devices: [DeviceConfig], schedule: Schedule?) async throws -> Scene
     
-    /// Activate scene
-    func activateScene(_ sceneId: String) async throws
+    /// Activates specified scene across all associated devices
+    /// - Parameter scene: Scene object to activate
+    /// - Throws: SceneError if activation fails or devices are unreachable
+    func activateScene(_ scene: Scene) async throws
     
-    /// Update existing scene
-    func updateScene(_ scene: Scene) async throws
+    /// Updates existing scene with new configuration
+    /// - Parameters:
+    ///   - scene: Scene object to update
+    ///   - config: New configuration parameters
+    /// - Throws: SceneError if update fails or scene doesn't exist
+    func updateScene(_ scene: Scene, with config: SceneConfig) async throws
     
-    /// Delete scene
-    func deleteScene(_ sceneId: String) async throws
-    
-    /// List available scenes
-    func listScenes() async throws -> [Scene]
+    /// Deletes specified scene from storage
+    /// - Parameter scene: Scene object to delete
+    /// - Throws: SceneError if deletion fails
+    func deleteScene(_ scene: Scene) async throws
 }
 ```
 
@@ -242,121 +301,304 @@ struct StatusWidget: Widget {
 
 ### Error Types
 
+#### DeviceError
 ```swift
+/// Enumeration of possible device-related errors
 enum DeviceError: Error {
+    /// Device cannot be found on network
+    case deviceNotFound
+    
+    /// Connection to device failed
+    /// - Parameter reason: String describing connection failure reason
     case connectionFailed(reason: String)
-    case commandFailed(command: String, reason: String)
-    case invalidState
-    case timeout
-    case unauthorized
-}
-
-enum SceneError: Error {
-    case activationFailed(reason: String)
-    case invalidConfiguration
-    case notFound
-}
-
-enum AutomationError: Error {
-    case invalidRule
-    case executionFailed(reason: String)
-    case conditionNotMet
+    
+    /// Device is not responding to commands
+    case deviceUnresponsive
+    
+    /// Operation timeout exceeded
+    /// - Parameter seconds: Number of seconds before timeout
+    case timeout(seconds: Int)
+    
+    /// Device firmware is incompatible
+    /// - Parameter required: Required firmware version
+    /// - Parameter current: Current firmware version
+    case firmwareIncompatible(required: String, current: String)
+    
+    /// Operation not supported by device
+    /// - Parameter operation: String describing unsupported operation
+    case operationNotSupported(operation: String)
 }
 ```
+
+#### EffectError
+```swift
+/// Enumeration of possible effect-related errors
+enum EffectError: Error {
+    /// Effect parameters are invalid
+    /// - Parameter reason: Description of validation failure
+    case invalidParameters(reason: String)
+    
+    /// Effect execution failed
+    /// - Parameter reason: Description of execution failure
+    case executionFailed(reason: String)
+    
+    /// Effect is not supported by device
+    /// - Parameter deviceId: ID of device that doesn't support the effect
+    case unsupportedEffect(deviceId: String)
+    
+    /// Effect was interrupted
+    /// - Parameter reason: Description of interruption cause
+    case interrupted(reason: String)
+}
+
+#### SceneError
+```swift
+/// Enumeration of possible scene-related errors
+enum SceneError: Error {
+    /// Scene name already exists
+    case duplicateName
+    
+    /// Scene configuration is invalid
+    /// - Parameter reason: Description of configuration issue
+    case invalidConfiguration(reason: String)
+    
+    /// Scene activation failed
+    /// - Parameter reason: Description of activation failure
+    case activationFailed(reason: String)
+    
+    /// Scene not found in storage
+    case sceneNotFound
+    
+    /// Scene schedule is invalid
+    /// - Parameter reason: Description of scheduling issue
+    case invalidSchedule(reason: String)
+}
 
 ### Error Recovery
 
+#### Recovery Protocols
 ```swift
+/// Protocol defining error recovery strategies
 protocol ErrorRecoverable {
-    /// Attempt to recover from error
-    func recover(from error: Error) async throws
+    /// Attempts to recover from a specific error
+    /// - Parameters:
+    ///   - error: The error to recover from
+    ///   - context: Additional context for recovery attempt
+    /// - Returns: Boolean indicating if recovery was successful
+    /// - Throws: RecoveryError if recovery attempt fails
+    func attemptRecovery(from error: Error, context: RecoveryContext) async throws -> Bool
     
-    /// Check if error is recoverable
-    func isRecoverable(_ error: Error) -> Bool
-    
-    /// Get recovery options
-    func recoveryOptions(for error: Error) -> [RecoveryOption]
+    /// Suggests recovery options for a given error
+    /// - Parameter error: The error to get recovery options for
+    /// - Returns: Array of available recovery options
+    func getRecoveryOptions(for error: Error) -> [RecoveryOption]
 }
 ```
 
-## Best Practices
+### Best Practices
 
-### Device Control
-1. Always check device connectivity before sending commands
-2. Implement retry logic for network operations
-3. Cache device state for better responsiveness
-4. Handle background state appropriately
+#### Device Control
+```swift
+/// Guidelines for optimal device control implementation
+protocol DeviceControlBestPractices {
+    /// Implement robust connection management
+    /// - Always check device availability before sending commands
+    /// - Handle connection timeouts gracefully
+    /// - Implement automatic reconnection logic
+    /// - Cache device states for quick access
+    
+    /// Optimize command execution
+    /// - Batch similar commands when possible
+    /// - Implement command queuing for sequential operations
+    /// - Handle rate limiting appropriately
+    /// - Validate commands before sending
+    
+    /// Manage device state
+    /// - Maintain local state cache
+    /// - Implement state synchronization
+    /// - Handle state conflicts resolution
+    /// - Provide state change notifications
+}
+```
 
-### Effect Management
-1. Validate effect parameters before application
-2. Implement smooth transitions
-3. Handle interruptions gracefully
-4. Consider device capabilities
+#### Effect Management
+```swift
+/// Guidelines for implementing effect management
+protocol EffectManagementBestPractices {
+    /// Effect Creation
+    /// - Validate effect parameters before creation
+    /// - Check device compatibility
+    /// - Implement proper error handling
+    /// - Document effect requirements
+    
+    /// Effect Execution
+    /// - Handle device unavailability
+    /// - Implement proper timing control
+    /// - Manage effect transitions
+    /// - Monitor effect execution
+    
+    /// Effect Optimization
+    /// - Cache commonly used effects
+    /// - Implement effect previews
+    /// - Optimize resource usage
+    /// - Handle effect interruptions
+}
+```
 
-### Scene Management
-1. Validate scene configuration
-2. Handle partial failures
-3. Implement proper state restoration
-4. Consider timing and transitions
+#### Scene Management
+```swift
+/// Guidelines for scene management implementation
+protocol SceneManagementBestPractices {
+    /// Scene Creation
+    /// - Validate device configurations
+    /// - Implement proper naming conventions
+    /// - Handle scheduling requirements
+    /// - Manage scene dependencies
+    
+    /// Scene Activation
+    /// - Check device availability
+    /// - Handle partial activation
+    /// - Implement fallback options
+    /// - Monitor activation status
+    
+    /// Scene Storage
+    /// - Implement proper persistence
+    /// - Handle version control
+    /// - Manage scene updates
+    /// - Implement backup/restore
+}
+```
 
-### Error Handling
-1. Provide meaningful error messages
-2. Implement proper recovery mechanisms
-3. Log errors appropriately
-4. Handle edge cases
+#### Error Handling
+```swift
+/// Guidelines for implementing error handling
+protocol ErrorHandlingBestPractices {
+    /// Error Detection
+    /// - Implement proper error categorization
+    /// - Provide detailed error context
+    /// - Handle nested errors
+    /// - Log error occurrences
+    
+    /// Error Recovery
+    /// - Implement automatic recovery where possible
+    /// - Provide user-friendly error messages
+    /// - Handle recovery failures
+    /// - Document recovery procedures
+    
+    /// Error Prevention
+    /// - Implement input validation
+    /// - Handle edge cases
+    /// - Implement proper testing
+    /// - Monitor error patterns
+}
+```
 
 ## API Versioning
 
-The API follows semantic versioning:
-- Major version: Breaking changes
-- Minor version: New features
-- Patch version: Bug fixes
-
-Current version: 1.0.0
+### Version Management
+```swift
+/// Protocol for managing API versions and compatibility
+protocol VersionManagement {
+    /// Current API version information
+    /// - Major: Breaking changes
+    /// - Minor: New features, backwards compatible
+    /// - Patch: Bug fixes, backwards compatible
+    static var currentVersion: SemanticVersion { get }
+    
+    /// Checks compatibility between versions
+    /// - Parameters:
+    ///   - version: Version to check compatibility with
+    /// - Returns: Boolean indicating compatibility
+    static func isCompatible(with version: SemanticVersion) -> Bool
+    
+    /// Provides migration path between versions
+    /// - Parameters:
+    ///   - fromVersion: Source version
+    ///   - toVersion: Target version
+    /// - Returns: Array of migration steps
+    static func migrationPath(from fromVersion: SemanticVersion, to toVersion: SemanticVersion) -> [MigrationStep]
+}
+```
 
 ## Security Considerations
 
-1. **Authentication**
-   - Device authentication
-   - User authorization
-   - API key management
+### Authentication
+```swift
+/// Protocol for implementing secure device authentication
+protocol DeviceAuthentication {
+    /// Authenticates with a device using secure credentials
+    /// - Parameters:
+    ///   - deviceId: Target device identifier
+    ///   - credentials: Authentication credentials
+    /// - Returns: Authentication token
+    /// - Throws: AuthenticationError if authentication fails
+    func authenticate(deviceId: String, credentials: DeviceCredentials) async throws -> AuthToken
+    
+    /// Validates authentication token
+    /// - Parameter token: Token to validate
+    /// - Returns: Boolean indicating if token is valid
+    func validateToken(_ token: AuthToken) -> Bool
+    
+    /// Revokes authentication token
+    /// - Parameter token: Token to revoke
+    /// - Throws: AuthenticationError if revocation fails
+    func revokeToken(_ token: AuthToken) async throws
+}
+```
 
-2. **Network Security**
-   - Secure communication
-   - Certificate validation
-   - Data encryption
+### Encryption
+```swift
+/// Protocol for implementing secure communication
+protocol SecureCommunication {
+    /// Establishes secure channel with device
+    /// - Parameter deviceId: Target device identifier
+    /// - Returns: Encrypted channel object
+    /// - Throws: SecurityError if channel establishment fails
+    func establishSecureChannel(with deviceId: String) async throws -> SecureChannel
+    
+    /// Encrypts command data
+    /// - Parameters:
+    ///   - data: Data to encrypt
+    ///   - key: Encryption key
+    /// - Returns: Encrypted data
+    /// - Throws: EncryptionError if encryption fails
+    func encryptCommand(_ data: Data, using key: EncryptionKey) throws -> EncryptedData
+    
+    /// Decrypts response data
+    /// - Parameters:
+    ///   - data: Data to decrypt
+    ///   - key: Decryption key
+    /// - Returns: Decrypted data
+    /// - Throws: DecryptionError if decryption fails
+    func decryptResponse(_ data: EncryptedData, using key: EncryptionKey) throws -> Data
+}
+```
 
-3. **Privacy**
-   - Data collection
-   - User consent
-   - Data retention
+## Support and Resources
 
-## Rate Limiting
+### Documentation
+- [Getting Started Guide](../docs/getting-started.md)
+- [API Reference](../docs/api-reference.md)
+- [Migration Guide](../docs/migration-guide.md)
+- [Security Best Practices](../docs/security.md)
+- [Troubleshooting Guide](../docs/troubleshooting.md)
 
-1. **Device Commands**
-   - Maximum 10 commands per second per device
-   - Queue management for burst commands
-   - Priority handling
+### Support Channels
+- GitHub Issues: Report bugs and feature requests
+- Discord Community: Real-time support and discussions
+- Stack Overflow: Technical Q&A
+- Email Support: enterprise@yeelightcontrol.com
 
-2. **Network Discovery**
-   - Scan interval: 30 seconds
-   - Cache results
-   - Background refresh
+### Sample Code
+- [Basic Device Control](../examples/basic-control)
+- [Effect Creation](../examples/effects)
+- [Scene Management](../examples/scenes)
+- [Error Handling](../examples/error-handling)
+- [Security Implementation](../examples/security)
 
-## Migration Guide
-
-### Version 1.0.0
-- Initial release
-
-### Future Versions
-- Planned features
-- Breaking changes
-- Migration paths
-
-## Support
-
-For API support:
-- GitHub Issues
-- Documentation Updates
-- Version Compatibility
-- Breaking Changes
+### Updates and Maintenance
+- Regular security updates
+- Quarterly feature releases
+- Monthly bug fixes
+- LTS (Long Term Support) versions available
+- Deprecation notices with 6-month grace period
