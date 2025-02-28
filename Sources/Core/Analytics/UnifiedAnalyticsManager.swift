@@ -13,16 +13,16 @@ protocol AnalyticsManaging {
 }
 
 // MARK: - Analytics Event
-struct AnalyticsEvent {
-    let name: String
-    let category: AnalyticsCategory
-    let parameters: [String: Any]?
-    let timestamp: Date
+public struct AnalyticsEvent: Codable {
+    public let name: String
+    public let category: AnalyticsCategory
+    public let parameters: [String: String]
+    public let timestamp: Date
     
-    init(
+    public init(
         name: String,
         category: AnalyticsCategory,
-        parameters: [String: Any]? = nil,
+        parameters: [String: String] = [:],
         timestamp: Date = Date()
     ) {
         self.name = name
@@ -33,7 +33,7 @@ struct AnalyticsEvent {
 }
 
 // MARK: - Analytics Category
-enum AnalyticsCategory: String {
+enum AnalyticsCategory: String, Codable {
     case device
     case room
     case scene
@@ -69,6 +69,9 @@ public final class UnifiedAnalyticsManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let queue = DispatchQueue(label: "com.yeelight.analytics", qos: .utility)
     private let storage: UnifiedStorageManager
+    private var sessionStartTime: Date?
+    private var eventBuffer: [AnalyticsEvent] = []
+    private let maxBufferSize = 100
     
     // MARK: - Constants
     private enum Constants {
@@ -84,6 +87,7 @@ public final class UnifiedAnalyticsManager: ObservableObject {
         self.storage = .shared
         loadEvents()
         setupPeriodicUpload()
+        loadSettings()
     }
     
     // MARK: - Public Methods
@@ -92,18 +96,17 @@ public final class UnifiedAnalyticsManager: ObservableObject {
         if !enabled {
             clearEvents()
         }
+        saveSettings()
     }
     
     public func trackEvent(_ event: AnalyticsEvent) {
-        guard isEnabled else { return }
+        guard isEnabled, sessionStartTime != nil else { return }
         
-        events.append(event)
-        if events.count > Constants.maxEventCount {
-            events.removeFirst(events.count - Constants.maxEventCount)
+        eventBuffer.append(event)
+        
+        if eventBuffer.count >= maxBufferSize {
+            flushEvents()
         }
-        
-        saveEvents()
-        uploadEvents()
     }
     
     public func clearEvents() {
@@ -156,18 +159,33 @@ public final class UnifiedAnalyticsManager: ObservableObject {
             }
         }
     }
-}
-
-// MARK: - Analytics Event
-public struct AnalyticsEvent: Codable {
-    public let name: String
-    public let timestamp: Date
-    public let parameters: [String: String]
     
-    public init(name: String, parameters: [String: String] = [:]) {
-        self.name = name
-        self.timestamp = Date()
-        self.parameters = parameters
+    private func flushEvents() {
+        guard !eventBuffer.isEmpty else { return }
+        
+        do {
+            try storage.save(eventBuffer, forKey: "analytics_events")
+            eventBuffer.removeAll()
+        } catch {
+            print("Failed to flush analytics events: \(error)")
+        }
+    }
+    
+    private func loadSettings() {
+        do {
+            isEnabled = try storage.load(Bool.self, forKey: "analytics_enabled")
+        } catch {
+            print("Failed to load analytics settings: \(error)")
+            isEnabled = true // Default to enabled
+        }
+    }
+    
+    private func saveSettings() {
+        do {
+            try storage.save(isEnabled, forKey: "analytics_enabled")
+        } catch {
+            print("Failed to save analytics settings: \(error)")
+        }
     }
 }
 

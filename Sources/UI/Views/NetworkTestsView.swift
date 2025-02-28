@@ -255,21 +255,4 @@ struct NetworkTestsView: View {
             )
         }
     }
-}
-
-enum NetworkError: LocalizedError {
-    case dnsResolutionFailed
-    case highLatency
-    case lowBandwidth
-    
-    var errorDescription: String? {
-        switch self {
-        case .dnsResolutionFailed:
-            return "Failed to resolve DNS names"
-        case .highLatency:
-            return "Network latency is too high"
-        case .lowBandwidth:
-            return "Network bandwidth is too low"
-        }
-    }
 } 

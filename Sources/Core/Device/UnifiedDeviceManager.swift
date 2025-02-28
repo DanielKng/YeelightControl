@@ -2,6 +2,16 @@ import Foundation
 import Combine
 import SwiftUI
 
+@preconcurrency protocol DeviceManaging: Actor {
+    nonisolated var devices: [YeelightDevice] { get }
+    nonisolated var deviceUpdates: PassthroughSubject<DeviceStateUpdate, Never> { get }
+    nonisolated func getDevice(byId id: String) -> YeelightDevice?
+    func addDevice(_ device: YeelightDevice) async
+    func removeDevice(_ device: YeelightDevice) async
+    func updateDevice(_ device: YeelightDevice) async
+    func discoverDevices() async
+}
+
 @MainActor
 public class UnifiedDeviceManager: ObservableObject, DeviceManaging {
     // MARK: - Published Properties
@@ -17,7 +27,6 @@ public class UnifiedDeviceManager: ObservableObject, DeviceManaging {
     weak var storageManager: UnifiedStorageManager?
     
     // MARK: - Private Properties
-    private let queue = DispatchQueue(label: "de.knng.app.yeelightcontrol.device", qos: .userInitiated)
     private var discoveryTask: Task<Void, Never>?
     private var deviceConnections: [String: DeviceConnection] = [:]
     private var cancellables = Set<AnyCancellable>()
@@ -42,39 +51,39 @@ public class UnifiedDeviceManager: ObservableObject, DeviceManaging {
     }
     
     // MARK: - Public Methods
-    public func getDevice(byId id: String) -> YeelightDevice? {
+    public nonisolated func getDevice(byId id: String) -> YeelightDevice? {
         devices.first { $0.id == id }
     }
     
-    public func addDevice(_ device: YeelightDevice) {
+    public func addDevice(_ device: YeelightDevice) async {
         guard !devices.contains(where: { $0.id == device.id }) else { return }
         devices.append(device)
-        saveDevices()
-        setupDeviceConnection(for: device)
+        await saveDevices()
+        await setupDeviceConnection(for: device)
     }
     
-    public func removeDevice(_ device: YeelightDevice) {
+    public func removeDevice(_ device: YeelightDevice) async {
         devices.removeAll { $0.id == device.id }
         deviceConnections[device.id]?.disconnect()
         deviceConnections.removeValue(forKey: device.id)
-        saveDevices()
+        await saveDevices()
     }
     
-    public func updateDevice(_ device: YeelightDevice) {
+    public func updateDevice(_ device: YeelightDevice) async {
         guard let index = devices.firstIndex(where: { $0.id == device.id }) else { return }
         devices[index] = device
-        saveDevices()
+        await saveDevices()
         deviceUpdates.send(DeviceStateUpdate(deviceId: device.id, state: device.state))
     }
     
     // MARK: - Discovery Methods
-    public func discoverDevices() {
+    public func discoverDevices() async {
         discoveryTask?.cancel()
         discoveryTask = Task {
             do {
-                networkManager?.startDiscovery()
+                await networkManager?.startDiscovery()
                 try await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
-                networkManager?.stopDiscovery()
+                await networkManager?.stopDiscovery()
             } catch {
                 print("Device discovery failed: \(error)")
             }
@@ -86,67 +95,72 @@ public class UnifiedDeviceManager: ObservableObject, DeviceManaging {
         networkManager?.isDiscoveryActive
             .sink { [weak self] isActive in
                 if !isActive {
-                    self?.handleDiscoveryCompleted()
+                    Task { @MainActor [weak self] in
+                        await self?.handleDiscoveryCompleted()
+                    }
                 }
             }
             .store(in: &cancellables)
     }
     
-    private func handleDiscoveryCompleted() {
+    private func handleDiscoveryCompleted() async {
         // Process any newly discovered devices
-        Task { @MainActor in
-            let newDevices = discoveredDevices.filter { device in
-                !devices.contains { $0.id == device.id }
-            }
-            
-            for device in newDevices {
-                addDevice(device)
-            }
+        let newDevices = discoveredDevices.filter { device in
+            !devices.contains { $0.id == device.id }
+        }
+        
+        for device in newDevices {
+            await addDevice(device)
         }
     }
     
     private func loadStoredDevices() {
-        do {
-            if let loadedDevices: [YeelightDevice] = try storageManager?.load([YeelightDevice].self, forKey: "devices") {
-                devices = loadedDevices
-                for device in loadedDevices where device.state.isOnline {
-                    setupDeviceConnection(for: device)
+        Task {
+            do {
+                if let loadedDevices: [YeelightDevice] = try await storageManager?.load([YeelightDevice].self, forKey: "devices") {
+                    self.devices = loadedDevices
+                    for device in loadedDevices where device.state.isOnline {
+                        await setupDeviceConnection(for: device)
+                    }
                 }
+            } catch {
+                print("Failed to load devices: \(error)")
             }
-        } catch {
-            print("Failed to load devices: \(error)")
         }
     }
     
-    private func saveDevices() {
+    private func saveDevices() async {
         do {
-            try storageManager?.save(devices, forKey: "devices")
+            try await storageManager?.save(devices, forKey: "devices")
         } catch {
             print("Failed to save devices: \(error)")
         }
     }
     
-    private func setupDeviceConnection(for device: YeelightDevice) {
+    private func setupDeviceConnection(for device: YeelightDevice) async {
         let connection = DeviceConnection(device: device)
         deviceConnections[device.id] = connection
         
         connection.stateUpdates
             .sink { [weak self] state in
-                guard let self = self else { return }
-                if var updatedDevice = self.getDevice(byId: device.id) {
-                    updatedDevice.state = state
-                    updatedDevice.state.isOnline = true
-                    updatedDevice.lastSeen = Date()
-                    self.updateDevice(updatedDevice)
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    if var updatedDevice = self.getDevice(byId: device.id) {
+                        updatedDevice.state = state
+                        updatedDevice.state.isOnline = true
+                        updatedDevice.lastSeen = Date()
+                        await self.updateDevice(updatedDevice)
+                    }
                 }
             }
             .store(in: &cancellables)
         
-        connection.connect()
+        await connection.connect()
     }
 }
 
 // MARK: - Device Connection
+@MainActor
 private class DeviceConnection {
     private let device: YeelightDevice
     private var reconnectTask: Task<Void, Never>?
@@ -158,41 +172,11 @@ private class DeviceConnection {
         self.device = device
     }
     
-    func connect() {
+    func connect() async {
         // Implementation for device connection
     }
     
     func disconnect() {
         reconnectTask?.cancel()
-    }
-}
-
-// MARK: - Device Errors
-enum DeviceError: LocalizedError {
-    case notFound
-    case alreadyExists
-    case connectionFailed
-    case timeout
-    case invalidResponse
-    case unsupportedOperation
-    case offline
-    
-    var errorDescription: String? {
-        switch self {
-        case .notFound:
-            return "Device not found"
-        case .alreadyExists:
-            return "Device already exists"
-        case .connectionFailed:
-            return "Failed to connect to device"
-        case .timeout:
-            return "Device operation timed out"
-        case .invalidResponse:
-            return "Invalid response from device"
-        case .unsupportedOperation:
-            return "Operation not supported by device"
-        case .offline:
-            return "Device is offline"
-        }
     }
 } 

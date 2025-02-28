@@ -2,6 +2,17 @@ import Foundation
 import Combine
 import SwiftUI
 
+@preconcurrency protocol EffectManaging: Actor {
+    nonisolated var effects: [Effect] { get }
+    nonisolated var effectUpdates: PassthroughSubject<EffectUpdate, Never> { get }
+    func getEffect(byId id: String) -> Effect?
+    func getAllEffects() -> [Effect]
+    func createEffect(_ effect: Effect) async throws
+    func updateEffect(_ effect: Effect) async throws
+    func deleteEffect(_ effect: Effect) async throws
+    func applyEffect(_ effect: Effect, to deviceIds: [String]) async throws
+}
+
 @MainActor
 public final class UnifiedEffectManager: ObservableObject, EffectManaging {
     // MARK: - Published Properties
@@ -24,11 +35,11 @@ public final class UnifiedEffectManager: ObservableObject, EffectManaging {
     }
     
     // MARK: - Public Methods
-    public func getEffect(byId id: String) -> Effect? {
+    public nonisolated func getEffect(byId id: String) -> Effect? {
         effects.first { $0.id == id }
     }
     
-    public func getAllEffects() -> [Effect] {
+    public nonisolated func getAllEffects() -> [Effect] {
         effects
     }
     
@@ -75,7 +86,7 @@ public final class UnifiedEffectManager: ObservableObject, EffectManaging {
         }
         
         for deviceId in deviceIds {
-            guard let device = deviceManager?.getDevice(byId: deviceId) else {
+            guard let device = await deviceManager?.getDevice(byId: deviceId) else {
                 throw EffectError.deviceNotFound
             }
             
@@ -95,21 +106,23 @@ public final class UnifiedEffectManager: ObservableObject, EffectManaging {
     
     // MARK: - Private Methods
     private func loadEffects() {
-        do {
-            if let loadedEffects: [Effect] = try storageManager?.load([Effect].self, forKey: "effects") {
-                effects = loadedEffects
+        Task {
+            do {
+                if let loadedEffects: [Effect] = try await storageManager?.load([Effect].self, forKey: "effects") {
+                    self.effects = loadedEffects
+                }
+            } catch {
+                print("Failed to load effects: \(error)")
             }
-        } catch {
-            print("Failed to load effects: \(error)")
         }
     }
     
     private func saveEffects() async throws {
-        try storageManager?.save(effects, forKey: "effects")
+        try await storageManager?.save(effects, forKey: "effects")
     }
     
     private func stopEffect(on deviceId: String) async throws {
-        guard let device = deviceManager?.getDevice(byId: deviceId) else {
+        guard let device = await deviceManager?.getDevice(byId: deviceId) else {
             throw EffectError.deviceNotFound
         }
         
@@ -120,6 +133,6 @@ public final class UnifiedEffectManager: ObservableObject, EffectManaging {
         var updatedDevice = device
         updatedDevice.state.brightness = 100
         updatedDevice.state.colorTemperature = 4000
-        deviceManager?.updateDevice(updatedDevice)
+        await deviceManager?.updateDevice(updatedDevice)
     }
 } 

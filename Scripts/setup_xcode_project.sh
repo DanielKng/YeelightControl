@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # Check if Xcode is installed
 if ! command -v xcodebuild &> /dev/null; then
     echo "Error: Xcode is not installed"
@@ -13,298 +15,127 @@ if ! command -v xcodegen &> /dev/null; then
 fi
 
 # Directory setup
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_ROOT/Build"
 SOURCES_DIR="$PROJECT_ROOT/Sources"
 CONFIGS_DIR="$BUILD_DIR/Configs"
+MODULES_DIR="$BUILD_DIR/Modules"
 
 # Create build directory if it doesn't exist
 mkdir -p "$BUILD_DIR"
 mkdir -p "$CONFIGS_DIR"
+mkdir -p "$BUILD_DIR/Sources"
+mkdir -p "$MODULES_DIR"
 
-# Clean up previous build files
-if [ -d "$BUILD_DIR" ]; then
-    # Save the module map files if they exist
-    if [ -f "$SOURCES_DIR/Core/Core.modulemap" ]; then
-        cp "$SOURCES_DIR/Core/Core.modulemap" /tmp/Core.modulemap
-    fi
-    if [ -f "$SOURCES_DIR/UI/UI.modulemap" ]; then
-        cp "$SOURCES_DIR/UI/UI.modulemap" /tmp/UI.modulemap
-    fi
+# Clean up previous build files but preserve symlinks
+find "$BUILD_DIR" -type f -not -name "*.symlink" -delete
+
+# Function to create Swift module
+create_swift_module() {
+    local module_name=$1
+    local source_dir=$2
+    local target_dir="$BUILD_DIR/Sources/$module_name"
     
-    # Only remove non-symlink files and directories to preserve our symlinks
-    find "$BUILD_DIR" -type f -not -name "project.yml" -delete
-    find "$BUILD_DIR" -type l -delete  # Remove old symlinks
-fi
-
-# Create Sources directories in Build
-mkdir -p "$BUILD_DIR/Sources/Core"
-mkdir -p "$BUILD_DIR/Sources/UI"
-
-# Create Core module map file
-echo "📄 Creating module map files..."
-cat > "$SOURCES_DIR/Core/Core.modulemap" << 'EOL'
-framework module Core {
-  umbrella header "Core.h"
-  
-  export *
-  module * { export * }
-}
-EOL
-
-# Create UI module map file
-cat > "$SOURCES_DIR/UI/UI.modulemap" << 'EOL'
-framework module UI {
-  umbrella header "UI.h"
-  
-  export *
-  module * { export * }
-}
-EOL
-
-# Create symbolic links recursively
-create_symlinks() {
-    local source_dir="$1"
-    local build_dir="$2"
-    local relative_path="$3"
+    echo "Set up Swift module $module_name at $target_dir"
+    mkdir -p "$target_dir"
     
-    # Create the directory in build if it doesn't exist
-    mkdir -p "$build_dir"
-    
-    # Loop through all items in the source directory
-    for item in "$source_dir"/*; do
-        # Skip if the item doesn't exist
-        [ ! -e "$item" ] && continue
-        
-        # Get the base name of the item
-        local name=$(basename "$item")
-        local build_path="$build_dir/$name"
-        local source_path="$item"
-        
-        # Skip if the item is .DS_Store
-        if [ "$name" = ".DS_Store" ]; then
-            continue
-        fi
-        
-        # Remove existing symlink or directory
-        rm -rf "$build_path"
-        
-        # If it's a directory, create it and recurse
-        if [ -d "$item" ]; then
-            mkdir -p "$build_path"
-            create_symlinks "$source_path" "$build_path" "$relative_path/$name"
-        else
-            # If it's a file, create a symbolic link
-            if [ -f "$item" ]; then
-                # Create relative symlink
-                ln -s "../../../Sources$relative_path/$name" "$build_path"
-                echo "Created symlink: Sources$relative_path/$name -> Build/Sources$relative_path/$name"
-            fi
-        fi
+    # Create symlinks for Swift files
+    find "$source_dir" -type f -name "*.swift" | while read -r source_file; do
+        relative_path=${source_file#$source_dir/}
+        target_path="$target_dir/$relative_path"
+        mkdir -p "$(dirname "$target_path")"
+        ln -sf "$source_file" "$target_path"
+        echo "Created symlink for $relative_path"
     done
 }
 
+# Set up modules
+create_swift_module "Core" "$SOURCES_DIR/Core"
+create_swift_module "UI" "$SOURCES_DIR/UI"
+create_swift_module "Features" "$SOURCES_DIR/Features"
+
+# Function to create Info.plist
+create_info_plist() {
+    local name=$1
+    local bundle_id=$2
+    local output_file="$CONFIGS_DIR/$name-Info.plist"
+    
+    cat > "$output_file" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>\$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$bundle_id</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>\$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>\$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+</dict>
+</plist>
+EOF
+    echo "Created $name-Info.plist"
+}
+
 # Create Info.plist files
-echo "📄 Creating Info.plist files..."
+create_info_plist "App" "de.knng.app.yeelightcontrol"
+create_info_plist "Core" "de.knng.app.yeelightcontrol.core"
+create_info_plist "UI" "de.knng.app.yeelightcontrol.ui"
+create_info_plist "Features" "de.knng.app.yeelightcontrol.features"
+create_info_plist "Widget" "de.knng.app.yeelightcontrol.widget"
 
-# Create main app Info.plist
-cat > "$CONFIGS_DIR/App-Info.plist" << 'EOL'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>$(DEVELOPMENT_LANGUAGE)</string>
-    <key>CFBundleDisplayName</key>
-    <string>YeelightControl</string>
-    <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
-    <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
-    <key>CFBundlePackageType</key>
-    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>LSRequiresIPhoneOS</key>
-    <true/>
-    <key>NSLocalNetworkUsageDescription</key>
-    <string>YeelightControl needs access to your local network to discover and control Yeelight devices.</string>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>YeelightControl uses your location for automation features.</string>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>YeelightControl needs microphone access for music visualization features.</string>
-    <key>UIApplicationSceneManifest</key>
-    <dict>
-        <key>UIApplicationSupportsMultipleScenes</key>
-        <false/>
-    </dict>
-    <key>UILaunchScreen</key>
-    <dict/>
-    <key>UISupportedInterfaceOrientations</key>
-    <array>
-        <string>UIInterfaceOrientationPortrait</string>
-        <string>UIInterfaceOrientationLandscapeLeft</string>
-        <string>UIInterfaceOrientationLandscapeRight</string>
-    </array>
-</dict>
-</plist>
-EOL
+# Create symlinks for App and Widget modules
+create_swift_module "App" "$SOURCES_DIR/App"
+create_swift_module "Widget" "$SOURCES_DIR/Widget"
+create_swift_module "Tests" "$SOURCES_DIR/Tests"
 
-# Create widget Info.plist
-cat > "$CONFIGS_DIR/Widget-Info.plist" << 'EOL'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>$(DEVELOPMENT_LANGUAGE)</string>
-    <key>CFBundleDisplayName</key>
-    <string>YeelightWidget</string>
-    <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
-    <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
-    <key>CFBundlePackageType</key>
-    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>NSExtension</key>
-    <dict>
-        <key>NSExtensionPointIdentifier</key>
-        <string>com.apple.widgetkit-extension</string>
-    </dict>
-</dict>
-</plist>
-EOL
-
-# Create Core framework Info.plist
-cat > "$CONFIGS_DIR/Core-Info.plist" << 'EOL'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>$(DEVELOPMENT_LANGUAGE)</string>
-    <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
-    <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
-    <key>CFBundlePackageType</key>
-    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-</dict>
-</plist>
-EOL
-
-# Create UI framework Info.plist
-cat > "$CONFIGS_DIR/UI-Info.plist" << 'EOL'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>$(DEVELOPMENT_LANGUAGE)</string>
-    <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
-    <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
-    <key>CFBundlePackageType</key>
-    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-</dict>
-</plist>
-EOL
-
-# Create Features framework Info.plist
-cat > "$CONFIGS_DIR/Features-Info.plist" << 'EOL'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>$(DEVELOPMENT_LANGUAGE)</string>
-    <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
-    <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
-    <key>CFBundlePackageType</key>
-    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-</dict>
-</plist>
-EOL
-
-# Create project.yml
 echo "📝 Creating XcodeGen configuration..."
-cat > "$BUILD_DIR/project.yml" << 'EOL'
+
+# Generate project.yml
+cat > "$BUILD_DIR/project.yml" << EOF
 name: YeelightControl
 options:
   bundleIdPrefix: de.knng.app
-  deploymentTarget:
+  deploymentTarget: 
     iOS: 15.0
-  xcodeVersion: "15.2"
+  xcodeVersion: 15.2
   generateEmptyDirectories: true
   createIntermediateGroups: true
-  useBaseInternationalization: true
-  groupSortPosition: top
-  indentWidth: 4
-  tabWidth: 4
-  defaultConfig: Debug
-  transitivelyLinkDependencies: true
-  settingPresets: all
-
 settings:
   base:
-    DEVELOPMENT_TEAM: ""
-    CODE_SIGN_STYLE: Automatic
-    MARKETING_VERSION: 1.0.0
-    CURRENT_PROJECT_VERSION: 1
     SWIFT_VERSION: 5.0
+    DEVELOPMENT_TEAM: \${DEVELOPMENT_TEAM}
+    CODE_SIGN_STYLE: Automatic
     ENABLE_BITCODE: NO
-    CLANG_ENABLE_MODULES: YES
-    CLANG_ENABLE_OBJC_ARC: YES
     ENABLE_TESTABILITY: YES
     SWIFT_OPTIMIZATION_LEVEL: "-Onone"
-    SWIFT_STRICT_CONCURRENCY: complete
-    ALWAYS_SEARCH_USER_PATHS: NO
-    FRAMEWORK_SEARCH_PATHS: "$(inherited) $(BUILT_PRODUCTS_DIR)"
-    LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @loader_path/Frameworks"
-
 targets:
+  YeelightControl:
+    type: application
+    platform: iOS
+    sources: 
+      - path: Sources/App
+    dependencies:
+      - target: Core
+      - target: UI
+      - target: Features
+    info:
+      path: Configs/App-Info.plist
+      properties:
+        UILaunchStoryboardName: LaunchScreen
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
   Core:
     type: framework
     platform: iOS
@@ -312,193 +143,43 @@ targets:
       - path: Sources/Core
     info:
       path: Configs/Core-Info.plist
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.core
-        TARGETED_DEVICE_FAMILY: 1
-        ENABLE_PREVIEWS: YES
-        DEFINES_MODULE: YES
-        GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_NAME: Core
-        SWIFT_INSTALL_OBJC_HEADER: NO
-        CLANG_ENABLE_MODULES: YES
-        CURRENT_PROJECT_VERSION: 1
-        VERSIONING_SYSTEM: apple-generic
-        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
-        SKIP_INSTALL: NO
-        DYLIB_INSTALL_NAME_BASE: "@rpath"
-        DYLIB_COMPATIBILITY_VERSION: "1"
-        DYLIB_CURRENT_VERSION: "1"
-        INSTALL_PATH: "@executable_path/Frameworks"
-        FRAMEWORK_SEARCH_PATHS: "$(inherited) $(BUILT_PRODUCTS_DIR)"
-        MODULEMAP_FILE: "$(SRCROOT)/Sources/Core/Core.modulemap"
-        SWIFT_INCLUDE_PATHS: "$(SRCROOT)/Sources"
-    dependencies:
-      - framework: SwiftUI
-      - framework: Foundation
-      - framework: CoreLocation
-      - framework: Network
-      - framework: Combine
-      - framework: CoreData
-      - framework: Security
-      - framework: UniformTypeIdentifiers
-
   UI:
     type: framework
     platform: iOS
     sources:
       - path: Sources/UI
-    info:
-      path: Configs/UI-Info.plist
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.ui
-        TARGETED_DEVICE_FAMILY: 1
-        ENABLE_PREVIEWS: YES
-        DEFINES_MODULE: YES
-        GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_NAME: UI
-        SWIFT_INSTALL_OBJC_HEADER: NO
-        CLANG_ENABLE_MODULES: NO
-        CURRENT_PROJECT_VERSION: 1
-        VERSIONING_SYSTEM: apple-generic
-        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
-        SKIP_INSTALL: NO
     dependencies:
       - target: Core
-      - framework: SwiftUI
-
+    info:
+      path: Configs/UI-Info.plist
   Features:
     type: framework
     platform: iOS
     sources:
       - path: Sources/Features
+    dependencies:
+      - target: Core
+      - target: UI
     info:
       path: Configs/Features-Info.plist
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.features
-        TARGETED_DEVICE_FAMILY: 1
-        ENABLE_PREVIEWS: YES
-        DEFINES_MODULE: YES
-        GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_NAME: Features
-        SWIFT_INSTALL_OBJC_HEADER: NO
-        CLANG_ENABLE_MODULES: NO
-        CURRENT_PROJECT_VERSION: 1
-        VERSIONING_SYSTEM: apple-generic
-        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
-        SKIP_INSTALL: NO
-    dependencies:
-      - target: Core
-      - target: UI
-      - framework: SwiftUI
-
-  YeelightControl:
-    type: application
-    platform: iOS
-    sources:
-      - path: Sources/App
-    info:
-      path: Configs/App-Info.plist
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol
-        TARGETED_DEVICE_FAMILY: 1
-        ENABLE_PREVIEWS: YES
-        SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
-        OTHER_LDFLAGS: [-ObjC]
-        SWIFT_OPTIMIZATION_LEVEL: "-Onone"
-        DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
-        DEFINES_MODULE: YES
-        GENERATE_INFOPLIST_FILE: YES
-        FRAMEWORK_SEARCH_PATHS: "$(inherited) $(PROJECT_DIR)/Build/Products/Debug-iphoneos"
-        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @loader_path/Frameworks"
-        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
-    dependencies:
-      - target: Core
-        embed: true
-        link: true
-      - target: UI
-        embed: true
-        link: true
-      - target: Features
-        embed: true
-        link: true
-      - framework: SwiftUI
-        
-  YeelightWidget:
+  Widget:
     type: app-extension
     platform: iOS
     sources:
       - path: Sources/Widget
-    info:
-      path: Configs/Widget-Info.plist
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: de.knng.app.yeelightcontrol.widget
-        TARGETED_DEVICE_FAMILY: 1
-        ENABLE_PREVIEWS: YES
-        SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
-        DEFINES_MODULE: YES
-        GENERATE_INFOPLIST_FILE: YES
-        SWIFT_INSTALL_OBJC_HEADER: NO
-        CLANG_ENABLE_MODULES: NO
-        LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks
     dependencies:
       - target: Core
-      - target: UI
-      - framework: SwiftUI
-      - framework: WidgetKit
+    info:
+      path: Configs/Widget-Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+EOF
 
-schemes:
-  YeelightControl:
-    build:
-      targets:
-        Core: [run, test]
-        UI: [run, test]
-        Features: [run, test]
-        YeelightControl: all
-        YeelightWidget: [run, test]
-      parallelizeBuild: false
-      buildImplicitDependencies: true
-      preActions:
-        - script: rm -rf "${PROJECT_DIR}/Build/Products"
-          name: Clean Products
-          settingsTarget: Core
-    run:
-      config: Debug
-      environmentVariables:
-        - SWIFT_DEBUG_CONCURRENCY: 1
-    test:
-      config: Debug
-      targets:
-        - Core
-        - UI
-        - Features
-    profile:
-      config: Release
-    analyze:
-      config: Debug
-    archive:
-      config: Release
-EOL
-
-# Create symbolic links
-echo "🔗 Creating symbolic links..."
-create_symlinks "$SOURCES_DIR" "$BUILD_DIR/Sources" ""
-
-# Run XcodeGen
 echo "🛠 Running XcodeGen..."
 cd "$BUILD_DIR" && xcodegen generate
 
 echo "✅ Setup complete!"
-
-# Try to open the Xcode project
-if [ -d "$BUILD_DIR/YeelightControl.xcodeproj" ]; then
-    echo "Opening Xcode project..."
-    open "$BUILD_DIR/YeelightControl.xcodeproj"
-fi
 
 # Verify generated files
 echo -e "\nVerifying generated files:"
@@ -506,5 +187,7 @@ echo "Project files:"
 ls -la "$BUILD_DIR/YeelightControl.xcodeproj"
 echo -e "\nConfig files:"
 ls -la "$CONFIGS_DIR"
+echo -e "\nModule files:"
+ls -la "$MODULES_DIR"
 echo -e "\nSymlinks:"
-find "$BUILD_DIR/Sources" -type l -exec ls -l {} \; 
+find "$BUILD_DIR/Sources" -type l -ls 

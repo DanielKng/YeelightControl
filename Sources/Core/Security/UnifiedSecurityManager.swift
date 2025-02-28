@@ -230,58 +230,7 @@ public final class UnifiedSecurityManager: ObservableObject {
     }
 }
 
-// MARK: - Security Error
-enum SecurityError: LocalizedError {
-    case encryptionFailed(String)
-    case decryptionFailed(String)
-    case invalidKey
-    case invalidData
-    case keychainSaveFailed(OSStatus)
-    case keychainLoadFailed(OSStatus)
-    case keychainDeleteFailed(OSStatus)
-    case accessControlCreationFailed(String)
-    case biometricAuthenticationFailed(String)
-    case biometryNotAvailable
-    case biometricsNotAvailable
-    case authenticationFailed
-    case keychainUpdateFailed
-    case keychainClearFailed
-    
-    var errorDescription: String? {
-        switch self {
-        case .encryptionFailed(let reason):
-            return "Encryption failed: \(reason)"
-        case .decryptionFailed(let reason):
-            return "Decryption failed: \(reason)"
-        case .invalidKey:
-            return "Invalid encryption key"
-        case .invalidData:
-            return "Invalid data format"
-        case .keychainSaveFailed(let status):
-            return "Failed to save to keychain: \(status)"
-        case .keychainLoadFailed(let status):
-            return "Failed to load from keychain: \(status)"
-        case .keychainDeleteFailed(let status):
-            return "Failed to delete from keychain: \(status)"
-        case .accessControlCreationFailed(let reason):
-            return "Failed to create access control: \(reason)"
-        case .biometricAuthenticationFailed(let reason):
-            return "Biometric authentication failed: \(reason)"
-        case .biometryNotAvailable:
-            return "Biometric authentication not available"
-        case .biometricsNotAvailable:
-            return "Biometric authentication is not available on this device"
-        case .authenticationFailed:
-            return "Biometric authentication failed"
-        case .keychainUpdateFailed:
-            return "Failed to update data in keychain"
-        case .keychainClearFailed:
-            return "Failed to clear all data from keychain"
-        }
-    }
-}
-
-// MARK: - Logger Category Extension
-extension LogCategory {
-    static let security: LogCategory = "security"
+// MARK: - Constants
+extension UnifiedSecurityManager {
+    static let logCategory = LogCategory.security
 } 

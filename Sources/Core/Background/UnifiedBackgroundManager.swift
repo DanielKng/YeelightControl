@@ -3,6 +3,25 @@ import BackgroundTasks
 import Combine
 import SwiftUI
 
+// MARK: - Configuration
+public struct BackgroundConfiguration: Codable {
+    public struct AppSettings: Codable {
+        public var backgroundRefreshEnabled: Bool
+        public var backgroundRefreshInterval: TimeInterval?
+        
+        public init(backgroundRefreshEnabled: Bool = false, backgroundRefreshInterval: TimeInterval? = nil) {
+            self.backgroundRefreshEnabled = backgroundRefreshEnabled
+            self.backgroundRefreshInterval = backgroundRefreshInterval
+        }
+    }
+    
+    public var appSettings: AppSettings
+    
+    public init(appSettings: AppSettings = AppSettings()) {
+        self.appSettings = appSettings
+    }
+}
+
 @MainActor
 public final class UnifiedBackgroundManager: ObservableObject {
     // MARK: - Published Properties
@@ -13,8 +32,9 @@ public final class UnifiedBackgroundManager: ObservableObject {
     // MARK: - Private Properties
     private let deviceManager: UnifiedDeviceManager
     private let configManager: UnifiedConfigurationManager
-    private let errorManager: UnifiedErrorManager
+    private let errorHandler: UnifiedErrorHandler
     private var cancellables = Set<AnyCancellable>()
+    private var backgroundConfig = BackgroundConfiguration()
     
     // MARK: - Constants
     private enum Constants {
@@ -29,22 +49,28 @@ public final class UnifiedBackgroundManager: ObservableObject {
     private init() {
         self.deviceManager = .shared
         self.configManager = .shared
-        self.errorManager = .shared
-        registerBackgroundTasks()
+        self.errorHandler = .shared
+        
         setupObservers()
+        registerBackgroundTasks()
     }
     
     // MARK: - Public Methods
     public func enableBackgroundRefresh() {
-        guard !isBackgroundRefreshEnabled else { return }
-        isBackgroundRefreshEnabled = true
+        backgroundConfig.appSettings.backgroundRefreshEnabled = true
         scheduleBackgroundRefresh()
     }
     
     public func disableBackgroundRefresh() {
-        isBackgroundRefreshEnabled = false
-        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Constants.appRefreshTaskIdentifier)
-        nextScheduledRefresh = nil
+        backgroundConfig.appSettings.backgroundRefreshEnabled = false
+        cancelBackgroundRefresh()
+    }
+    
+    public func setBackgroundRefreshInterval(_ interval: TimeInterval) {
+        backgroundConfig.appSettings.backgroundRefreshInterval = interval
+        if backgroundConfig.appSettings.backgroundRefreshEnabled {
+            scheduleBackgroundRefresh()
+        }
     }
     
     public func performBackgroundRefresh() async throws {
@@ -55,7 +81,7 @@ public final class UnifiedBackgroundManager: ObservableObject {
             do {
                 try await deviceManager.updateDeviceState(device)
             } catch {
-                errorManager.handle(error, context: ["device_id": device.id])
+                errorHandler.handle(error, context: ["device_id": device.id])
             }
         }
         
@@ -64,80 +90,68 @@ public final class UnifiedBackgroundManager: ObservableObject {
     }
     
     // MARK: - Private Methods
+    private func setupObservers() {
+        // Add any necessary observers here
+    }
+    
     private func registerBackgroundTasks() {
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: Constants.appRefreshTaskIdentifier,
             using: nil
         ) { [weak self] task in
-            task.expirationHandler = {
-                task.setTaskCompleted(success: false)
-            }
-            
-            Task { @MainActor [weak self] in
-                do {
-                    try await self?.performBackgroundRefresh()
-                    task.setTaskCompleted(success: true)
-                } catch {
-                    self?.errorManager.handle(error)
-                    task.setTaskCompleted(success: false)
-                }
-            }
+            self?.handleAppRefresh(task as! BGAppRefreshTask)
         }
     }
     
     private func scheduleBackgroundRefresh() {
-        guard isBackgroundRefreshEnabled else { return }
-        
         let request = BGAppRefreshTaskRequest(identifier: Constants.appRefreshTaskIdentifier)
-        request.earliestBeginDate = calculateNextRefreshDate()
+        request.earliestBeginDate = Date(timeIntervalSinceNow:
+            backgroundConfig.appSettings.backgroundRefreshInterval ?? Constants.minimumRefreshInterval
+        )
         
         do {
             try BGTaskScheduler.shared.submit(request)
             nextScheduledRefresh = request.earliestBeginDate
         } catch {
-            errorManager.handle(error)
+            errorHandler.handle(error)
         }
     }
     
-    private func calculateNextRefreshDate() -> Date {
-        let now = Date()
-        let interval = max(
-            Constants.minimumRefreshInterval,
-            min(
-                configManager.configuration.appSettings.backgroundRefreshInterval ?? Constants.minimumRefreshInterval,
-                Constants.maximumRefreshInterval
-            )
-        )
-        return now.addingTimeInterval(interval)
+    private func cancelBackgroundRefresh() {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Constants.appRefreshTaskIdentifier)
+        nextScheduledRefresh = nil
     }
     
-    private func setupObservers() {
-        // Observe configuration changes
-        configManager.$configuration
-            .sink { [weak self] config in
-                if config.appSettings.backgroundRefreshEnabled {
-                    self?.enableBackgroundRefresh()
-                } else {
-                    self?.disableBackgroundRefresh()
-                }
+    private func handleAppRefresh(_ task: BGAppRefreshTask) {
+        if backgroundConfig.appSettings.backgroundRefreshEnabled {
+            Task {
+                await refreshDevices()
+                scheduleBackgroundRefresh()
+                task.setTaskCompleted(success: true)
             }
-            .store(in: &cancellables)
-        
-        // Initial state
-        if configManager.configuration.appSettings.backgroundRefreshEnabled {
-            enableBackgroundRefresh()
+        } else {
+            task.setTaskCompleted(success: false)
         }
+    }
+    
+    private func refreshDevices() async {
+        // Implement device refresh logic here
     }
 }
 
 // MARK: - Configuration Extension
-extension Configuration.AppSettings {
+extension BackgroundConfiguration.AppSettings {
     public var backgroundRefreshInterval: TimeInterval? {
         get {
-            UserDefaults.standard.value(forKey: "background_refresh_interval") as? TimeInterval
+            let interval = TimeInterval(exactly: UserDefaults.standard.integer(forKey: "backgroundRefreshInterval"))
+            return interval.map { max(Constants.minimumRefreshInterval, min($0, Constants.maximumRefreshInterval)) }
         }
         set {
-            UserDefaults.standard.setValue(newValue, forKey: "background_refresh_interval")
+            if let interval = newValue {
+                UserDefaults.standard.set(Int(interval), forKey: "backgroundRefreshInterval")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "backgroundRefreshInterval")
+            }
         }
     }
 } 

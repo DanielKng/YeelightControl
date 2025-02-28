@@ -3,16 +3,16 @@ import Combine
 import SwiftUI
 
 // MARK: - Storage Managing Protocol
-protocol StorageManaging {
+@preconcurrency public protocol StorageManaging: Actor {
     func save<T: Encodable>(_ value: T, forKey key: StorageKey) async throws
     func load<T: Decodable>(forKey key: StorageKey) async throws -> T
     func remove(forKey key: StorageKey) async throws
-    func exists(forKey key: StorageKey) -> Bool
+    nonisolated func exists(forKey key: StorageKey) -> Bool
     func clear() async throws
 }
 
 // MARK: - Storage Keys
-enum StorageKey: String, CaseIterable {
+public enum StorageKey: String, CaseIterable {
     case devices
     case rooms
     case automations
@@ -127,67 +127,65 @@ public final class UnifiedStorageManager: ObservableObject, StorageManaging {
     
     // MARK: - Public Methods
     public func save<T: Encodable>(_ value: T, forKey key: StorageKey) async throws {
-        try await queue.run {
-            let url = getURL(for: key)
-            let data = try encoder.encode(value)
+        try await Task.detached {
+            let url = self.getURL(for: key)
+            let data = try self.encoder.encode(value)
             
             // Create directory if needed
-            try createDirectoryIfNeeded(for: key.directory)
+            try self.createDirectoryIfNeeded(for: key.directory)
             
             // Write data
             try data.write(to: url, options: .atomic)
             
             // Clean up if needed
             if key.directory == .cache {
-                try cleanupCacheIfNeeded()
+                try self.cleanupCacheIfNeeded()
             } else if key.directory == .backups {
-                try cleanupBackupsIfNeeded()
+                try self.cleanupBackupsIfNeeded()
             }
             
-            Task { @MainActor in
-                lastSaveDate = Date()
+            await MainActor.run {
+                self.lastSaveDate = Date()
             }
-        }
+        }.value
     }
     
     public func load<T: Decodable>(forKey key: StorageKey) async throws -> T {
-        try await queue.run {
-            let url = getURL(for: key)
+        try await Task.detached {
+            let url = self.getURL(for: key)
             let data = try Data(contentsOf: url)
-            let value = try decoder.decode(T.self, from: data)
+            let value = try self.decoder.decode(T.self, from: data)
             
-            Task { @MainActor in
-                lastLoadDate = Date()
+            await MainActor.run {
+                self.lastLoadDate = Date()
             }
             
             return value
-        }
+        }.value
     }
     
     public func remove(forKey key: StorageKey) async throws {
-        try await queue.run {
-            let url = getURL(for: key)
-            try fileManager.removeItem(at: url)
-        }
+        try await Task.detached {
+            let url = self.getURL(for: key)
+            try self.fileManager.removeItem(at: url)
+        }.value
     }
     
-    public func exists(forKey key: StorageKey) -> Bool {
-        queue.sync {
-            let url = getURL(for: key)
-            return fileManager.fileExists(atPath: url.path)
-        }
+    public nonisolated func exists(forKey key: StorageKey) -> Bool {
+        let url = getURL(for: key)
+        return fileManager.fileExists(atPath: url.path)
     }
     
     public func clear() async throws {
-        try await queue.run {
+        try await Task.detached {
             for directory in StorageDirectory.allCases {
                 let url = directory.url
-                let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+                let contents = try self.fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
                 for fileURL in contents {
-                    try fileManager.removeItem(at: fileURL)
+                    try self.fileManager.removeItem(at: fileURL)
                 }
             }
-        }
+        }.value
     }
     
     public func createBackup() async throws -> URL {
@@ -312,39 +310,6 @@ public final class UnifiedStorageManager: ObservableObject, StorageManaging {
             for fileURL in sortedFiles.prefix(contents.count - config.maxBackupCount) {
                 try fileManager.removeItem(at: fileURL)
             }
-        }
-    }
-}
-
-// MARK: - Storage Errors
-enum StorageError: LocalizedError {
-    case saveFailed(String)
-    case loadFailed(String)
-    case notFound
-    case invalidData
-    case directoryCreationFailed
-    case encryptionFailed
-    case diskSpaceLow
-    case backupNotFound
-    
-    var errorDescription: String? {
-        switch self {
-        case .saveFailed(let reason):
-            return "Failed to save data: \(reason)"
-        case .loadFailed(let reason):
-            return "Failed to load data: \(reason)"
-        case .notFound:
-            return "Data not found"
-        case .invalidData:
-            return "Invalid data format"
-        case .directoryCreationFailed:
-            return "Failed to create directory"
-        case .encryptionFailed:
-            return "Failed to encrypt/decrypt data"
-        case .diskSpaceLow:
-            return "Insufficient disk space"
-        case .backupNotFound:
-            return "Backup not found"
         }
     }
 }

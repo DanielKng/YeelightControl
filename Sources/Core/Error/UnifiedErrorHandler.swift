@@ -12,102 +12,36 @@ public protocol ErrorHandling {
     func clearError()
 }
 
-// MARK: - App Error Type
-public enum AppError: LocalizedError, Identifiable, Codable {
-    case network(NetworkError)
-    case location(LocationError)
-    case background(BackgroundError)
-    case configuration(ConfigurationError)
-    case storage(StorageError)
-    case device(DeviceError)
-    case automation(AutomationError)
-    case state(StateError)
-    case scene(SceneError)
-    case effect(EffectError)
-    case system(String)
-    case unknown(String)
+// MARK: - Error Record
+private struct ErrorRecord: Codable {
+    let timestamp: Date
+    let severity: ErrorSeverity
+    let message: String
+    let category: LogCategory
+    let file: String
+    let function: String
+    let line: Int
     
-    public var id: String {
-        switch self {
-        case .network(let error): return "network-\(error.localizedDescription)"
-        case .location(let error): return "location-\(error.localizedDescription)"
-        case .background(let error): return "background-\(error.localizedDescription)"
-        case .configuration(let error): return "config-\(error.localizedDescription)"
-        case .storage(let error): return "storage-\(error.localizedDescription)"
-        case .device(let error): return "device-\(error.localizedDescription)"
-        case .automation(let error): return "automation-\(error.localizedDescription)"
-        case .state(let error): return "state-\(error.localizedDescription)"
-        case .scene(let error): return "scene-\(error.localizedDescription)"
-        case .effect(let error): return "effect-\(error.localizedDescription)"
-        case .system(let message): return "system-\(message)"
-        case .unknown(let message): return "unknown-\(message)"
-        }
-    }
-    
-    public var errorDescription: String? {
-        switch self {
-        case .network(let error): return error.localizedDescription
-        case .location(let error): return error.localizedDescription
-        case .background(let error): return error.localizedDescription
-        case .configuration(let error): return error.localizedDescription
-        case .storage(let error): return error.localizedDescription
-        case .device(let error): return error.localizedDescription
-        case .automation(let error): return error.localizedDescription
-        case .state(let error): return error.localizedDescription
-        case .scene(let error): return error.localizedDescription
-        case .effect(let error): return error.localizedDescription
-        case .system(let message): return message
-        case .unknown(let message): return message
-        }
-    }
-    
-    public var recoverySuggestion: String? {
-        switch self {
-        case .network:
-            return "Check your internet connection and try again."
-        case .location:
-            return "Check location permissions in Settings and try again."
-        case .background:
-            return "Try restarting the app."
-        case .configuration:
-            return "Try resetting app settings to defaults."
-        case .storage:
-            return "Check available storage space and try again."
-        case .device:
-            return "Make sure the device is powered on and connected to the network."
-        case .automation:
-            return "Check automation settings and try again."
-        case .state:
-            return "Try refreshing the device state."
-        case .scene:
-            return "Check scene configuration and try again."
-        case .effect:
-            return "Check effect settings and try again."
-        case .system, .unknown:
-            return "Try restarting the app. If the problem persists, contact support."
-        }
-    }
-    
-    public var severity: ErrorSeverity {
-        switch self {
-        case .network: return .warning
-        case .location: return .warning
-        case .background: return .warning
-        case .configuration: return .warning
-        case .storage: return .error
-        case .device: return .warning
-        case .automation: return .warning
-        case .state: return .warning
-        case .scene: return .warning
-        case .effect: return .warning
-        case .system: return .error
-        case .unknown: return .error
-        }
+    init(timestamp: Date = Date(),
+         severity: ErrorSeverity,
+         message: String,
+         category: LogCategory,
+         file: String = #file,
+         function: String = #function,
+         line: Int = #line) {
+        self.timestamp = timestamp
+        self.severity = severity
+        self.message = message
+        self.category = category
+        self.file = file
+        self.function = function
+        self.line = line
     }
 }
 
 // MARK: - Error Severity
 public enum ErrorSeverity: String, Codable {
+    case debug
     case info
     case warning
     case error
@@ -119,6 +53,7 @@ public enum ErrorSeverity: String, Codable {
         case .warning: return "exclamationmark.triangle"
         case .error: return "xmark.circle"
         case .critical: return "exclamationmark.octagon"
+        case .debug: return "ladybug"
         }
     }
     
@@ -128,6 +63,70 @@ public enum ErrorSeverity: String, Codable {
         case .warning: return .yellow
         case .error: return .red
         case .critical: return .purple
+        case .debug: return .gray
+        }
+    }
+}
+
+// MARK: - AppError Extensions
+extension AppError: Identifiable {
+    public var id: String {
+        switch self {
+        case .network(let error): return "network-\(error)"
+        case .location(let error): return "location-\(error)"
+        case .configuration(let error): return "config-\(error)"
+        case .device(let error): return "device-\(error)"
+        case .security(let error): return "security-\(error)"
+        case .storage(let error): return "storage-\(error)"
+        case .permission(let error): return "permission-\(error)"
+        case .effect(let error): return "effect-\(error)"
+        case .scene(let error): return "scene-\(error)"
+        case .unknown: return "unknown"
+        }
+    }
+    
+    public var errorDescription: String? {
+        switch self {
+        case .network(let error): return "Network error: \(error)"
+        case .location(let error): return "Location error: \(error)"
+        case .configuration(let error): return "Configuration error: \(error)"
+        case .device(let error): return "Device error: \(error)"
+        case .security(let error): return "Security error: \(error)"
+        case .storage(let error): return "Storage error: \(error)"
+        case .permission(let error): return "Permission error: \(error)"
+        case .effect(let error): return "Effect error: \(error)"
+        case .scene(let error): return "Scene error: \(error)"
+        case .unknown: return "Unknown error occurred"
+        }
+    }
+    
+    public var recoverySuggestion: String? {
+        switch self {
+        case .network: return "Check your internet connection and try again."
+        case .location: return "Check location permissions in Settings and try again."
+        case .configuration: return "Try resetting app settings to defaults."
+        case .device: return "Make sure the device is powered on and connected to the network."
+        case .security: return "Try authenticating again."
+        case .storage: return "Check available storage space and try again."
+        case .permission: return "Check app permissions in Settings."
+        case .effect: return "Check effect settings and try again."
+        case .scene: return "Check scene configuration and try again."
+        case .unknown: return "Try restarting the app. If the problem persists, contact support."
+        }
+    }
+    
+    public var severity: ErrorSeverity {
+        switch self {
+        case .network: return .warning
+        case .location: return .warning
+        case .configuration: return .warning
+        case .device: return .warning
+        case .security: return .error
+        case .storage: return .error
+        case .permission: return .warning
+        case .effect: return .warning
+        case .scene: return .warning
+        case .unknown: return .error
         }
     }
 }
@@ -135,163 +134,128 @@ public enum ErrorSeverity: String, Codable {
 // MARK: - Error Handler Implementation
 @MainActor
 public final class UnifiedErrorHandler: ErrorHandling, ObservableObject {
-    // MARK: - Published Properties
+    // MARK: - Properties
     @Published public private(set) var lastError: AppError?
-    @Published public private(set) var errorHistory: [ErrorRecord] = []
-    
-    // MARK: - Publishers
     private let errorSubject = PassthroughSubject<AppError, Never>()
+    
     public var errorUpdates: AnyPublisher<AppError, Never> {
         errorSubject.eraseToAnyPublisher()
     }
     
-    // MARK: - Private Properties
-    private let storage: StorageManaging
-    private let analytics: UnifiedAnalyticsManager
+    private let storageManager: StorageManaging
+    private var errorRecords: [ErrorRecord] = []
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Constants
     private enum Constants {
-        static let maxHistoryCount = 100
-        static let errorHistoryKey = "error_history"
-    }
-    
-    // MARK: - Singleton
-    public static let shared = UnifiedErrorHandler()
-    
-    // MARK: - Types
-    private struct ErrorRecord: Codable {
-        let error: AppError
-        let timestamp: Date
-        let context: [String: String]?
+        static let maxRecords = 1000
+        static let errorLogFile = "error_log.json"
     }
     
     // MARK: - Initialization
-    private init() {
-        self.storage = UnifiedStorageManager.shared
-        self.analytics = UnifiedAnalyticsManager.shared
-        loadErrorHistory()
+    public init(services: ServiceContainer) {
+        self.storageManager = services.storageManager
+        loadErrorLog()
     }
     
     // MARK: - Public Methods
     public func handle(_ error: Error) {
-        let appError = convertToAppError(error)
+        let appError: AppError
+        
+        switch error {
+        case let networkError as NetworkError:
+            appError = .network(networkError)
+        case let locationError as LocationError:
+            appError = .location(locationError)
+        case let configError as ConfigurationError:
+            appError = .configuration(configError)
+        case let deviceError as DeviceError:
+            appError = .device(deviceError)
+        case let securityError as SecurityError:
+            appError = .security(securityError)
+        case let storageError as StorageError:
+            appError = .storage(storageError)
+        case let permissionError as PermissionError:
+            appError = .permission(permissionError)
+        case let effectError as EffectError:
+            appError = .effect(effectError)
+        case let sceneError as SceneError:
+            appError = .scene(sceneError)
+        default:
+            appError = .unknown
+        }
+        
         handle(appError)
     }
     
     public func handle(_ error: AppError) {
+        let category: LogCategory
+        switch error {
+        case .network: category = .network
+        case .location: category = .location
+        case .configuration: category = .configuration
+        case .device: category = .device
+        case .security: category = .security
+        case .storage: category = .storage
+        case .permission: category = .permission
+        case .effect: category = .effect
+        case .scene: category = .scene
+        case .unknown: category = .general
+        }
+        
+        let record = ErrorRecord(
+            severity: error.severity,
+            message: error.localizedDescription ?? "Unknown error",
+            category: category
+        )
+        
+        errorRecords.append(record)
+        if errorRecords.count > Constants.maxRecords {
+            errorRecords.removeFirst()
+        }
+        
         lastError = error
         errorSubject.send(error)
         
-        let record = ErrorRecord(
-            error: error,
-            timestamp: Date(),
-            context: ["stack": Thread.callStackSymbols.first ?? ""]
-        )
-        
-        errorHistory.insert(record, at: 0)
-        if errorHistory.count > Constants.maxHistoryCount {
-            errorHistory.removeLast(errorHistory.count - Constants.maxHistoryCount)
-        }
-        
-        saveErrorHistory()
-        trackError(error)
+        saveErrorLog()
     }
     
     public func clearError() {
         lastError = nil
     }
     
-    public func clearErrorHistory() {
-        errorHistory.removeAll()
-        try? storage.remove(forKey: Constants.errorHistoryKey)
-    }
-    
     // MARK: - Private Methods
-    private func convertToAppError(_ error: Error) -> AppError {
-        switch error {
-        case let networkError as NetworkError:
-            return .network(networkError)
-        case let locationError as LocationError:
-            return .location(locationError)
-        case let backgroundError as BackgroundError:
-            return .background(backgroundError)
-        case let configError as ConfigurationError:
-            return .configuration(configError)
-        case let storageError as StorageError:
-            return .storage(storageError)
-        case let deviceError as DeviceError:
-            return .device(deviceError)
-        case let automationError as AutomationError:
-            return .automation(automationError)
-        case let stateError as StateError:
-            return .state(stateError)
-        case let sceneError as SceneError:
-            return .scene(sceneError)
-        case let effectError as EffectError:
-            return .effect(effectError)
-        default:
-            return .unknown(error.localizedDescription)
-        }
-    }
-    
-    private func loadErrorHistory() {
+    private func loadErrorLog() {
         do {
-            let data = try storage.load(Constants.errorHistoryKey)
-            errorHistory = try JSONDecoder().decode([ErrorRecord].self, from: data)
+            if let data = try storageManager.readData(fromFile: Constants.errorLogFile) {
+                let decoder = JSONDecoder()
+                errorRecords = try decoder.decode([ErrorRecord].self, from: data)
+            }
         } catch {
-            print("Failed to load error history: \(error)")
+            print("Failed to load error log: \(error)")
         }
     }
     
-    private func saveErrorHistory() {
+    private func saveErrorLog() {
         do {
-            let data = try JSONEncoder().encode(errorHistory)
-            try storage.save(data, forKey: Constants.errorHistoryKey)
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(errorRecords)
+            try storageManager.writeData(data, toFile: Constants.errorLogFile)
         } catch {
-            print("Failed to save error history: \(error)")
+            print("Failed to save error log: \(error)")
         }
-    }
-    
-    private func trackError(_ error: AppError) {
-        analytics.trackEvent(AnalyticsEvent(
-            name: "error_occurred",
-            parameters: [
-                "error_type": String(describing: type(of: error)),
-                "error_description": error.errorDescription ?? "",
-                "error_severity": error.severity.rawValue
-            ]
-        ))
     }
 }
 
-// MARK: - SwiftUI View Modifiers
+// MARK: - View Extension
 public extension View {
     func handleError(_ error: Binding<AppError?>) -> some View {
-        modifier(ErrorHandlingViewModifier(error: error))
-    }
-}
-
-public struct ErrorHandlingViewModifier: ViewModifier {
-    @Binding var error: AppError?
-    @Environment(\.dismiss) private var dismiss
-    
-    public func body(content: Content) -> some View {
-        content
-            .alert(
-                error?.errorDescription ?? "",
-                isPresented: Binding(
-                    get: { error != nil },
-                    set: { if !$0 { error = nil } }
-                )
-            ) {
-                Button("OK") {
-                    error = nil
-                }
-            } message: {
-                if let suggestion = error?.recoverySuggestion {
-                    Text(suggestion)
-                }
-            }
+        alert(item: error) { error in
+            Alert(
+                title: Text("Error"),
+                message: Text(error.localizedDescription ?? "Unknown error"),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 } 

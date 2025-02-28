@@ -2,17 +2,18 @@ import Foundation
 import Combine
 
 // MARK: - Effect Managing Protocol
-protocol EffectManaging {
-    var effects: [Effect] { get }
+@preconcurrency
+public protocol EffectManaging {
     var effectUpdates: AnyPublisher<EffectUpdate, Never> { get }
     
-    func getEffect(byId id: String) -> Effect?
-    func getAllEffects() -> [Effect]
-    func createEffect(_ effect: Effect) async throws
-    func updateEffect(_ effect: Effect) async throws
-    func deleteEffect(_ effect: Effect) async throws
-    func applyEffect(_ effect: Effect, to devices: [String]) async throws
-    func stopEffect(on devices: [String]) async throws
+    func createEffect(name: String, type: EffectType, parameters: EffectParameters) async -> Effect
+    func getEffect(withId id: String) async -> Effect?
+    func getAllEffects() async -> [Effect]
+    func updateEffect(_ effect: Effect) async -> Effect
+    func deleteEffect(_ effect: Effect) async
+    func startEffect(_ effect: Effect) async
+    func stopEffect(_ effect: Effect) async
+    func stopAllEffects() async
 }
 
 // MARK: - Effect Model
@@ -118,272 +119,122 @@ enum EffectUpdate {
     case deleted(String)
     case applied(Effect, [String])
     case stopped([String])
+    case allStopped
 }
 
 // MARK: - Effect Manager Implementation
-final class UnifiedEffectManager: EffectManaging, ObservableObject {
-    // MARK: - Published Properties
-    @Published private(set) var effects: [Effect] = []
-    
-    // MARK: - Publishers
+@MainActor
+public final class UnifiedEffectManager: ObservableObject {
     private let effectSubject = PassthroughSubject<EffectUpdate, Never>()
-    var effectUpdates: AnyPublisher<EffectUpdate, Never> {
-        effectSubject.eraseToAnyPublisher()
-    }
+    private var effects: [String: Effect] = [:]
+    private var activeEffects: Set<String> = []
+    private var effectTimers: [String: Timer] = [:]
     
-    // MARK: - Private Properties
-    private let services: ServiceContainer
-    private let queue = DispatchQueue(label: "de.knng.app.yeelightcontrol.effect", qos: .userInitiated)
-    private var activeEffects: [String: Task<Void, Error>] = [:] // deviceId: task
-    private var cancellables = Set<AnyCancellable>()
+    public static let shared = UnifiedEffectManager()
     
-    // MARK: - Initialization
-    init(services: ServiceContainer = .shared) {
-        self.services = services
-        loadEffects()
-        setupObservers()
-    }
-    
-    // MARK: - Public Methods
-    func getEffect(byId id: String) -> Effect? {
-        queue.sync {
-            effects.first { $0.id == id }
+    private init() {
+        // Load preset effects
+        for preset in Effect.presets {
+            effects[preset.id] = preset
         }
     }
     
-    func getAllEffects() -> [Effect] {
-        queue.sync {
-            effects
-        }
-    }
-    
-    func createEffect(_ effect: Effect) async throws {
-        try await queue.run {
-            // Validate effect
-            guard !effects.contains(where: { $0.id == effect.id }) else {
-                throw EffectError.alreadyExists
-            }
-            
-            // Add effect
-            effects.append(effect)
-            effectSubject.send(.created(effect))
-            
-            // Save effects
-            try await saveEffects()
-            
-            services.logger.info("Created effect: \(effect.name)", category: .effect)
-        }
-    }
-    
-    func updateEffect(_ effect: Effect) async throws {
-        try await queue.run {
-            guard let index = effects.firstIndex(where: { $0.id == effect.id }) else {
-                throw EffectError.notFound
-            }
-            
-            // Update effect
-            effects[index] = effect
-            effectSubject.send(.updated(effect))
-            
-            // Save effects
-            try await saveEffects()
-            
-            services.logger.info("Updated effect: \(effect.name)", category: .effect)
-        }
-    }
-    
-    func deleteEffect(_ effect: Effect) async throws {
-        try await queue.run {
-            // Validate effect
-            guard !effect.isPreset else {
-                throw EffectError.cannotDeletePreset
-            }
-            
-            // Remove effect
-            effects.removeAll { $0.id == effect.id }
-            effectSubject.send(.deleted(effect.id))
-            
-            // Save effects
-            try await saveEffects()
-            
-            services.logger.info("Deleted effect: \(effect.name)", category: .effect)
-        }
-    }
-    
-    func applyEffect(_ effect: Effect, to deviceIds: [String]) async throws {
-        try await queue.run {
-            // Validate devices
-            let devices = deviceIds.compactMap { services.deviceManager.getDevice(byId: $0) }
-            guard devices.count == deviceIds.count else {
-                throw EffectError.deviceNotFound
-            }
-            
-            // Stop any active effects on these devices
-            try await stopEffect(on: deviceIds)
-            
-            // Apply effect to each device
-            for deviceId in deviceIds {
-                let task = Task {
-                    repeat {
-                        try await applyEffectCycle(effect, to: deviceId)
-                    } while effect.parameters.repeat && !Task.isCancelled
-                }
-                activeEffects[deviceId] = task
-            }
-            
-            effectSubject.send(.applied(effect, deviceIds))
-            services.logger.info("Applied effect \(effect.name) to \(deviceIds.count) devices", category: .effect)
-        }
-    }
-    
-    func stopEffect(on deviceIds: [String]) async throws {
-        try await queue.run {
-            for deviceId in deviceIds {
-                // Cancel active effect task
-                activeEffects[deviceId]?.cancel()
-                activeEffects.removeValue(forKey: deviceId)
-                
-                // Reset device state
-                if let device = services.deviceManager.getDevice(byId: deviceId) {
-                    let defaultState = DeviceState(
-                        power: true,
-                        brightness: 100,
-                        colorTemperature: 4000,
-                        lastUpdate: Date(),
-                        isOnline: true
-                    )
-                    try await services.stateManager.setState(defaultState, for: deviceId)
-                }
-            }
-            
-            effectSubject.send(.stopped(deviceIds))
-            services.logger.info("Stopped effects on \(deviceIds.count) devices", category: .effect)
-        }
-    }
-    
-    // MARK: - Private Methods
-    private func setupObservers() {
-        // Observe device removals
-        services.deviceManager.deviceUpdates
-            .sink { [weak self] update in
-                if case .removed(let deviceId) = update {
-                    self?.handleDeviceRemoved(deviceId)
-                }
-            }
-            .store(in: &cancellables)
-    }
-    
-    private func loadEffects() {
-        Task {
-            do {
-                var loadedEffects: [Effect] = try await services.storage.load(forKey: .effects)
-                
-                // Add presets if not present
-                for preset in Effect.presets {
-                    if !loadedEffects.contains(where: { $0.id == preset.id }) {
-                        loadedEffects.append(preset)
-                    }
-                }
-                
-                queue.async { [weak self] in
-                    self?.effects = loadedEffects
-                }
-            } catch {
-                services.logger.error("Failed to load effects: \(error.localizedDescription)", category: .effect)
-                
-                // Load presets as fallback
-                queue.async { [weak self] in
-                    self?.effects = Effect.presets
-                }
-            }
-        }
-    }
-    
-    private func saveEffects() async throws {
-        // Only save non-preset effects
-        let customEffects = effects.filter { !$0.isPreset }
-        try await services.storage.save(customEffects, forKey: .effects)
-    }
-    
-    private func handleDeviceRemoved(_ deviceId: String) {
-        Task {
-            try? await stopEffect(on: [deviceId])
-        }
-    }
-    
-    private func applyEffectCycle(_ effect: Effect, to deviceId: String) async throws {
-        let params = effect.parameters
+    private func startEffectTimer(_ effect: Effect) {
+        guard !effectTimers.keys.contains(effect.id) else { return }
         
-        switch effect.type {
-        case .smooth, .sudden:
-            // Simple transition
-            let state = DeviceState(
-                power: true,
-                brightness: params.brightness[0],
-                colorTemperature: params.colorTemperature?.first,
-                color: params.colors?.first.map { DeviceState.Color(red: $0[0], green: $0[1], blue: $0[2]) },
-                effect: effect.type == .smooth ? .smooth : .sudden,
-                lastUpdate: Date(),
-                isOnline: true
-            )
-            try await services.stateManager.setState(state, for: deviceId)
-            
-        case .strobe, .pulse:
-            // Alternating states
-            for brightness in params.brightness {
-                let state = DeviceState(
-                    power: true,
-                    brightness: brightness,
-                    colorTemperature: params.colorTemperature?.first,
-                    lastUpdate: Date(),
-                    isOnline: true
-                )
-                try await services.stateManager.setState(state, for: deviceId)
-                try await Task.sleep(nanoseconds: UInt64(params.duration) * 1_000_000)
-            }
-            
-        case .colorFlow:
-            // Color sequence
-            guard let colors = params.colors else { return }
-            for color in colors {
-                let state = DeviceState(
-                    power: true,
-                    brightness: params.brightness[0],
-                    color: DeviceState.Color(red: color[0], green: color[1], blue: color[2]),
-                    effect: .smooth,
-                    lastUpdate: Date(),
-                    isOnline: true
-                )
-                try await services.stateManager.setState(state, for: deviceId)
-                try await Task.sleep(nanoseconds: UInt64(params.duration) * 1_000_000)
-            }
+        let timer = Timer.scheduledTimer(withTimeInterval: Double(effect.parameters.duration) / 1000.0, repeats: effect.parameters.repeat) { [weak self] _ in
+            self?.applyEffect(effect)
         }
+        effectTimers[effect.id] = timer
+    }
+    
+    private func stopEffectTimer(_ effect: Effect) {
+        effectTimers[effect.id]?.invalidate()
+        effectTimers.removeValue(forKey: effect.id)
+    }
+    
+    private func applyEffect(_ effect: Effect) {
+        // Implementation for applying the effect to devices
+        // This would involve sending commands to the Yeelight devices
+        // based on the effect parameters
     }
 }
 
-// MARK: - Effect Errors
-enum EffectError: LocalizedError {
-    case notFound
-    case alreadyExists
-    case deviceNotFound
-    case cannotDeletePreset
-    case invalidParameters
-    case applicationFailed(String)
+extension UnifiedEffectManager: EffectManaging {
+    public var effectUpdates: AnyPublisher<EffectUpdate, Never> {
+        effectSubject.eraseToAnyPublisher()
+    }
     
-    var errorDescription: String? {
-        switch self {
-        case .notFound:
-            return "Effect not found"
-        case .alreadyExists:
-            return "Effect already exists"
-        case .deviceNotFound:
-            return "One or more devices not found"
-        case .cannotDeletePreset:
-            return "Cannot delete preset effect"
-        case .invalidParameters:
-            return "Invalid effect parameters"
-        case .applicationFailed(let reason):
-            return "Failed to apply effect: \(reason)"
+    public func createEffect(name: String, type: EffectType, parameters: EffectParameters) async -> Effect {
+        let effect = Effect(name: name, type: type, parameters: parameters)
+        effects[effect.id] = effect
+        effectSubject.send(.created(effect))
+        return effect
+    }
+    
+    public func getEffect(withId id: String) async -> Effect? {
+        effects[id]
+    }
+    
+    public func getAllEffects() async -> [Effect] {
+        Array(effects.values)
+    }
+    
+    public func updateEffect(_ effect: Effect) async -> Effect {
+        effects[effect.id] = effect
+        effectSubject.send(.updated(effect))
+        return effect
+    }
+    
+    public func deleteEffect(_ effect: Effect) async {
+        if activeEffects.contains(effect.id) {
+            await stopEffect(effect)
+        }
+        effects.removeValue(forKey: effect.id)
+        effectSubject.send(.deleted(effect.id))
+    }
+    
+    public func startEffect(_ effect: Effect) async {
+        guard !activeEffects.contains(effect.id) else { return }
+        
+        activeEffects.insert(effect.id)
+        startEffectTimer(effect)
+        effectSubject.send(.started(effect))
+    }
+    
+    public func stopEffect(_ effect: Effect) async {
+        guard activeEffects.contains(effect.id) else { return }
+        
+        activeEffects.remove(effect.id)
+        stopEffectTimer(effect)
+        effectSubject.send(.stopped(effect))
+    }
+    
+    public func stopAllEffects() async {
+        let activeEffectsCopy = activeEffects
+        for effectId in activeEffectsCopy {
+            if let effect = effects[effectId] {
+                await stopEffect(effect)
+            }
+        }
+        effectSubject.send(.allStopped)
+    }
+}
+
+// MARK: - Queue Extension
+extension DispatchQueue {
+    func run<T>(_ block: @escaping () async throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            self.async {
+                Task {
+                    do {
+                        let result = try await block()
+                        continuation.resume(returning: result)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
         }
     }
 } 

@@ -3,284 +3,130 @@ import Combine
 import SwiftUI
 
 // MARK: - Configuration Managing Protocol
-protocol ConfigurationManaging {
-    var configurationUpdates: AnyPublisher<Void, Never> { get }
+public protocol ConfigurationManaging {
+    var configurationUpdates: AnyPublisher<Configuration, Never> { get }
     
-    func getValue<T>(for key: ConfigKey) -> T?
+    func getValue<T>(for key: ConfigKey) throws -> T
     func setValue<T>(_ value: T, for key: ConfigKey) throws
+    func removeValue(for key: ConfigKey)
     func resetToDefaults()
-}
-
-// MARK: - Configuration Keys
-enum ConfigKey: String {
-    // Network Configuration
-    case discoveryTimeout
-    case discoveryRetryCount
-    case discoveryRetryDelay
-    case useBonjourDiscovery
-    case ssdpDiscoveryPort
-    
-    // Background Configuration
-    case minRefreshInterval
-    case maxRetryAttempts
-    case retryDelay
-    case backgroundTaskTimeout
-    
-    // Location Configuration
-    case desiredAccuracy
-    case distanceFilter
-    case activityType
-    case pausesLocationUpdatesAutomatically
-    case allowsBackgroundLocationUpdates
-    
-    // Logger Configuration
-    case maxLogFileSize
-    case maxLogFiles
-    case minDiskSpace
-    case rotationInterval
-    case isFileLoggingEnabled
-    
-    // App Configuration
-    case theme
-    case autoDiscoveryEnabled
-    case defaultTransitionDuration
-    case defaultBrightness
-    case defaultColorTemperature
-}
-
-// MARK: - Configuration Value Type
-enum ConfigValue: Codable, Equatable {
-    case bool(Bool)
-    case int(Int)
-    case double(Double)
-    case string(String)
-    case timeInterval(TimeInterval)
-    
-    var boolValue: Bool? {
-        if case .bool(let value) = self { return value }
-        return nil
-    }
-    
-    var intValue: Int? {
-        if case .int(let value) = self { return value }
-        return nil
-    }
-    
-    var doubleValue: Double? {
-        if case .double(let value) = self { return value }
-        return nil
-    }
-    
-    var stringValue: String? {
-        if case .string(let value) = self { return value }
-        return nil
-    }
-    
-    var timeIntervalValue: TimeInterval? {
-        if case .timeInterval(let value) = self { return value }
-        return nil
-    }
 }
 
 // MARK: - Configuration Manager Implementation
 @MainActor
-public final class UnifiedConfigurationManager: ObservableObject {
+public final class UnifiedConfigurationManager: ObservableObject, ConfigurationManaging {
     // MARK: - Published Properties
     @Published public private(set) var configuration: Configuration
     @Published public private(set) var isDirty = false
     
     // MARK: - Private Properties
-    private let storage: UnifiedStorageManager
+    private let services: ServiceContainer
     private var cancellables = Set<AnyCancellable>()
+    private let configurationSubject = CurrentValueSubject<Configuration, Never>(Configuration())
+    private let storageManager: StorageManaging
     
     // MARK: - Constants
     private enum Constants {
-        static let configurationKey = "app_configuration"
+        static let configFileName = "app_config.json"
+        static let configFileExtension = "json"
         static let autosaveInterval: TimeInterval = 30
     }
     
     // MARK: - Singleton
     public static let shared = UnifiedConfigurationManager()
     
-    private init() {
-        self.storage = .shared
-        self.configuration = Self.defaultConfiguration
+    // MARK: - Initialization
+    public init(services: ServiceContainer) {
+        self.services = services
+        self.storageManager = services.storageManager
+        self.configuration = Configuration()
+        
+        setupObservers()
         loadConfiguration()
-        setupAutosave()
     }
     
-    // MARK: - Public Methods
-    public func updateConfiguration(_ update: (inout Configuration) -> Void) {
-        var newConfig = configuration
-        update(&newConfig)
-        configuration = newConfig
-        isDirty = true
-        saveConfiguration()
+    // MARK: - Configuration Management
+    public func getValue<T>(for key: ConfigKey) throws -> T {
+        guard let value = configuration.deviceSettings[key.rawValue] else {
+            throw ConfigurationError.notFound
+        }
+        
+        switch value {
+        case .string(let stringValue) where T.self == String.self:
+            return stringValue as! T
+        case .int(let intValue) where T.self == Int.self:
+            return intValue as! T
+        case .double(let doubleValue) where T.self == Double.self:
+            return doubleValue as! T
+        case .bool(let boolValue) where T.self == Bool.self:
+            return boolValue as! T
+        default:
+            throw ConfigurationError.invalidValue
+        }
     }
     
-    public func resetToDefaults() {
-        configuration = Self.defaultConfiguration
-        isDirty = true
-        saveConfiguration()
+    public func setValue<T>(_ value: T, for key: ConfigKey) throws {
+        let configValue: ConfigValue
+        
+        switch value {
+        case let stringValue as String:
+            configValue = .string(stringValue)
+        case let intValue as Int:
+            configValue = .int(intValue)
+        case let doubleValue as Double:
+            configValue = .double(doubleValue)
+        case let boolValue as Bool:
+            configValue = .bool(boolValue)
+        default:
+            throw ConfigurationError.invalidValue
+        }
+        
+        configuration.deviceSettings[key.rawValue] = configValue
+        configurationSubject.send(configuration)
+        try saveConfiguration()
+    }
+    
+    public func removeValue(for key: ConfigKey) {
+        configuration.deviceSettings.removeValue(forKey: key.rawValue)
+        configurationSubject.send(configuration)
+        try? saveConfiguration()
+    }
+    
+    public func resetToDefaults() throws {
+        configuration = Configuration()
+        configurationSubject.send(configuration)
+        try saveConfiguration()
+    }
+    
+    // MARK: - ConfigurationManaging Protocol
+    public var configurationUpdates: AnyPublisher<Configuration, Never> {
+        configurationSubject.eraseToAnyPublisher()
     }
     
     // MARK: - Private Methods
     private func loadConfiguration() {
         do {
-            let data = try storage.load(forKey: Constants.configurationKey)
-            let decoder = JSONDecoder()
-            configuration = try decoder.decode(Configuration.self, from: data)
-            isDirty = false
+            if let data = try storageManager.readData(fromFile: Constants.configFileName) {
+                let decoder = JSONDecoder()
+                configuration = try decoder.decode(Configuration.self, from: data)
+            }
         } catch {
             print("Failed to load configuration: \(error)")
-            configuration = Self.defaultConfiguration
         }
+        configurationSubject.send(configuration)
     }
     
-    private func saveConfiguration() {
+    private func saveConfiguration() throws {
         do {
             let encoder = JSONEncoder()
             let data = try encoder.encode(configuration)
-            try storage.save(data, forKey: Constants.configurationKey)
-            isDirty = false
+            try storageManager.writeData(data, toFile: Constants.configFileName)
         } catch {
-            print("Failed to save configuration: \(error)")
+            throw ConfigurationError.saveFailed
         }
     }
     
-    private func setupAutosave() {
-        Timer.publish(every: Constants.autosaveInterval, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                guard let self = self, self.isDirty else { return }
-                self.saveConfiguration()
-            }
-            .store(in: &cancellables)
-    }
-    
-    private static var defaultConfiguration: Configuration {
-        Configuration(
-            deviceSettings: .init(
-                defaultBrightness: 50,
-                defaultColorTemperature: 4000,
-                autoConnect: true,
-                discoveryTimeout: 10
-            ),
-            networkSettings: .init(
-                discoveryPort: 1982,
-                controlPort: 55443,
-                discoveryInterval: 5,
-                connectionTimeout: 5
-            ),
-            appSettings: .init(
-                theme: .system,
-                analyticsEnabled: true,
-                notificationsEnabled: true,
-                backgroundRefreshEnabled: true
-            ),
-            securitySettings: .init(
-                biometricsEnabled: true,
-                autoLockTimeout: 300
-            )
-        )
+    private func setupObservers() {
+        // Add any necessary observers here
     }
 }
-
-// MARK: - Configuration Types
-public struct Configuration: Codable {
-    public var deviceSettings: DeviceSettings
-    public var networkSettings: NetworkSettings
-    public var appSettings: AppSettings
-    public var securitySettings: SecuritySettings
-    
-    public struct DeviceSettings: Codable {
-        public var defaultBrightness: Int
-        public var defaultColorTemperature: Int
-        public var autoConnect: Bool
-        public var discoveryTimeout: TimeInterval
-    }
-    
-    public struct NetworkSettings: Codable {
-        public var discoveryPort: Int
-        public var controlPort: Int
-        public var discoveryInterval: TimeInterval
-        public var connectionTimeout: TimeInterval
-    }
-    
-    public struct AppSettings: Codable {
-        public var theme: Theme
-        public var analyticsEnabled: Bool
-        public var notificationsEnabled: Bool
-        public var backgroundRefreshEnabled: Bool
-    }
-    
-    public struct SecuritySettings: Codable {
-        public var biometricsEnabled: Bool
-        public var autoLockTimeout: TimeInterval
-    }
-}
-
-public enum Theme: String, Codable {
-    case light
-    case dark
-    case system
-}
-
-// MARK: - ConfigValue Extensions
-extension ConfigValue {
-    init<T>(value: T) throws {
-        switch value {
-        case let bool as Bool:
-            self = .bool(bool)
-        case let int as Int:
-            self = .int(int)
-        case let double as Double:
-            self = .double(double)
-        case let string as String:
-            self = .string(string)
-        case let timeInterval as TimeInterval:
-            self = .timeInterval(timeInterval)
-        default:
-            throw ConfigurationError.unsupportedType
-        }
-    }
-    
-    func getValue<T>() -> T? {
-        switch self {
-        case .bool(let value):
-            return value as? T
-        case .int(let value):
-            return value as? T
-        case .double(let value):
-            return value as? T
-        case .string(let value):
-            return value as? T
-        case .timeInterval(let value):
-            return value as? T
-        }
-    }
-}
-
-// MARK: - Configuration Errors
-enum ConfigurationError: LocalizedError {
-    case invalidKey
-    case invalidValue
-    case unsupportedType
-    case saveFailed
-    case loadFailed
-    
-    var errorDescription: String? {
-        switch self {
-        case .invalidKey:
-            return "Invalid configuration key"
-        case .invalidValue:
-            return "Invalid configuration value"
-        case .unsupportedType:
-            return "Unsupported configuration value type"
-        case .saveFailed:
-            return "Failed to save configuration"
-        case .loadFailed:
-            return "Failed to load configuration"
-        }
-    }
-} 

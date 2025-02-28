@@ -2,6 +2,7 @@ import Foundation
 import UserNotifications
 import Combine
 import SwiftUI
+import CoreLocation
 
 // MARK: - Notification Managing Protocol
 protocol NotificationManaging {
@@ -152,7 +153,7 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject {
     // MARK: - Private Properties
     private let notificationCenter = UNUserNotificationCenter.current()
     private let analytics: UnifiedAnalyticsManager
-    private let errorManager: UnifiedErrorManager
+    private let services: ServiceContainer
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Constants
@@ -163,14 +164,15 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject {
         
         static let defaultSound = UNNotificationSound.default
         static let criticalSound = UNNotificationSound.defaultCritical
+        static let logCategory: LogCategory = .notification
     }
     
     // MARK: - Singleton
     public static let shared = UnifiedNotificationManager()
     
-    private override init() {
+    private init() {
         self.analytics = .shared
-        self.errorManager = .shared
+        self.services = .shared
         super.init()
         notificationCenter.delegate = self
         checkNotificationStatus()
@@ -318,4 +320,9 @@ extension UnifiedNotificationManager: UNUserNotificationCenterDelegate {
 // MARK: - Logger Category Extension
 extension LogCategory {
     static let notification: LogCategory = "notification"
+}
+
+// MARK: - Constants
+extension UnifiedNotificationManager {
+    static let logCategory = LogCategory.notification
 } 

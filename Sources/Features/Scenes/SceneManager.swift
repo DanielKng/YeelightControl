@@ -2,6 +2,17 @@ import Foundation
 import Combine
 import SwiftUI
 
+@preconcurrency protocol SceneManaging: Actor {
+    nonisolated var scenes: [Scene] { get }
+    nonisolated var sceneUpdates: PassthroughSubject<SceneUpdate, Never> { get }
+    nonisolated func getScene(byId id: String) -> Scene?
+    nonisolated func getAllScenes() -> [Scene]
+    func createScene(_ scene: Scene) async throws
+    func updateScene(_ scene: Scene) async throws
+    func deleteScene(_ scene: Scene) async throws
+    func applyScene(_ scene: Scene, to deviceIds: [String]) async throws
+}
+
 @MainActor
 public final class UnifiedSceneManager: ObservableObject, SceneManaging {
     // MARK: - Published Properties
@@ -24,11 +35,11 @@ public final class UnifiedSceneManager: ObservableObject, SceneManaging {
     }
     
     // MARK: - Public Methods
-    public func getScene(byId id: String) -> Scene? {
+    public nonisolated func getScene(byId id: String) -> Scene? {
         scenes.first { $0.id == id }
     }
     
-    public func getAllScenes() -> [Scene] {
+    public nonisolated func getAllScenes() -> [Scene] {
         scenes
     }
     
@@ -38,7 +49,7 @@ public final class UnifiedSceneManager: ObservableObject, SceneManaging {
         }
         
         // Validate scene
-        try validateScene(scene)
+        try await validateScene(scene)
         
         scenes.append(scene)
         try await saveScenes()
@@ -51,7 +62,7 @@ public final class UnifiedSceneManager: ObservableObject, SceneManaging {
         }
         
         // Validate scene
-        try validateScene(scene)
+        try await validateScene(scene)
         
         scenes[index] = scene
         try await saveScenes()
@@ -91,7 +102,7 @@ public final class UnifiedSceneManager: ObservableObject, SceneManaging {
         
         for deviceId in deviceIds {
             do {
-                guard let device = deviceManager?.getDevice(byId: deviceId) else {
+                guard let device = await deviceManager?.getDevice(byId: deviceId) else {
                     throw SceneError.deviceNotFound
                 }
                 
@@ -110,7 +121,7 @@ public final class UnifiedSceneManager: ObservableObject, SceneManaging {
                 // Update device with scene state
                 var updatedDevice = device
                 updatedDevice.state = deviceState
-                deviceManager?.updateDevice(updatedDevice)
+                await deviceManager?.updateDevice(updatedDevice)
                 
             } catch {
                 failedDevices.append((deviceId, error))
@@ -130,20 +141,22 @@ public final class UnifiedSceneManager: ObservableObject, SceneManaging {
     
     // MARK: - Private Methods
     private func loadScenes() {
-        do {
-            if let loadedScenes: [Scene] = try storageManager?.load([Scene].self, forKey: "scenes") {
-                scenes = loadedScenes
+        Task {
+            do {
+                if let loadedScenes: [Scene] = try await storageManager?.load([Scene].self, forKey: "scenes") {
+                    self.scenes = loadedScenes
+                }
+            } catch {
+                print("Failed to load scenes: \(error)")
             }
-        } catch {
-            print("Failed to load scenes: \(error)")
         }
     }
     
     private func saveScenes() async throws {
-        try storageManager?.save(scenes, forKey: "scenes")
+        try await storageManager?.save(scenes, forKey: "scenes")
     }
     
-    private func validateScene(_ scene: Scene) throws {
+    private func validateScene(_ scene: Scene) async throws {
         // Check for duplicate names
         if scenes.contains(where: { $0.name == scene.name && $0.id != scene.id }) {
             throw SceneError.duplicateName
@@ -151,14 +164,14 @@ public final class UnifiedSceneManager: ObservableObject, SceneManaging {
         
         // Validate device states
         for (deviceId, _) in scene.deviceStates {
-            guard deviceManager?.getDevice(byId: deviceId) != nil else {
+            guard await deviceManager?.getDevice(byId: deviceId) != nil else {
                 throw SceneError.deviceNotFound
             }
         }
     }
     
     private func deactivateScene(on deviceId: String) async throws {
-        guard let device = deviceManager?.getDevice(byId: deviceId) else {
+        guard let device = await deviceManager?.getDevice(byId: deviceId) else {
             throw SceneError.deviceNotFound
         }
         
@@ -169,6 +182,6 @@ public final class UnifiedSceneManager: ObservableObject, SceneManaging {
         var updatedDevice = device
         updatedDevice.state.brightness = 100
         updatedDevice.state.colorTemperature = 4000
-        deviceManager?.updateDevice(updatedDevice)
+        await deviceManager?.updateDevice(updatedDevice)
     }
 } 

@@ -2,8 +2,13 @@ import Foundation
 import Network
 import Combine
 
+/// Protocol for network message handling
+public protocol UnifiedNetworkMessageHandler: AnyObject {
+    func handle(_ message: Data, from endpoint: NWEndpoint)
+}
+
 /// Protocol defining network management capabilities
-protocol NetworkManaging {
+public protocol NetworkManaging {
     /// Check if network is reachable
     var isNetworkReachable: Bool { get }
     
@@ -23,7 +28,7 @@ protocol NetworkManaging {
     func listen(on port: UInt16) -> AnyPublisher<(Data, NWEndpoint), Error>
     
     /// Send a command to a device
-    func sendCommand(_ command: String, to endpoint: NWEndpoint, completion: @escaping (Result<Data, Error>) -> Void)
+    func sendCommand(_ command: String, to endpoint: NWEndpoint) async throws -> Data
     
     /// Start SSDP discovery
     func startSSDP()
@@ -33,7 +38,7 @@ protocol NetworkManaging {
 }
 
 /// Unified manager for handling network operations
-final class UnifiedNetworkManager: NetworkManaging {
+public final class UnifiedNetworkManager: NetworkManaging {
     // MARK: - Properties
     
     /// Network path monitor
@@ -68,18 +73,19 @@ final class UnifiedNetworkManager: NetworkManaging {
     
     // MARK: - NetworkManaging Properties
     
-    var isNetworkReachable: Bool {
+    public var isNetworkReachable: Bool {
         networkStatusSubject.value == .satisfied
     }
     
-    var networkStatusPublisher: AnyPublisher<NWPath.Status, Never> {
+    public var networkStatusPublisher: AnyPublisher<NWPath.Status, Never> {
         networkStatusSubject.eraseToAnyPublisher()
     }
     
     // MARK: - Initialization
     
-    init(services: ServiceContainer) {
+    public init(services: ServiceContainer, messageHandler: UnifiedNetworkMessageHandler? = nil) {
         self.services = services
+        self.messageHandler = messageHandler
         self.pathMonitor = NWPathMonitor()
         setupPathMonitor()
     }
@@ -91,15 +97,15 @@ final class UnifiedNetworkManager: NetworkManaging {
     
     // MARK: - NetworkManaging Methods
     
-    func startMonitoring() {
+    public func startMonitoring() {
         pathMonitor.start(queue: networkQueue)
     }
     
-    func stopMonitoring() {
+    public func stopMonitoring() {
         pathMonitor.cancel()
     }
     
-    func send(_ data: Data, to endpoint: NWEndpoint) -> AnyPublisher<Data, Error> {
+    public func send(_ data: Data, to endpoint: NWEndpoint) -> AnyPublisher<Data, Error> {
         Future { [weak self] promise in
             guard let self = self else {
                 promise(.failure(NetworkError.managerDeallocated))
@@ -128,7 +134,7 @@ final class UnifiedNetworkManager: NetworkManaging {
         .eraseToAnyPublisher()
     }
     
-    func listen(on port: UInt16) -> AnyPublisher<(Data, NWEndpoint), Error> {
+    public func listen(on port: UInt16) -> AnyPublisher<(Data, NWEndpoint), Error> {
         let subject = PassthroughSubject<(Data, NWEndpoint), Error>()
         
         do {
@@ -162,35 +168,41 @@ final class UnifiedNetworkManager: NetworkManaging {
         return subject.eraseToAnyPublisher()
     }
     
-    func sendCommand(_ command: String, to endpoint: NWEndpoint, completion: @escaping (Result<Data, Error>) -> Void) {
+    public func sendCommand(_ command: String, to endpoint: NWEndpoint) async throws -> Data {
         guard let data = command.data(using: .utf8) else {
-            completion(.failure(NetworkError.invalidCommand))
-            return
+            throw NetworkError.invalidCommand
         }
         
-        let connection = getOrCreateConnection(to: endpoint)
-        
-        connection.stateUpdateHandler = { [weak self] state in
-            switch state {
-            case .ready:
-                self?.sendData(data, over: connection) { result in
-                    completion(result)
+        return try await withCheckedThrowingContinuation { continuation in
+            let connection = getOrCreateConnection(to: endpoint)
+            
+            connection.stateUpdateHandler = { [weak self] state in
+                switch state {
+                case .ready:
+                    self?.sendData(data, over: connection) { result in
+                        switch result {
+                        case .success(let data):
+                            continuation.resume(returning: data)
+                        case .failure(let error):
+                            continuation.resume(throwing: error)
+                        }
+                    }
+                case .failed(let error):
+                    continuation.resume(throwing: error)
+                    self?.cleanupConnection(connection)
+                case .cancelled:
+                    continuation.resume(throwing: NetworkError.connectionCancelled)
+                    self?.cleanupConnection(connection)
+                default:
+                    break
                 }
-            case .failed(let error):
-                completion(.failure(error))
-                self?.cleanupConnection(connection)
-            case .cancelled:
-                completion(.failure(NetworkError.connectionCancelled))
-                self?.cleanupConnection(connection)
-            default:
-                break
             }
+            
+            connection.start(queue: networkQueue)
         }
-        
-        connection.start(queue: networkQueue)
     }
     
-    func startSSDP() {
+    public func startSSDP() {
         let parameters = NWParameters.udp
         parameters.allowLocalEndpointReuse = true
         
@@ -213,7 +225,7 @@ final class UnifiedNetworkManager: NetworkManaging {
         }
     }
     
-    func stopSSDP() {
+    public func stopSSDP() {
         cleanupListener(on: ssdpPort)
     }
     
@@ -242,72 +254,26 @@ final class UnifiedNetworkManager: NetworkManaging {
         return connection
     }
     
-    private func sendData(_ data: Data, over connection: NWConnection, promise: @escaping (Result<Data, Error>) -> Void) {
-        connection.send(content: data, completion: .contentProcessed { [weak self] error in
-            if let error = error {
-                promise(.failure(error))
-                self?.cleanupConnection(connection)
-                return
-            }
-            
-            self?.receiveResponse(on: connection, promise: promise)
-        })
-    }
-    
-    private func receiveResponse(on connection: NWConnection, promise: @escaping (Result<Data, Error>) -> Void) {
-        connection.receiveMessage { [weak self] content, _, isComplete, error in
-            if let error = error {
-                promise(.failure(error))
-                self?.cleanupConnection(connection)
-                return
-            }
-            
-            if let data = content {
-                promise(.success(data))
-            }
-            
-            if isComplete {
-                self?.cleanupConnection(connection)
-            }
-        }
-    }
-    
-    private func handleNewConnection(_ connection: NWConnection, subject: PassthroughSubject<(Data, NWEndpoint), Error>) {
-        connection.stateUpdateHandler = { [weak self] state in
-            switch state {
-            case .ready:
-                self?.receiveData(on: connection, subject: subject)
-            case .failed(let error):
-                subject.send(completion: .failure(error))
-                self?.cleanupConnection(connection)
-            case .cancelled:
-                self?.cleanupConnection(connection)
-            default:
-                break
-            }
-        }
+    private func cleanupConnection(_ connection: NWConnection) {
+        connectionLock.lock()
+        defer { connectionLock.unlock() }
         
-        connection.start(queue: networkQueue)
+        let key = connection.endpoint.debugDescription
+        activeConnections.removeValue(forKey: key)
+        connection.cancel()
     }
     
-    private func receiveData(on connection: NWConnection, subject: PassthroughSubject<(Data, NWEndpoint), Error>) {
-        connection.receiveMessage { [weak self] content, _, isComplete, error in
-            if let error = error {
-                subject.send(completion: .failure(error))
-                self?.cleanupConnection(connection)
-                return
-            }
-            
-            if let data = content {
-                subject.send((data, connection.endpoint))
-            }
-            
-            if isComplete {
-                self?.cleanupConnection(connection)
-            } else {
-                self?.receiveData(on: connection, subject: subject)
-            }
-        }
+    private func cleanupListener(on port: UInt16) {
+        activeListeners[port]?.cancel()
+        activeListeners.removeValue(forKey: port)
+    }
+    
+    private func cleanupConnections() {
+        connectionLock.lock()
+        defer { connectionLock.unlock() }
+        
+        activeConnections.values.forEach { $0.cancel() }
+        activeConnections.removeAll()
     }
     
     private func handleListenerState(_ state: NWListener.State) {
@@ -324,6 +290,83 @@ final class UnifiedNetworkManager: NetworkManaging {
         }
     }
     
+    private func handleNewConnection(_ connection: NWConnection) {
+        connection.receiveMessage { [weak self] content, context, isComplete, error in
+            if let data = content, let handler = self?.messageHandler {
+                handler.handle(data, from: connection.endpoint)
+            }
+            
+            if let error = error {
+                self?.services.logger.log(.error, "Error receiving message: \(error)")
+            }
+        }
+        
+        connection.start(queue: networkQueue)
+    }
+    
+    private func handleNewConnection(_ connection: NWConnection, subject: PassthroughSubject<(Data, NWEndpoint), Error>) {
+        connection.receiveMessage { [weak self] content, context, isComplete, error in
+            if let error = error {
+                subject.send(completion: .failure(error))
+                self?.cleanupConnection(connection)
+                return
+            }
+            
+            if let data = content {
+                subject.send((data, connection.endpoint))
+            }
+            
+            if isComplete {
+                subject.send(completion: .finished)
+                self?.cleanupConnection(connection)
+            }
+        }
+        
+        connection.start(queue: networkQueue)
+    }
+    
+    private func sendData(_ data: Data, over connection: NWConnection, promise: @escaping (Result<Data, Error>) -> Void) {
+        connection.send(content: data, completion: .contentProcessed { [weak self] error in
+            if let error = error {
+                promise(.failure(error))
+                self?.cleanupConnection(connection)
+                return
+            }
+            
+            self?.receiveResponse(on: connection, completion: promise)
+        })
+    }
+    
+    private func sendData(_ data: Data, over connection: NWConnection, completion: @escaping (Result<Data, Error>) -> Void) {
+        connection.send(content: data, completion: .contentProcessed { [weak self] error in
+            if let error = error {
+                completion(.failure(error))
+                self?.cleanupConnection(connection)
+                return
+            }
+            
+            self?.receiveResponse(on: connection, completion: completion)
+        })
+    }
+    
+    private func receiveResponse(on connection: NWConnection, completion: @escaping (Result<Data, Error>) -> Void) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+            if let error = error {
+                completion(.failure(error))
+                self?.cleanupConnection(connection)
+                return
+            }
+            
+            if let data = data {
+                completion(.success(data))
+            }
+            
+            if isComplete {
+                self?.cleanupConnection(connection)
+            }
+        }
+    }
+    
     private func sendDiscoveryMessage() {
         let discoveryMessage = """
         M-SEARCH * HTTP/1.1\r
@@ -337,61 +380,11 @@ final class UnifiedNetworkManager: NetworkManaging {
         let connection = NWConnection(to: endpoint, using: .udp)
         
         connection.stateUpdateHandler = { [weak self] state in
-            if case .ready = state {
+            if state == .ready {
                 self?.sendData(discoveryMessage.data(using: .utf8)!, over: connection) { _ in }
             }
         }
         
         connection.start(queue: networkQueue)
-    }
-    
-    private func cleanupConnection(_ connection: NWConnection) {
-        connectionLock.lock()
-        defer { connectionLock.unlock() }
-        
-        let key = connection.endpoint.debugDescription
-        connection.cancel()
-        activeConnections.removeValue(forKey: key)
-    }
-    
-    private func cleanupListener(on port: UInt16) {
-        activeListeners[port]?.cancel()
-        activeListeners.removeValue(forKey: port)
-    }
-    
-    private func cleanupConnections() {
-        connectionLock.lock()
-        defer { connectionLock.unlock() }
-        
-        activeConnections.values.forEach { $0.cancel() }
-        activeConnections.removeAll()
-        
-        activeListeners.values.forEach { $0.cancel() }
-        activeListeners.removeAll()
-    }
-}
-
-// MARK: - Network Errors
-
-enum NetworkError: Error {
-    case managerDeallocated
-    case connectionCancelled
-    case invalidEndpoint
-    case timeout
-    case invalidCommand
-    
-    var localizedDescription: String {
-        switch self {
-        case .managerDeallocated:
-            return "Network manager was deallocated"
-        case .connectionCancelled:
-            return "Connection was cancelled"
-        case .invalidEndpoint:
-            return "Invalid network endpoint"
-        case .timeout:
-            return "Network operation timed out"
-        case .invalidCommand:
-            return "Invalid command format"
-        }
     }
 } 
