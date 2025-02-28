@@ -50,123 +50,32 @@ playground.xcworkspace
 .swiftpm/
 Package.resolved
 
-# Remove legacy dependency management
+# CocoaPods
 Pods/
-Carthage/
+*.xcconfig
+Podfile.lock
+
+# Carthage
+Carthage/Build/
 Dependencies/
 .accio/
 Frameworks/
 
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-.Spotlight-V100
-.Trashes
-
-# Environment and IDE
-.env
-.env.*
-.idea/
-*.swp
-*~
-*.bak
-
-# Documentation
-docs/build/
-
-# Test and Coverage
-*.xcresult/
-coverage.xml
-*.coverage
-*.coveragexml
-coverage/
-
-# Fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/**/*.png
-fastlane/test_output
-
 # Project specific
 Resources/Screenshots/*.png
 *.generated.swift
+Xcode/build/
+
+# Generated files
+Sources/Core/Core.h
+Sources/Core/Core.modulemap
+Sources/UI/UI.h
+Sources/UI/UI.modulemap
 
 # Temporary files
 temp_backup/
 *.tmp
 *.temp
-
-# Widget Extension
-*.appex
-
-# Code Injection
-#
-# After new code Injection tools there's a generated folder /iOSInjectionProject
-# https://github.com/johnno1962/injectionforxcode
-
-iOSInjectionProject/
-
-# Directories potentially created on remote AFP share
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk
-
-# Documentation
-docs/build/
-
-# Test coverage
-*.xcresult/
-coverage.xml
-
-# Project specific
-*.xcuserstate
-*.xcscmblueprint
-*.xccheckout
-
-# Xcode Patch
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-!*.xcodeproj/xcshareddata/
-!*.xcodeproj/xcuserdata/
-!*.xcworkspace/contents.xcworkspacedata
-/*.gcno
-**/xcshareddata/WorkspaceSettings.xcsettings
-
-# Code coverage
-*.coverage
-*.coveragexml
-coverage/
-
-# Temp backup
-temp_backup/
-
-# YeelightControl specific
-Xcode/build/
-Resources/Screenshots/*.png
-
-# Additional cleanup patterns
-## Editor specific
-.vscode/
-*.sublime-workspace
-*.sublime-project
-.atom/
-.idea/
-*.vim
-.project
-.settings/
-
-## Generated files
-*.generated.*
-**/Generated/
-GeneratedAssetSymbols.swift
-*.gen.*
-*.generated/
-
-## Temporary files
 *.log
 log/
 logs/
@@ -176,48 +85,24 @@ temp/
 .cache/
 *.old
 *.bak
-*.tmp
 *~
 \#*\#
 .\#*
+*.swp
+*.swo
 
-## Debug files
-*.dSYM/
-*.dSYM.zip
+# Debug files
 *.crash
 crash.log
 syslog
 *.trace
 
-## Analysis files
+# Analysis files
 *.profraw
 *.gcda
 *.gcno
 *.xccovarchive
 .scannerwork/
-
-# Remove legacy dependency management
-Pods/
-Carthage/
-Dependencies/
-.accio/
-Frameworks/
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-.Spotlight-V100
-.Trashes
-
-# Environment and IDE
-.env
-.env.*
-.idea/
-*.swp
-*~
-*.bak
 
 # Documentation
 docs/build/
@@ -228,106 +113,40 @@ coverage.xml
 *.coverage
 *.coveragexml
 coverage/
-
-# Fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/**/*.png
-fastlane/test_output
-
-# Project specific
-Resources/Screenshots/*.png
-*.generated.swift
-
-# Temporary files
-temp_backup/
-*.tmp
-*.temp
+*.coverage.txt
 
 # Widget Extension
 *.appex
 
 # Code Injection
-#
-# After new code Injection tools there's a generated folder /iOSInjectionProject
-# https://github.com/johnno1962/injectionforxcode
-
 iOSInjectionProject/
 
-# Directories potentially created on remote AFP share
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
 .AppleDB
 .AppleDesktop
 Network Trash Folder
 Temporary Items
 .apdisk
 
-# Documentation
-docs/build/
+# Environment and IDE
+.env
+.env.*
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+.atom/
+.project
+.settings/
 
-# Test coverage
-*.xcresult/
-coverage.xml
-
-# Project specific
-*.xcuserstate
-*.xcscmblueprint
-*.xccheckout
-
-# Xcode Patch
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-!*.xcodeproj/xcshareddata/
-!*.xcodeproj/xcuserdata/
-!*.xcworkspace/contents.xcworkspacedata
-/*.gcno
-**/xcshareddata/WorkspaceSettings.xcsettings
-
-# Code coverage
-*.coverage
-*.coveragexml
-coverage/
-
-# Temp backup
-temp_backup/
-
-# YeelightControl specific
-Xcode/build/
-Resources/Screenshots/*.png
-
-# Generated files
-Resources/Configs/
-project.yml
-
-# CocoaPods
-*.xcconfig
-Podfile.lock
-
-# Swift Package Manager
-.swiftpm/
-Package.resolved
-
-# Build directory
-Build/
-
-# Temporary files
-*.swp
-*.swo
-*~
-
-# Backup files
-temp_backup/
-
-### Build ###
-Build/
-DerivedData/
-
-### Generated Files ###
-Sources/Core/Core.h
-Sources/Core/Core.modulemap
-Sources/UI/UI.h
-Sources/UI/UI.modulemap
-
-### macOS ###
-.DS_Store
-.AppleDouble
-.LSOverride 
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output

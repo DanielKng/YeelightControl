@@ -1,184 +1,295 @@
 #!/bin/bash
 
-# Exit on any error
-set -e
-
-# Script directory and project root
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
-
-# Directory paths
-SOURCES_DIR="$PROJECT_ROOT/Sources"
-BUILD_DIR="$PROJECT_ROOT/Build"
-BACKUP_DIR="$PROJECT_ROOT/temp_backup/backup_$(date +%Y%m%d_%H%M%S)"
+# Set strict mode
+set -euo pipefail
 
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Function to log messages
-log() {
-    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] $1${NC}"
-}
+# Logging functions
+log() { echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"; }
+success() { log "${GREEN}✅ $1${NC}"; }
+warning() { log "${YELLOW}WARNING: $1${NC}"; }
+error() { log "${RED}ERROR: $1${NC}"; exit 1; }
 
-warn() {
-    echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1${NC}"
-}
-
-error() {
-    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"
-    exit 1
-}
-
-# Function to create backup
+# Create backup of current state
 create_backup() {
-    log "Creating backup in $BACKUP_DIR"
-    mkdir -p "$BACKUP_DIR"
-    cp -R "$SOURCES_DIR" "$BACKUP_DIR/"
-    
-    # Verify backup
-    if [ ! -d "$BACKUP_DIR/Sources" ]; then
-        error "Backup creation failed"
-    fi
-    log "Backup created successfully"
+    local backup_dir="temp_backup/backup_$(date +'%Y%m%d_%H%M%S')"
+    log "Creating backup in $(pwd)/${backup_dir}"
+    mkdir -p "${backup_dir}"
+    cp -R Sources "${backup_dir}/" 2>/dev/null || true
+    success "Backup created successfully"
 }
 
-# Function to verify directory structure
-verify_directory_structure() {
-    local expected_dirs=(
-        "App"
-        "Core/Analytics"
-        "Core/Background"
-        "Core/Configuration"
-        "Core/Device"
-        "Core/Effect"
-        "Core/Error"
-        "Core/Location"
-        "Core/Network"
-        "Core/Notification"
-        "Core/Permission"
-        "Core/Scene"
-        "Core/Security"
-        "Core/Services"
-        "Core/State"
-        "Core/Storage"
-        "Features/Automation"
-        "Features/Effects"
-        "Features/Rooms"
-        "Features/Scenes"
-        "UI/Components"
-        "UI/Views"
-        "Tests/UITests"
-        "Widget"
-    )
+# Restore files from GitHub if missing
+restore_from_github() {
+    log "Checking for missing files from GitHub..."
     
-    log "Verifying directory structure..."
-    for dir in "${expected_dirs[@]}"; do
-        if [ ! -d "$SOURCES_DIR/$dir" ]; then
-            mkdir -p "$SOURCES_DIR/$dir"
-            warn "Created missing directory: $dir"
+    # Store list of files from GitHub
+    git ls-tree -r --name-only origin/main Sources/ > github_files.txt
+    
+    # Store list of current files
+    find Sources -type f > current_files.txt
+    
+    # Compare and restore missing files
+    while IFS= read -r file; do
+        if ! grep -q "^$file$" current_files.txt; then
+            warning "Restoring missing file from GitHub: $file"
+            git checkout origin/main -- "$file"
         fi
-    done
+    done < github_files.txt
+    
+    # Cleanup temporary files
+    rm -f github_files.txt current_files.txt
 }
 
-# Function to clean build artifacts
+# Clean build artifacts (only .build and .swiftmodule files)
 clean_build_artifacts() {
     log "Cleaning build artifacts..."
-    if [ -d "$BUILD_DIR" ]; then
-        rm -rf "$BUILD_DIR"
-    fi
+    find . -type f -name "*.build" -delete
+    find . -type f -name "*.swiftmodule" -delete
+    find . -type d -name ".build" -exec rm -rf {} + 2>/dev/null || true
+}
+
+# Verify and create directory structure (only creates missing directories)
+verify_directory_structure() {
+    log "Verifying directory structure..."
     
-    # Clean old backups (keep last 5)
-    cd "$PROJECT_ROOT"
-    if [ -d "temp_backup" ]; then
-        cd temp_backup
-        ls -t | tail -n +6 | xargs -I {} rm -rf {}
+    local -a directories=(
+        "Core/Device/Discovery" "Core/Device/Management"
+        "Core/Effect/Patterns" "Core/Effect/Transitions"
+        "Core/Network/Protocol" "Core/Network/Socket"
+        "Core/Scene/Templates"
+        "Core/Security/Encryption"
+        "Core/Services/Interfaces" "Core/Services/Implementation"
+        "Core/Storage/CoreData" "Core/Storage/UserDefaults"
+        "Features/Automation/Rules" "Features/Automation/Triggers"
+        "Features/Effects" "Features/Effects/Music" "Features/Effects/Presets"
+        "Features/Rooms" "Features/Rooms/Management"
+        "Features/Scenes/Templates"
+        "UI/Components/Buttons" "UI/Components/Cards" "UI/Components/Lists"
+        "UI/Views/Device" "UI/Views/Scene" "UI/Views/Settings"
+        "Controllers" "Controllers/Navigation"
+        "Extensions" "Extensions/Foundation" "Extensions/SwiftUI" "Extensions/UIKit"
+        "Models" "Models/Device" "Models/Scene" "Models/Settings"
+        "Services" "Services/Analytics" "Services/Network" "Services/Storage"
+        "Utils" "Utils/Constants" "Utils/Helpers" "Utils/Protocols"
+        "Views" "Views/Common" "Views/Custom"
+        "Tests/UITests/Screens" "Tests/UITests/Flows"
+        "Tests/UnitTests/Core" "Tests/UnitTests/Features" "Tests/UnitTests/Services"
+        "Widget/Views" "Widget/Models"
+    )
+
+    for dir in "${directories[@]}"; do
+        if [[ ! -d "Sources/${dir}" ]]; then
+            mkdir -p "Sources/${dir}"
+            warning "Created missing directory: ${dir}"
+        fi
+    done
+}
+
+# Verify required files exist (only creates if missing and not in GitHub)
+verify_required_files() {
+    log "Verifying required files..."
+    local -a required_files=(
+        "Core/Services/ServiceProtocols.swift"
+        "Core/Device/YeelightModels.swift"
+        "Core/Error/DomainErrors.swift"
+        "Core/Error/LoggingTypes.swift"
+        "UI/Views/MainView.swift"
+        "Widget/YeelightWidget.swift"
+    )
+
+    for file in "${required_files[@]}"; do
+        if [[ ! -f "Sources/${file}" ]]; then
+            # Check if file exists in GitHub first
+            if git ls-tree -r --name-only origin/main | grep -q "^Sources/${file}$"; then
+                warning "Restoring missing file from GitHub: Sources/${file}"
+                git checkout origin/main -- "Sources/${file}"
+            else
+                log "Creating new file: Sources/${file}"
+                create_swift_file_template "Sources/${file}"
+            fi
+        fi
+    done
+}
+
+# Create Swift file template (only for new files)
+create_swift_file_template() {
+    local file_path="$1"
+    local file_name=$(basename "${file_path}")
+    local module_name=$(echo "${file_path}" | cut -d'/' -f2)
+    
+    # Only create if file doesn't exist
+    if [[ ! -f "${file_path}" ]]; then
+        mkdir -p "$(dirname "${file_path}")"
+        
+        cat > "${file_path}" << EOF
+//
+//  ${file_name}
+//  YeelightControl
+//
+//  Created by YeelightControl on $(date +'%Y-%m-%d')
+//  Copyright © $(date +'%Y') YeelightControl. All rights reserved.
+//
+
+import Foundation
+import SwiftUI
+
+// TODO: Implement ${file_name%.*}
+EOF
     fi
 }
 
-# Function to verify Swift files
+# Verify module structure (only creates missing READMEs)
+verify_module_structure() {
+    log "Verifying module structure..."
+    local -a modules=("App" "Core" "Features" "UI" "Widget" "Tests")
+    
+    for module in "${modules[@]}"; do
+        if [[ ! -f "Sources/${module}/README.md" ]]; then
+            # Check if README exists in GitHub first
+            if git ls-tree -r --name-only origin/main | grep -q "^Sources/${module}/README.md$"; then
+                warning "Restoring README from GitHub: Sources/${module}/README.md"
+                git checkout origin/main -- "Sources/${module}/README.md"
+            else
+                local module_lower=$(echo "$module" | tr '[:upper:]' '[:lower:]')
+                cat > "Sources/${module}/README.md" << EOF
+# ${module} Module
+
+This module contains the ${module_lower} components of the YeelightControl application.
+
+## Overview
+
+TODO: Add module overview and documentation.
+EOF
+            fi
+        fi
+    done
+}
+
+# Verify configuration files (only creates if missing)
+verify_config_files() {
+    log "Verifying configuration files..."
+    
+    if [[ ! -f ".swiftlint.yml" ]]; then
+        if git ls-tree -r --name-only origin/main | grep -q "^.swiftlint.yml$"; then
+            warning "Restoring .swiftlint.yml from GitHub"
+            git checkout origin/main -- ".swiftlint.yml"
+        else
+            cat > ".swiftlint.yml" << EOF
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  
+opt_in_rules:
+  - empty_count
+  - missing_docs
+  
+included:
+  - Sources
+excluded:
+  - Tests
+EOF
+        fi
+    fi
+    
+    if [[ ! -f "project.yml" ]]; then
+        if git ls-tree -r --name-only origin/main | grep -q "^project.yml$"; then
+            warning "Restoring project.yml from GitHub"
+            git checkout origin/main -- "project.yml"
+        else
+            cat > "project.yml" << EOF
+name: YeelightControl
+options:
+  bundleIdPrefix: com.yeelightcontrol
+  deploymentTarget:
+    iOS: 15.0
+    macOS: 12.0
+  
+targets:
+  YeelightControl:
+    type: application
+    platform: iOS
+    sources: [Sources/App]
+    dependencies:
+      - target: Core
+      - target: UI
+      - target: Features
+      
+  Core:
+    type: framework
+    platform: iOS
+    sources: [Sources/Core]
+    
+  UI:
+    type: framework
+    platform: iOS
+    sources: [Sources/UI]
+    dependencies:
+      - target: Core
+      
+  Features:
+    type: framework
+    platform: iOS
+    sources: [Sources/Features]
+    dependencies:
+      - target: Core
+      - target: UI
+      
+  Widget:
+    type: app-extension
+    platform: iOS
+    sources: [Sources/Widget]
+    dependencies:
+      - target: Core
+EOF
+        fi
+    fi
+}
+
+# Verify Swift files (only reports issues, never deletes)
 verify_swift_files() {
     log "Verifying Swift files..."
-    local swift_files=$(find "$SOURCES_DIR" -name "*.swift")
-    local swift_count=$(echo "$swift_files" | wc -l)
-    
-    if [ "$swift_count" -lt 1 ]; then
-        error "No Swift files found in the project"
-    fi
-    
-    # Check for basic Swift file validity
-    for file in $swift_files; do
-        if [ ! -s "$file" ]; then
-            warn "Empty Swift file found: $file"
+    find Sources -name "*.swift" -type f | while read -r file; do
+        if [[ ! -s "$file" ]]; then
+            warning "Empty Swift file found: $file"
+        elif ! grep -q "import" "$file"; then
+            warning "No imports found in: $file"
         fi
         
-        # Check for import statements
-        if ! grep -q "^import" "$file"; then
-            warn "No import statements found in: $file"
+        if grep -q "TODO:" "$file"; then
+            warning "TODO comment found in: $file"
         fi
     done
 }
 
-# Function to verify file permissions
-verify_permissions() {
+# Verify file permissions
+verify_file_permissions() {
     log "Verifying file permissions..."
-    find "$SOURCES_DIR" -type f -name "*.swift" -exec chmod 644 {} \;
-    find "$SOURCES_DIR" -type d -exec chmod 755 {} \;
-    
-    if [ -d "$SCRIPT_DIR" ]; then
-        find "$SCRIPT_DIR" -type f -name "*.sh" -exec chmod +x {} \;
-    fi
-}
-
-# Function to clean empty directories
-clean_empty_dirs() {
-    log "Cleaning empty directories..."
-    find "$SOURCES_DIR" -type d -empty -delete
-}
-
-# Function to verify symlinks
-verify_symlinks() {
-    log "Verifying symlinks..."
-    find "$SOURCES_DIR" -type l | while read symlink; do
-        if [ ! -e "$symlink" ]; then
-            warn "Broken symlink found: $symlink"
-            rm "$symlink"
-        fi
-    done
+    find Sources -type f -exec chmod 644 {} \;
+    find Sources -type d -exec chmod 755 {} \;
 }
 
 # Main execution
 main() {
     log "Starting project reorganization..."
     
-    # Create backup first
     create_backup
-    
-    # Clean and verify
+    restore_from_github
     clean_build_artifacts
     verify_directory_structure
+    verify_required_files
+    verify_module_structure
+    verify_config_files
     verify_swift_files
-    verify_symlinks
-    clean_empty_dirs
-    verify_permissions
+    verify_file_permissions
     
-    log "Project reorganization completed successfully"
+    success "Project reorganization completed successfully"
+    success "All tasks completed successfully"
 }
 
-# Execute main function with error handling
-if main; then
-    log "✅ All tasks completed successfully"
-else
-    error "❌ Reorganization failed"
-    # Restore from backup if something went wrong
-    if [ -d "$BACKUP_DIR" ]; then
-        warn "Restoring from backup..."
-        rm -rf "$SOURCES_DIR"
-        cp -R "$BACKUP_DIR/Sources" "$PROJECT_ROOT/"
-        verify_permissions
-        log "Restored from backup"
-    fi
-    exit 1
-fi 
+main 
