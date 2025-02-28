@@ -103,6 +103,8 @@ A modern iOS app for controlling Yeelight smart lighting devices. Built with Swi
 - [Core Module](Sources/Core/README.md)
 - [Features Module](Sources/Features/README.md)
 - [UI Module](Sources/UI/README.md)
+- [Tests Module](Sources/Tests/README.md)
+- [Widget Module](Sources/Widget/README.md)
 
 ## Project Structure
 
