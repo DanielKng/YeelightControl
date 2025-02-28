@@ -1,85 +1,90 @@
 # App Module
 
-The App module serves as the main entry point for the YeelightControl application. It coordinates the initialization of all other modules and manages the app's lifecycle.
+## Overview
+The App module serves as the main entry point and coordinator for the YeelightControl application. It manages the application lifecycle, coordinates between modules, and handles high-level navigation and state management.
+
+## Architecture
+
+### Directory Structure
+```
+App/
+├── YeelightControlApp.swift - Main application entry
+└── ContentView.swift       - Root view coordination
+```
 
 ## Components
 
 ### Application Entry
-- `YeelightControlApp.swift` - Main app entry point
-  - App lifecycle management
-  - Module initialization
-  - Dependency injection setup
-  - Environment configuration
-  - Scene management
 
-### Main Interface
-- `ContentView.swift` - Root view of the application
-  - Navigation structure
-  - Tab organization
-  - Main layout
-  - State coordination
-
-## Application Structure
-
-### Initialization Flow
-1. App launch
-2. Service container setup
-3. Core services initialization
-4. Feature managers setup
-5. UI preparation
-6. Widget integration
-
-### Navigation Architecture
-- Tab-based navigation
-- Feature-specific flows
-- Modal presentations
-- Deep linking support
-
-## Integration Points
-
-### Core Module Integration
+#### YeelightControlApp
 ```swift
-import Core
-
 @main
 struct YeelightControlApp: App {
-    // Initialize core services
-    let serviceContainer = ServiceContainer.shared
+    /// Application state
+    @StateObject private var appState = AppState()
     
-    init() {
-        // Configure core services
-        serviceContainer.configure()
-    }
+    /// Scene phase monitoring
+    @Environment(\.scenePhase) private var scenePhase
     
+    /// Application configuration
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(serviceContainer)
+                .environmentObject(appState)
+                .task {
+                    await setupApplication()
+                }
+        }
+        .onChange(of: scenePhase) { phase in
+            handleScenePhase(phase)
+        }
+    }
+    
+    /// Application setup
+    private func setupApplication() async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await setupCore() }
+            group.addTask { await setupFeatures() }
+            group.addTask { await setupUI() }
+            group.addTask { await setupWidget() }
         }
     }
 }
 ```
 
-### Features Integration
-```swift
-import Features
+### Root Coordination
 
+#### ContentView
+```swift
 struct ContentView: View {
-    @EnvironmentObject var serviceContainer: ServiceContainer
+    /// Application state
+    @EnvironmentObject var appState: AppState
+    
+    /// Navigation path
+    @State private var navigationPath = NavigationPath()
+    
+    /// Tab selection
+    @State private var selectedTab: Tab = .devices
     
     var body: some View {
-        TabView {
-            DevicesView()
-                .tabItem { Label("Devices", systemImage: "lightbulb") }
-            
-            ScenesView()
-                .tabItem { Label("Scenes", systemImage: "theatermasks") }
-            
-            AutomationView()
-                .tabItem { Label("Automation", systemImage: "clock") }
-            
-            SettingsView()
-                .tabItem { Label("Settings", systemImage: "gear") }
+        NavigationStack(path: $navigationPath) {
+            TabView(selection: $selectedTab) {
+                DevicesTab()
+                    .tabItem { Label("Devices", systemImage: "lightbulb") }
+                    .tag(Tab.devices)
+                
+                ScenesTab()
+                    .tabItem { Label("Scenes", systemImage: "theatermasks") }
+                    .tag(Tab.scenes)
+                
+                AutomationTab()
+                    .tabItem { Label("Automation", systemImage: "wand.and.stars") }
+                    .tag(Tab.automation)
+                
+                SettingsTab()
+                    .tabItem { Label("Settings", systemImage: "gear") }
+                    .tag(Tab.settings)
+            }
         }
     }
 }
@@ -87,93 +92,185 @@ struct ContentView: View {
 
 ## State Management
 
-### App State
-- Global app state
-- User preferences
-- Authentication state
-- Network status
+### Application State
+```swift
+final class AppState: ObservableObject {
+    /// Published properties
+    @Published var isInitialized: Bool = false
+    @Published var currentUser: User?
+    @Published var systemStatus: SystemStatus = .default
+    @Published var activeScene: Scene?
+    
+    /// State restoration
+    func restoreState() async {
+        guard let data = UserDefaults.standard.data(forKey: "AppState")
+        else { return }
+        
+        let state = try? JSONDecoder().decode(StoredState.self, from: data)
+        await MainActor.run {
+            self.currentUser = state?.user
+            self.systemStatus = state?.status ?? .default
+            self.activeScene = state?.scene
+        }
+    }
+    
+    /// State persistence
+    func persistState() {
+        let state = StoredState(
+            user: currentUser,
+            status: systemStatus,
+            scene: activeScene
+        )
+        
+        UserDefaults.standard.set(
+            try? JSONEncoder().encode(state),
+            forKey: "AppState"
+        )
+    }
+}
+```
 
-### Environment Objects
-- Service container
-- Feature managers
-- UI state
-- User settings
+## Navigation
 
-## Deep Linking
+### Deep Linking
+```swift
+struct DeepLinkHandler {
+    /// Handle incoming URLs
+    static func handle(_ url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+        else { return }
+        
+        switch components.path {
+        case "/device":
+            navigateToDevice(components.queryItems)
+        case "/scene":
+            navigateToScene(components.queryItems)
+        case "/automation":
+            navigateToAutomation(components.queryItems)
+        default:
+            break
+        }
+    }
+}
+```
 
-### URL Scheme
-- yeelight://devices/{id}
-- yeelight://scenes/{id}
-- yeelight://automation/{id}
-- yeelight://settings
+### Navigation Coordination
+```swift
+struct NavigationCoordinator {
+    /// Navigation state
+    @Binding var path: NavigationPath
+    
+    /// Navigate to device
+    func navigateToDevice(_ device: Device) {
+        path.append(Route.device(device))
+    }
+    
+    /// Navigate to scene
+    func navigateToScene(_ scene: Scene) {
+        path.append(Route.scene(scene))
+    }
+    
+    /// Navigate to automation
+    func navigateToAutomation(_ automation: Automation) {
+        path.append(Route.automation(automation))
+    }
+}
+```
 
-### Universal Links
-- Support for web links
-- Shortcut integration
-- Widget deep links
+## Module Coordination
 
-## Background Tasks
+### Core Integration
+```swift
+struct CoreCoordinator {
+    /// Initialize core services
+    func initialize() async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await initializeDeviceManager() }
+            group.addTask { try await initializeSceneManager() }
+            group.addTask { try await initializeEffectManager() }
+        }
+    }
+    
+    /// Handle core events
+    func handleCoreEvent(_ event: CoreEvent) {
+        switch event {
+        case .deviceStateChanged(let device):
+            updateDeviceState(device)
+        case .sceneActivated(let scene):
+            updateActiveScene(scene)
+        case .error(let error):
+            handleCoreError(error)
+        }
+    }
+}
+```
 
-### Background Modes
-- Network access
-- Location updates
-- State refresh
-- Notifications
-
-### Background Tasks
-- Device status updates
-- Scene scheduling
-- Automation triggers
-- Data synchronization
+### Feature Integration
+```swift
+struct FeatureCoordinator {
+    /// Initialize features
+    func initialize() async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await initializeAutomation() }
+            group.addTask { try await initializeRooms() }
+        }
+    }
+    
+    /// Handle feature events
+    func handleFeatureEvent(_ event: FeatureEvent) {
+        switch event {
+        case .automationTriggered(let automation):
+            executeAutomation(automation)
+        case .roomStateChanged(let room):
+            updateRoomState(room)
+        case .error(let error):
+            handleFeatureError(error)
+        }
+    }
+}
+```
 
 ## Best Practices
 
-1. **Initialization**
-   - Lazy loading when possible
-   - Asynchronous setup
-   - Error handling
-   - Recovery procedures
+### Application Lifecycle
+- Handle state restoration
+- Manage background tasks
+- Monitor memory usage
+- Handle system events
 
-2. **State Management**
-   - Single source of truth
-   - State isolation
-   - Predictable updates
-   - Performance optimization
+### Module Communication
+- Use clear interfaces
+- Maintain loose coupling
+- Handle errors gracefully
+- Ensure thread safety
 
-3. **Navigation**
-   - Consistent patterns
-   - State preservation
-   - History management
-   - Error recovery
+### State Management
+- Centralize state
+- Use appropriate scopes
+- Handle conflicts
+- Maintain consistency
 
-4. **Memory Management**
-   - Resource cleanup
-   - Cache management
-   - Memory warnings
-   - State restoration
+### Performance
+- Optimize startup time
+- Manage resources
+- Monitor metrics
+- Handle low memory
+
+## Dependencies
+- Core module
+- Features module
+- UI module
+- Widget module
 
 ## Testing
+- Integration tests
+- State management
+- Navigation flow
+- Deep linking
+- Performance
 
-### Launch Testing
-```swift
-final class AppLaunchTests: XCTestCase {
-    func testAppInitialization() {
-        let app = YeelightControlApp()
-        XCTAssertNotNil(app.serviceContainer)
-        // Additional initialization tests
-    }
-}
-```
-
-### Integration Testing
-```swift
-final class AppIntegrationTests: XCTestCase {
-    func testCoreIntegration() {
-        // Test core service availability
-    }
-    
-    func testFeatureIntegration() {
-        // Test feature manager setup
-    }
-}
-```
+## Documentation
+- [App Architecture](../../docs/architecture.md)
+- [State Management](../../docs/state.md)
+- [Navigation](../../docs/navigation.md)
+- [Module Integration](../../docs/integration.md)

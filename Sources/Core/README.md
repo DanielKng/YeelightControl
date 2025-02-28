@@ -1,260 +1,266 @@
 # Core Module
 
-The Core module is the foundation of the YeelightControl app, providing essential services, managers, and types that power the entire application. This module follows clean architecture principles and emphasizes type safety, modularity, and testability.
+## Overview
+The Core module serves as the foundation of the YeelightControl application, providing essential services, types, and utilities that power the entire system. This module implements the core business logic and infrastructure components necessary for device control, state management, and system operations.
 
-## Directory Structure
+## Architecture
 
-### Analytics and Monitoring
-#### `Analytics/` - Usage Tracking and Metrics
-- `UnifiedAnalyticsManager.swift` - Analytics event tracking and reporting
-  - User interaction tracking
-  - Feature usage analytics
-  - Error reporting
-  - Performance metrics
+### Directory Structure
+```
+Core/
+├── Analytics/      - Usage tracking and performance monitoring
+├── Background/     - Background task management
+├── Configuration/  - System and user preferences
+├── Device/         - Device discovery and control
+├── Effect/         - Lighting effect implementation
+├── Error/         - Error handling and recovery
+├── Location/      - Geolocation services
+├── Logging/       - System logging and debugging
+├── Network/       - Network communication
+├── Notification/  - Push and local notifications
+├── Permission/    - System permission handling
+├── Scene/         - Scene management
+├── Security/      - Authentication and encryption
+├── Services/      - Core service implementations
+├── State/         - Application state management
+├── Storage/       - Data persistence
+└── Types/         - Common type definitions
+```
 
-### System Integration
-#### `Background/` - Background Task Management
-- `UnifiedBackgroundManager.swift` - Background process handling
-  - Task scheduling
-  - Background refresh
-  - State preservation
-  - Resource management
+## Components
 
-#### `Location/` - Location Services
-- `UnifiedLocationManager.swift` - Location awareness
-  - Geofencing
-  - Region monitoring
-  - Location-based triggers
-  - Privacy controls
+### Analytics
+- Performance metrics collection
+- Usage statistics tracking
+- Crash reporting
+- Analytics event dispatching
+- Privacy-compliant data handling
 
-#### `Notification/` - User Notifications
-- `UnifiedNotificationManager.swift` - Notification handling
-  - Local notifications
-  - Remote notifications
-  - Notification scheduling
-  - User preferences
+### Background Processing
+- Background task scheduling
+- Task prioritization
+- Resource management
+- State persistence
+- Background refresh handling
 
-### Configuration and Security
-#### `Configuration/` - App Configuration
-- `UnifiedConfigurationManager.swift` - Configuration management
-  - App settings
-  - User preferences
-  - Feature flags
-  - Environment configuration
+### Configuration
+- User preferences management
+- System settings
+- Feature flags
+- Environment configuration
+- Default values management
 
-#### `Permission/` - Permission Management
-- `UnifiedPermissionManager.swift` - System permissions
-  - Permission requests
-  - Authorization status
-  - Permission changes
-  - User guidance
+### Device Management
+- Device discovery protocols
+- Connection management
+- State synchronization
+- Command queuing
+- Device capability detection
+- Firmware management
 
-#### `Security/` - Security Features
-- `UnifiedSecurityManager.swift` - Security management
-  - Authentication
-  - Data encryption
-  - Secure storage
-  - Access control
+### Effect System
+- Effect creation and management
+- Transition handling
+- Timeline management
+- Effect synchronization
+- Custom effect definition
+- Effect preview generation
 
-### Device and Control
-#### `Device/` - Device Management
-- `UnifiedDeviceManager.swift` - Central device management
-  - Device discovery
-  - Connection handling
-  - State management
-  - Command dispatch
-- `UnifiedYeelightManager.swift` - Yeelight-specific control
-  - Protocol implementation
-  - Command translation
-  - State synchronization
-- `YeelightModels.swift` - Device data models
-  - Device properties
-  - State definitions
-  - Command structures
+### Error Handling
+- Error categorization
+- Recovery strategies
+- Error logging
+- User feedback generation
+- Debug information collection
 
-#### `Effect/` - Light Effects
-- `UnifiedEffectManager.swift` - Effect management
-  - Effect definitions
-  - Animation control
-  - Timing management
-  - Synchronization
+### Location Services
+- Geofencing
+- Room-based location
+- Location permission management
+- Location-based automation
+- Position tracking
 
-#### `Scene/` - Scene Management
-- `UnifiedSceneManager.swift` - Scene control
-  - Scene creation
-  - Scene activation
-  - State persistence
-  - Transition handling
+### Logging System
+- Debug logging
+- Performance logging
+- Error logging
+- Log rotation
+- Log export
+- Privacy filtering
 
-### Network and Communication
-#### `Network/` - Network Operations
-- `UnifiedNetworkManager.swift` - Network communication
-  - Connection management
-  - Protocol handling
-  - Error recovery
-  - State monitoring
-- `UnifiedNetworkProtocolManager.swift` - Protocol-specific handling
-  - Protocol implementation
-  - Message formatting
-  - Response parsing
+### Network Layer
+- HTTP/HTTPS communication
+- WebSocket management
+- Network reachability
+- Request retrying
+- Cache management
+- Rate limiting
 
-### State and Storage
-#### `State/` - Application State
-- `UnifiedStateManager.swift` - State management
-  - Global state
-  - State updates
-  - Change notifications
-  - State restoration
+### Notification System
+- Push notification handling
+- Local notification scheduling
+- Notification grouping
+- Action handling
+- Rich notification support
 
-#### `Storage/` - Data Persistence
-- `UnifiedStorageManager.swift` - Storage management
-  - Data persistence
-  - Cache management
-  - File operations
-  - Migration handling
+### Permission Management
+- Permission request handling
+- Permission state tracking
+- User consent management
+- Permission dependencies
+- Restricted feature handling
 
-### Error Handling and Logging
-#### `Error/` - Error Management
-- `UnifiedErrorHandler.swift` - Error handling
-  - Error definitions
-  - Error recovery
-  - User feedback
-  - Logging integration
-- `LoggingTypes.swift` - Logging structures
-  - Log levels
-  - Log categories
-  - Message formatting
+### Scene Management
+- Scene creation and editing
+- Scene activation
+- Scene scheduling
+- Scene synchronization
+- Scene backup/restore
+- Scene sharing
 
-#### `Logging/` - Debug and Error Logging
-- `UnifiedLogger.swift` - Logging system
-  - Log management
-  - File logging
-  - Console output
-  - Log rotation
+### Security
+- Authentication
+- Encryption
+- Key management
+- Secure storage
+- Certificate pinning
+- Security policy enforcement
 
-### Type System
-#### `Types/` - Core Type Definitions
-- `Configuration/`
-  - Configuration types
-  - Setting definitions
-  - Preference models
-- `Device/`
-  - Device state models
-  - Command types
-  - Property definitions
-- `Effect/`
-  - Effect parameters
-  - Animation types
-  - Timing models
-- `Error/`
-  - Error types
-  - Error categories
-  - Recovery options
-- `Location/`
-  - Location models
-  - Region types
-  - Coordinate handling
-- `Permission/`
-  - Permission types
-  - Authorization models
-  - Status definitions
-- `Scene/`
-  - Scene models
-  - State definitions
-  - Transition types
+### Core Services
+- Service registration
+- Dependency injection
+- Service lifecycle
+- Service discovery
+- Inter-service communication
 
-### Services Layer
-#### `Services/` - Core Services
-- `ServiceContainer.swift` - Dependency injection
-  - Service registration
-  - Dependency resolution
-  - Lifecycle management
-  - Service access
-- `YeelightProtocols.swift` - Device protocols
-  - Command interfaces
-  - State protocols
-  - Event handling
+### State Management
+- Application state
+- State persistence
+- State synchronization
+- State restoration
+- Change notification
 
-## Design Principles
+### Storage
+- Data persistence
+- Caching
+- File management
+- Database operations
+- Migration handling
 
-1. **Unified Management**
-   - Each subsystem has a unified manager
-   - Single point of access
-   - Consistent interfaces
-   - Clear responsibilities
-
-2. **Type Safety**
-   - Strong typing throughout
-   - Clear domain models
-   - Compile-time safety
-   - Protocol conformance
-
-3. **Dependency Injection**
-   - Service container based
-   - Clear dependencies
-   - Testable components
-   - Flexible configuration
-
-4. **Protocol-Oriented**
-   - Interface-based design
-   - Protocol composition
-   - Default implementations
-   - Extension points
-
-5. **Error Handling**
-   - Comprehensive error types
-   - Recovery strategies
-   - User feedback
-   - Logging integration
+### Common Types
+- Data models
+- Protocols
+- Enumerations
+- Type extensions
+- Utility types
 
 ## Usage
 
+### Service Registration
 ```swift
-import Core
-
-// Access managers through the service container
-let deviceManager = ServiceContainer.shared.deviceManager
-let effectManager = ServiceContainer.shared.effectManager
-
-// Example: Device Control
-try await deviceManager.connect(to: deviceId)
-try await deviceManager.setBrightness(0.75, for: deviceId)
-
-// Example: Effect Management
-let effect = ColorFlowEffect(colors: [.red, .blue], duration: 5.0)
-try await effectManager.apply(effect, to: deviceId)
+// Register core services
+CoreServiceRegistry.shared.register {
+    DeviceService()
+    EffectService()
+    SceneService()
+    // Additional services...
+}
 ```
 
-## Testing
+### Device Discovery
+```swift
+let deviceManager = CoreServiceRegistry.shared.resolve(DeviceManaging.self)
+let devices = try await deviceManager.discoverDevices()
+```
 
-Each component has corresponding unit tests. Run Core-specific tests:
+### Effect Creation
+```swift
+let effectManager = CoreServiceRegistry.shared.resolve(EffectManaging.self)
+let effect = try effectManager.createEffect(parameters: .init(
+    name: "Sunset",
+    duration: .minutes(30),
+    transitions: [
+        .color(from: .white, to: .orange),
+        .brightness(from: 1.0, to: 0.3)
+    ]
+))
+```
 
-```bash
-swift test --filter "CoreTests"
+### Scene Management
+```swift
+let sceneManager = CoreServiceRegistry.shared.resolve(SceneManaging.self)
+let scene = try await sceneManager.createScene(
+    name: "Movie Night",
+    devices: movieRoomDevices,
+    schedule: .evening
+)
 ```
 
 ## Best Practices
 
-1. **Manager Access**
-   - Always access through ServiceContainer
-   - Respect access levels
-   - Handle errors appropriately
-   - Check operation status
+### Error Handling
+```swift
+do {
+    try await deviceManager.connect(to: deviceId)
+} catch DeviceError.connectionFailed(let reason) {
+    logger.error("Connection failed: \(reason)")
+    // Implement recovery strategy
+} catch DeviceError.timeout {
+    // Handle timeout specifically
+}
+```
 
-2. **State Management**
-   - Observe state changes
-   - Handle updates atomically
-   - Maintain consistency
-   - Cache appropriately
+### State Management
+```swift
+// Subscribe to state changes
+stateManager.observe(\.deviceState) { state in
+    // Update UI or trigger side effects
+}
 
-3. **Error Handling**
-   - Use specific error types
-   - Provide recovery options
-   - Log appropriately
-   - Inform users
+// Update state
+await stateManager.update { state in
+    state.deviceState.power = .on
+    state.deviceState.brightness = 0.8
+}
+```
 
-4. **Resource Management**
-   - Clean up resources
-   - Handle background states
-   - Monitor memory usage
-   - Optimize performance
+### Background Tasks
+```swift
+backgroundManager.schedule(
+    task: DeviceUpdateTask(),
+    frequency: .hourly,
+    requirements: [
+        .network,
+        .charging
+    ]
+)
+```
+
+## Dependencies
+- Foundation
+- Combine
+- CoreLocation
+- Network
+- Security
+
+## Thread Safety
+The Core module is designed with thread safety in mind:
+- All public APIs are thread-safe
+- State modifications are synchronized
+- Background operations are properly queued
+- Resource access is coordinated
+
+## Testing
+Each component includes:
+- Unit tests
+- Integration tests
+- Performance tests
+- Mock implementations
+- Test utilities
+
+## Documentation
+Additional documentation:
+- [API Reference](../../docs/API.md)
+- [Architecture Guide](../../docs/architecture.md)
+- [Migration Guide](../../docs/migration.md)
+- [Security Guide](../../docs/security.md)

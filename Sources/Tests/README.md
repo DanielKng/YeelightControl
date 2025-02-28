@@ -1,168 +1,297 @@
 # Tests Module
 
-This module contains all test suites for the YeelightControl app, ensuring code quality, functionality, and reliability across all modules.
+## Overview
+The Tests module contains a comprehensive suite of tests for the YeelightControl application. It includes unit tests, integration tests, UI tests, and performance tests to ensure the reliability and quality of the application.
 
-## Test Organization
+## Architecture
+
+### Directory Structure
+```
+Tests/
+├── UnitTests/   - Unit and integration tests
+└── UITests/     - User interface tests
+```
+
+## Test Categories
 
 ### Unit Tests
-- `UnitTests/` - Component and integration tests
-  - Core module tests
-    - Manager tests
-    - Service tests
-    - Type tests
-  - Features module tests
-    - Scene management tests
-    - Effect system tests
-    - Automation tests
-  - Mock implementations
-  - Test utilities
+
+#### Core Module Tests
+```swift
+final class DeviceManagerTests: XCTestCase {
+    /// Test device discovery
+    func testDeviceDiscovery() async throws {
+        // Given
+        let manager = DeviceManager()
+        let mockNetwork = MockNetworkService()
+        mockNetwork.mockDevices = [mockDevice1, mockDevice2]
+        
+        // When
+        let devices = try await manager.discoverDevices()
+        
+        // Then
+        XCTAssertEqual(devices.count, 2)
+        XCTAssertEqual(devices[0].id, mockDevice1.id)
+    }
+    
+    /// Test device connection
+    func testDeviceConnection() async throws {
+        // Given
+        let manager = DeviceManager()
+        let device = MockDevice()
+        
+        // When
+        try await manager.connect(to: device.id)
+        
+        // Then
+        XCTAssertTrue(device.isConnected)
+        XCTAssertNotNil(device.connectionTimestamp)
+    }
+}
+```
+
+#### Features Module Tests
+```swift
+final class SceneManagerTests: XCTestCase {
+    /// Test scene creation
+    func testSceneCreation() async throws {
+        // Given
+        let manager = SceneManager()
+        let devices = [mockDevice1, mockDevice2]
+        
+        // When
+        let scene = try await manager.createScene(
+            name: "Test Scene",
+            devices: devices,
+            states: [.on, .off]
+        )
+        
+        // Then
+        XCTAssertEqual(scene.name, "Test Scene")
+        XCTAssertEqual(scene.devices.count, 2)
+    }
+    
+    /// Test scene activation
+    func testSceneActivation() async throws {
+        // Given
+        let manager = SceneManager()
+        let scene = MockScene()
+        
+        // When
+        try await manager.activateScene(scene)
+        
+        // Then
+        XCTAssertTrue(scene.isActive)
+        XCTAssertNotNil(scene.activationTimestamp)
+    }
+}
+```
 
 ### UI Tests
-- `UITests/` - User interface tests
-  - View tests
-  - Component tests
-  - Integration tests
-  - User flow tests
-  - Accessibility tests
 
-## Testing Strategy
-
-### Unit Testing
-1. **Core Module**
-   - Service container initialization
-   - Manager functionality
-   - Network operations
-   - Data persistence
-   - Error handling
-
-2. **Features Module**
-   - Scene management
-   - Effect processing
-   - Automation rules
-   - Room organization
-
-3. **Test Coverage Goals**
-   - Core module: 90%+ coverage
-   - Features module: 85%+ coverage
-   - Critical paths: 100% coverage
-
-### UI Testing
-1. **Component Testing**
-   - Individual view behavior
-   - User interactions
-   - State management
-   - Animation verification
-
-2. **Integration Testing**
-   - Feature workflows
-   - Navigation flows
-   - Data flow
-   - Error states
-
-3. **Accessibility Testing**
-   - VoiceOver functionality
-   - Dynamic type
-   - Color contrast
-   - Navigation
-
-## Running Tests
-
-### All Tests
-```bash
-swift test
+#### Device Control Tests
+```swift
+final class DeviceControlUITests: XCTestCase {
+    /// Test device list navigation
+    func testDeviceListNavigation() {
+        // Given
+        let app = XCUIApplication()
+        app.launch()
+        
+        // When
+        app.buttons["Devices"].tap()
+        
+        // Then
+        XCTAssertTrue(app.tables["DeviceList"].exists)
+        XCTAssertTrue(app.navigationBars["Devices"].exists)
+    }
+    
+    /// Test device control interaction
+    func testDeviceControl() {
+        // Given
+        let app = XCUIApplication()
+        app.launch()
+        
+        // When
+        app.buttons["Device1"].tap()
+        app.sliders["Brightness"].adjust(toNormalizedSliderPosition: 0.5)
+        
+        // Then
+        XCTAssertEqual(app.sliders["Brightness"].value as! Double, 0.5)
+    }
+}
 ```
 
-### Specific Test Suites
-```bash
-# Run Core module tests
-swift test --filter "CoreTests"
+### Performance Tests
 
-# Run Feature module tests
-swift test --filter "FeaturesTests"
-
-# Run UI tests
-swift test --filter "UITests"
+#### Core Performance
+```swift
+final class CorePerformanceTests: XCTestCase {
+    /// Test device discovery performance
+    func testDeviceDiscoveryPerformance() {
+        measure {
+            let expectation = expectation(description: "Discovery")
+            
+            Task {
+                let devices = try await deviceManager.discoverDevices()
+                XCTAssertFalse(devices.isEmpty)
+                expectation.fulfill()
+            }
+            
+            wait(for: [expectation], timeout: 5.0)
+        }
+    }
+}
 ```
 
-### Coverage Report
-```bash
-swift test --enable-code-coverage
-xcrun llvm-cov report .build/debug/YeelightControlPackageTests.xctest/Contents/MacOS/YeelightControlPackageTests
+## Test Utilities
+
+### Mock Objects
+```swift
+/// Mock device implementation
+struct MockDevice: Device {
+    var id: String
+    var name: String
+    var isConnected: Bool
+    var state: DeviceState
+    
+    mutating func connect() async throws {
+        isConnected = true
+    }
+    
+    mutating func disconnect() async throws {
+        isConnected = false
+    }
+}
+
+/// Mock network service
+class MockNetworkService: NetworkService {
+    var mockDevices: [Device] = []
+    
+    func discoverDevices() async throws -> [Device] {
+        return mockDevices
+    }
+}
 ```
 
-## Test Development Guidelines
+### Test Helpers
+```swift
+/// Async test helper
+func asyncTest(
+    timeout: TimeInterval = 5.0,
+    test: @escaping () async throws -> Void
+) {
+    let expectation = expectation(description: "Async test")
+    
+    Task {
+        try await test()
+        expectation.fulfill()
+    }
+    
+    wait(for: [expectation], timeout: timeout)
+}
 
-1. **Naming Convention**
-   - Test classes: `{Component}Tests`
-   - Test methods: `test_{scenario}_{expectedResult}`
-   - Mock classes: `Mock{Component}`
-
-2. **Test Structure**
-   ```swift
-   final class DeviceManagerTests: XCTestCase {
-       // MARK: - Properties
-       private var sut: DeviceManager!
-       private var mockNetwork: MockNetworkManager!
-       
-       // MARK: - Setup
-       override func setUp() {
-           super.setUp()
-           mockNetwork = MockNetworkManager()
-           sut = DeviceManager(network: mockNetwork)
-       }
-       
-       // MARK: - Tests
-       func test_deviceDiscovery_succeeds() async throws {
-           // Given
-           mockNetwork.mockDevices = [mockDevice]
-           
-           // When
-           let devices = try await sut.discoverDevices()
-           
-           // Then
-           XCTAssertEqual(devices.count, 1)
-       }
-   }
-   ```
-
-3. **Mock Objects**
-   - Use protocol-based mocks
-   - Implement verification
-   - Track method calls
-   - Support error simulation
-
-4. **Async Testing**
-   - Use async/await
-   - Test timeouts
-   - Error conditions
-   - Race conditions
-
-## Continuous Integration
-
-Tests are automatically run:
-- On pull requests
-- Before merges to main
-- On release branches
-- Nightly for performance tests
+/// UI test helper
+extension XCUIElement {
+    func waitForExistence(timeout: TimeInterval = 5.0) -> Bool {
+        return waitForExistence(timeout: timeout)
+    }
+}
+```
 
 ## Best Practices
 
-1. **Test Independence**
-   - Tests should be self-contained
-   - Clean up after each test
-   - No shared state between tests
+### Unit Testing
+- Write tests before implementation (TDD)
+- Test one thing per test
+- Use descriptive test names
+- Follow Arrange-Act-Assert pattern
+- Mock external dependencies
+- Test edge cases and error conditions
 
-2. **Test Data**
-   - Use factory methods
-   - Avoid hard-coded values
-   - Document test data requirements
+### UI Testing
+- Test critical user flows
+- Verify UI element states
+- Test accessibility features
+- Handle asynchronous operations
+- Test different device sizes
+- Test orientation changes
 
-3. **Error Testing**
-   - Test error conditions
-   - Verify error messages
-   - Check error recovery
+### Performance Testing
+- Establish baseline metrics
+- Test with realistic data sets
+- Monitor memory usage
+- Test background operations
+- Test network conditions
+- Profile CPU usage
 
-4. **Performance Testing**
-   - Measure critical operations
-   - Set performance baselines
-   - Monitor regressions
+## Test Configuration
+
+### XCTest Configuration
+```swift
+class TestConfiguration: NSObject {
+    static let shared = TestConfiguration()
+    
+    var isTestMode: Bool = false
+    var mockNetworkDelay: TimeInterval = 0.1
+    var mockDevices: [Device] = []
+    
+    func setUp() {
+        isTestMode = true
+        // Additional setup
+    }
+    
+    func tearDown() {
+        isTestMode = false
+        // Additional cleanup
+    }
+}
+```
+
+### Test Plans
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme>
+    <TestAction>
+        <TestPlans>
+            <TestPlanReference
+                reference="container:UnitTests.xctestplan"
+                default="YES"/>
+            <TestPlanReference
+                reference="container:UITests.xctestplan"/>
+            <TestPlanReference
+                reference="container:PerformanceTests.xctestplan"/>
+        </TestPlans>
+    </TestAction>
+</Scheme>
+```
+
+## Running Tests
+
+### Command Line
+```bash
+# Run all tests
+swift test
+
+# Run specific test target
+swift test --filter "CoreTests"
+
+# Run specific test case
+swift test --filter "DeviceManagerTests/testDeviceDiscovery"
+
+# Run performance tests
+swift test --filter "PerformanceTests"
+```
+
+### Xcode Integration
+- Use Test Navigator
+- Configure test plans
+- Set up CI integration
+- Generate test reports
+- Track test coverage
+
+## Documentation
+- [Testing Guide](../../docs/testing.md)
+- [Mock Objects](../../docs/mocks.md)
+- [Performance Testing](../../docs/performance.md)
+- [UI Testing](../../docs/ui-testing.md)
