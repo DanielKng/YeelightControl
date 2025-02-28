@@ -42,7 +42,7 @@ dependencies: [
 2. Add the Sources directory to your project
 3. Link against the necessary frameworks
 
-> 📘 For more details about the project structure, see the [Core Module Documentation](../../Sources/Core/README.md).
+> 📘 For more details about the project structure, see the [Module Documentation](../README.md#module-documentation).
 
 ## Quick Start
 
@@ -117,7 +117,7 @@ do {
 - [Create Lighting Effects](../examples/effects/README.md)
 - [Manage Scenes](../examples/scenes/README.md)
 - [Implement Security](../examples/security/README.md)
-- [Add Widgets](../../Sources/Widget/README.md)
+- [Add Widgets](../../Sources/Widget/README.md#key-components)
 
 ### Learn Best Practices
 - [Device Control Best Practices](../reference/api-reference.md#device-control)

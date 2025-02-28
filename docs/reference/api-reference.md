@@ -36,54 +36,54 @@
 > 
 > 🔧 Troubleshooting: [Device Issues Guide](../guides/troubleshooting.md#device-issues)
 >
-> 📝 Reference: [Device API Documentation](../Sources/Core/Device/README.md)
+> 📝 Reference: [Core Module Documentation](../../Sources/Core/README.md#key-components)
 
 ### Effect Management
 > 📘 Implementation: [Lighting Effects Example](../examples/effects/README.md)
 >
 > ⚡ Performance: [Performance Guide](../guides/troubleshooting.md#performance)
 >
-> 📝 Reference: [Effects API Documentation](../Sources/Core/Effects/README.md)
+> 📝 Reference: [Core Module Documentation](../../Sources/Core/README.md#key-components)
 
 ### Scene Management
 > 📘 Implementation: [Scene Management Example](../examples/scenes/README.md)
 >
 > 🔄 Migration: [Scene Migration Guide](../guides/migration.md#scene-management)
 >
-> 📝 Reference: [Scene API Documentation](../Sources/Core/Scenes/README.md)
+> 📝 Reference: [Core Module Documentation](../../Sources/Core/README.md#key-components)
 
 ## Feature APIs
 
 ### Automation
 > 📘 Implementation: [Automation Example](../examples/automation/README.md)
 >
-> 📝 Reference: [Automation API Documentation](../Sources/Features/Automation/README.md)
+> 📝 Reference: [Features Module Documentation](../../Sources/Features/README.md#key-components)
 
 ### Room Management
 > 📘 Implementation: [Room Management Example](../examples/rooms/README.md)
 >
-> 📝 Reference: [Room API Documentation](../Sources/Features/Rooms/README.md)
+> 📝 Reference: [Features Module Documentation](../../Sources/Features/README.md#key-components)
 
 ## UI Components
 > 📘 Implementation: [UI Examples](../examples/ui/README.md)
 >
 > 🎨 Design: [UI Guidelines](../guides/ui-guidelines.md)
 >
-> 📝 Reference: [UI Components Documentation](../Sources/UI/README.md)
+> 📝 Reference: [UI Module Documentation](../../Sources/UI/README.md#key-components)
 
 ## Widget Integration
 > 📘 Implementation: [Widget Example](../examples/widget/README.md)
 >
 > 📱 Setup: [Widget Setup Guide](../guides/widget-setup.md)
 >
-> 📝 Reference: [Widget Documentation](../Sources/Widget/README.md)
+> 📝 Reference: [Widget Module Documentation](../../Sources/Widget/README.md#key-components)
 
 ## Error Handling
 > 📘 Implementation: [Error Handling Example](../examples/error-handling/README.md)
 >
 > 🔧 Guide: [Troubleshooting Guide](../guides/troubleshooting.md)
 >
-> 📝 Reference: [Error Types Documentation](../Sources/Core/Errors/README.md)
+> 📝 Reference: [Core Module Documentation](../../Sources/Core/README.md#error-handling)
 
 ## Best Practices
 

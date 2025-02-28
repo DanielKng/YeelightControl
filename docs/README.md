@@ -72,31 +72,31 @@ Each example includes complete code and explanations:
   - Access control
 
 ## Module Documentation
-Detailed documentation for each module:
+Each module has a focused README with links to detailed documentation:
 - [Core Module](../Sources/Core/README.md)
-  - Core functionality
-  - Device management
-  - State handling
+  - Essential services and utilities
+  - Links to detailed Core APIs
+  - Implementation examples
 - [Features Module](../Sources/Features/README.md)
-  - Effects system
-  - Scene management
-  - Automation
+  - High-level functionality
+  - Links to Feature APIs
+  - Implementation examples
 - [UI Module](../Sources/UI/README.md)
   - SwiftUI components
-  - View models
-  - Bindings
+  - Links to UI documentation
+  - Component examples
 - [Tests Module](../Sources/Tests/README.md)
-  - Unit tests
-  - Integration tests
-  - Performance tests
+  - Test suites overview
+  - Links to testing guides
+  - Test examples
 - [Widget Module](../Sources/Widget/README.md)
-  - Widget types
-  - Configuration
-  - Timeline providers
+  - Widget implementation
+  - Links to widget guides
+  - Configuration examples
 - [App Module](../Sources/App/README.md)
-  - Application structure
-  - Coordination
-  - State management
+  - Application entry point
+  - Module coordination
+  - Setup guides
 
 ## Support
 - [GitHub Issues](https://github.com/DanielKng/YeelightControl/issues) - Report bugs and request features

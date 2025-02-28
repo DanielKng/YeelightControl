@@ -121,27 +121,39 @@ A modern iOS app for controlling Yeelight smart lighting devices. Built with Swi
 
 ### Module Documentation
 - [Core Module](Sources/Core/README.md)
-  - [Device API](Sources/Core/Device/README.md)
-  - [Effects API](Sources/Core/Effects/README.md)
-  - [Scenes API](Sources/Core/Scenes/README.md)
-  - [Error Types](Sources/Core/Errors/README.md)
+  - Essential services and utilities
+  - Device management and control
+  - State and error handling
 - [Features Module](Sources/Features/README.md)
-  - [Automation](Sources/Features/Automation/README.md)
-  - [Room Management](Sources/Features/Rooms/README.md)
+  - High-level functionality
+  - Automation and scenes
+  - Room management
 - [UI Module](Sources/UI/README.md)
+  - SwiftUI components
+  - View implementations
+  - UI utilities
 - [Tests Module](Sources/Tests/README.md)
+  - Test suites and utilities
+  - Mock implementations
+  - Performance testing
 - [Widget Module](Sources/Widget/README.md)
+  - Home screen widgets
+  - Widget configuration
+  - Timeline providers
 - [App Module](Sources/App/README.md)
+  - Application entry point
+  - Module coordination
+  - Configuration
 
 ## Project Structure
 
 ```
 Sources/
-├── App/          # Application entry point
-├── Core/         # Core functionality
-├── Features/     # Feature modules
-├── UI/          # User interface
-├── Tests/       # Test suites
+├── App/          # Application entry point and coordination
+├── Core/         # Essential services and utilities
+├── Features/     # High-level functionality modules
+├── UI/          # User interface components
+├── Tests/       # Test suites and utilities
 └── Widget/      # Home screen widgets
 ```
 
