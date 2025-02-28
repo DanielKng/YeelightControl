@@ -64,32 +64,52 @@ A modern iOS app for controlling Yeelight smart lighting devices. Built with Swi
 
 ```
 Sources/
-├── App/                    # Main app target and entry point
-├── Core/                   # Core functionality and services
-│   ├── Services/          # Core service protocols and implementations
-│   ├── Models/            # Core data models
-│   └── Utils/             # Utility functions and extensions
+├── App/
+├── Controllers/
+├── Core/
+│   ├── Analytics/
+│   ├── Background/
+│   ├── Configuration/
+│   ├── Device/
+│   ├── Effect/
+│   ├── Error/
+│   ├── Location/
+│   ├── Network/
+│   ├── Notification/
+│   ├── Permission/
+│   ├── Scene/
+│   ├── Security/
+│   ├── Services/
+│   ├── State/
+│   └── Storage/
 │
-├── Features/              # Feature-specific implementations
-│   ├── Automation/       # Automation features
-│   ├── Effects/          # Light effects
-│   └── Scenes/           # Scene management
+├── Extensions/
 │
-├── UI/                    # UI components and views
-│   ├── Components/       # Reusable UI components
-│   └── Views/            # Feature-specific views
+├── Features/
+│   ├── Automation/
+│   ├── Effects/
+│   ├── Rooms/
+│   └── Scenes/
 │
-├── Extensions/            # Swift and Framework extensions
-├── Utils/                 # Shared utilities
-├── Controllers/           # View controllers and coordinators
-├── Models/                # Shared data models
-├── Views/                 # Common view components
+├── Models/
 │
-├── Tests/                 # Test files
-│   ├── UITests/          # UI Tests
-│   └── UnitTests/        # Unit Tests
+├── Services/
 │
-└── Widget/                # Widget extension
+├── Tests/
+│   ├── UITests/
+│   └── UnitTests/
+│
+├── UI/
+│   ├── Components/
+│   │   └── Common/
+│   └── Views/
+│       └── Unified/
+│
+├── Utils/
+│
+├── Views/
+│
+└── Widget/
 ```
 
 ## 🏗 Architecture
