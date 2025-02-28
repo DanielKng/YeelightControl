@@ -65,23 +65,13 @@ A modern iOS app for controlling Yeelight smart lighting devices. Built with Swi
 ```
 Sources/
 ├── App/                    # Main app entry point
-│   ├── YeelightControlApp.swift
-│   └── ContentView.swift
-│
 ├── Core/                   # Core functionality and services
 │   ├── Analytics/         # Analytics tracking
 │   ├── Background/        # Background task handling
-│   │   └── UnifiedBackgroundManager.swift
 │   ├── Configuration/     # App configuration
 │   ├── Device/           # Device management
-│   │   ├── UnifiedYeelightManager.swift
-│   │   ├── UnifiedDeviceManager.swift
-│   │   └── YeelightModels.swift
 │   ├── Effect/           # Effect handling
 │   ├── Error/            # Centralized error handling
-│   │   ├── UnifiedErrorHandler.swift
-│   │   ├── DomainErrors.swift
-│   │   └── LoggingTypes.swift
 │   ├── Location/         # Location services
 │   ├── Network/          # Network communication
 │   ├── Notification/     # Push notifications
@@ -91,47 +81,24 @@ Sources/
 │   ├── Services/         # Core service protocols
 │   ├── State/            # State management
 │   └── Storage/          # Data persistence
-│       └── UnifiedStorageManager.swift
 │
 ├── Features/              # Feature-specific implementations
 │   ├── Automation/       # Automation features
-│   │   └── AutomationManager.swift
 │   ├── Effects/          # Light effects
-│   │   └── EffectManager.swift
 │   ├── Rooms/            # Room management
-│   │   └── RoomManager.swift
 │   └── Scenes/           # Scene management
-│       └── SceneManager.swift
 │
 ├── UI/                    # UI components and views
 │   ├── Components/       # Reusable UI components
 │   └── Views/            # Feature-specific views
-│       ├── MainView.swift
-│       ├── SettingsView.swift
-│       ├── NetworkTestsView.swift
 │       ├── DeviceViews/
-│       │   ├── DeviceCard.swift
-│       │   ├── DeviceDetailView.swift
-│       │   └── DeviceSetupView.swift
 │       ├── SceneViews/
-│       │   ├── SceneListView.swift
-│       │   ├── SceneCreator.swift
-│       │   └── ScenePreview.swift
 │       └── EffectViews/
-│           ├── EffectsListView.swift
-│           ├── FlowEffectEditor.swift
-│           └── ColorFlowView.swift
 │
 ├── Tests/                 # Test files
 │   └── UITests/          # UI Tests
-│       ├── MainViewUITests.swift
-│       ├── MusicSyncUITests.swift
-│       └── SceneEditorUITests.swift
 │
 └── Widget/                # Widget extension
-    ├── YeelightWidget.swift
-    ├── WidgetBundle.swift
-    └── DeviceControlWidget.swift
 ```
 
 ## 🏗 Architecture
