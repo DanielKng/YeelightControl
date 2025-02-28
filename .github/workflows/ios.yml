@@ -1,29 +1,31 @@
-name: iOS Build
+name: iOS CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
   build:
     name: Build and Test
-    runs-on: macos-latest
-
+    runs-on: macos-14
+    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
       
       - name: Install XcodeGen
         run: brew install xcodegen
-
-      - name: Setup Project
+      
+      - name: Create Build Directory Structure
         run: |
-          chmod +x Scripts/*.sh
-          ./Scripts/reorganize.sh
-          ./Scripts/setup_xcode_project.sh
-
+          mkdir -p Build/Sources
+          cp -R Sources/* Build/Sources/
+      
+      - name: Setup Project
+        run: ./Scripts/setup_xcode_project.sh
+      
       - name: Build
         run: |
-          xcodebuild clean build -project Build/YeelightControl.xcodeproj -scheme YeelightControl -destination "platform=iOS Simulator,name=iPhone 15 Pro,OS=latest" CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO 
+          cd Build
+          xcodebuild -scheme YeelightControl -configuration Debug -destination "platform=iOS Simulator,name=iPhone 16 Pro Max" 
