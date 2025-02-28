@@ -239,6 +239,18 @@ EOL
 EOL
 }
 
+# Open Xcode project
+open_project() {
+    log "🚀" "Opening Xcode project..."
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        if [ -d "$BUILD_DIR/YeelightControl.xcodeproj" ]; then
+            open "$BUILD_DIR/YeelightControl.xcodeproj"
+        else
+            handle_error "Xcode project not found at $BUILD_DIR/YeelightControl.xcodeproj"
+        fi
+    fi
+}
+
 # Main execution
 main() {
     log "🚀" "Setting up YeelightControl project..."
@@ -248,8 +260,9 @@ main() {
     copy_sources
     create_info_plists
     generate_project
+    open_project
     
-    log "✅" "Setup complete! Open $BUILD_DIR/YeelightControl.xcodeproj to start development"
+    log "✅" "Setup complete! Project opened in Xcode"
 }
 
 # Run the script
