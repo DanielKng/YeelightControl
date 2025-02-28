@@ -1,13 +1,28 @@
 # Security Best Practices
 
+## Quick Links
+- 📚 [API Reference](../reference/api-reference.md#error-handling)
+- 🔧 [Troubleshooting](troubleshooting.md#security-issues)
+- 📝 [Security Example](../examples/security/README.md)
+
+## Table of Contents
+- [Overview](#overview)
+- [Network Security](#network-security)
+- [Authentication](#authentication)
+- [Data Protection](#data-protection)
+- [Best Practices](#best-practices)
+- [Security Checklist](#security-checklist)
+
 ## Overview
-This guide outlines security best practices for implementing YeelightControl in your application.
+This guide outlines essential security practices for implementing YeelightControl in your application. Following these guidelines helps ensure secure device control and data protection.
+
+> 🔒 For implementation examples, see the [Security Implementation Example](../examples/security/README.md).
 
 ## Network Security
 
 ### Device Discovery
 ```swift
-// Secure device discovery
+// Secure device discovery configuration
 let config = DiscoveryConfiguration(
     searchTimeout: 5.0,
     verifyDevices: true,
@@ -19,9 +34,11 @@ let devices = try await deviceManager.discoverDevices(
 )
 ```
 
+> 🔧 For network-related issues, see [Network Troubleshooting](troubleshooting.md#network-issues).
+
 ### Connection Security
 ```swift
-// Secure connection establishment
+// Secure connection configuration
 let options = ConnectionOptions(
     encryption: .aes256,
     timeout: 30.0,
@@ -34,11 +51,15 @@ try await deviceManager.connect(
 )
 ```
 
+> 📘 See [Device Management API](../reference/api-reference.md#device-management) for more connection options.
+
 ### Data Transmission
 - Use encrypted channels
 - Validate data integrity
 - Implement rate limiting
 - Monitor for suspicious activity
+
+> ⚡ For performance considerations, see [Performance Best Practices](../reference/api-reference.md#best-practices).
 
 ## Authentication
 
@@ -56,6 +77,8 @@ try await deviceManager.authenticate(
 )
 ```
 
+> 🔧 For authentication issues, see [Authentication Troubleshooting](troubleshooting.md#authentication-issues).
+
 ### Token Management
 ```swift
 // Token handling
@@ -70,6 +93,8 @@ struct TokenManager {
     func revokeToken(_ token: Token)
 }
 ```
+
+> 📘 For token management details, see [Token Management API](../reference/api-reference.md#token-management).
 
 ## Data Protection
 
@@ -87,6 +112,8 @@ try await storage.store(
 )
 ```
 
+> 🔒 For storage best practices, see [Data Protection Best Practices](#best-practices).
+
 ### Data Encryption
 ```swift
 // Data encryption
@@ -98,6 +125,8 @@ let encryptor = DataEncryptor(
 let encrypted = try encryptor.encrypt(data)
 ```
 
+> 📘 For encryption details, see [Encryption API](../reference/api-reference.md#encryption).
+
 ## Best Practices
 
 ### Device Management
@@ -107,6 +136,8 @@ let encrypted = try encryptor.encrypt(data)
 4. Monitor device activity
 5. Handle disconnections
 
+> 📝 See [Device Control Example](../examples/basic-control/README.md) for implementation.
+
 ### Data Handling
 1. Encrypt sensitive data
 2. Secure storage
@@ -114,12 +145,16 @@ let encrypted = try encryptor.encrypt(data)
 4. Regular cleanup
 5. Access control
 
+> 🔒 See [Data Protection Example](../examples/security/README.md#data-protection) for implementation.
+
 ### Error Handling
 1. Secure error messages
 2. Log security events
 3. Handle failures gracefully
 4. Implement recovery
 5. Alert on suspicious activity
+
+> 🔧 See [Error Handling Guide](../examples/error-handling/README.md) for details.
 
 ## Security Checklist
 
@@ -140,24 +175,8 @@ let encrypted = try encryptor.encrypt(data)
 - [ ] Vulnerability scanning
 - [ ] Incident response plan
 
-## Troubleshooting
-
-### Common Issues
-1. Authentication failures
-2. Connection timeouts
-3. Encryption errors
-4. Token expiration
-5. Rate limiting
-
-### Resolution Steps
-1. Verify credentials
-2. Check network security
-3. Update certificates
-4. Rotate tokens
-5. Review logs
-
 ## Additional Resources
-- [Getting Started](getting-started.md)
-- [API Reference](api-reference.md)
-- [Migration Guide](migration-guide.md)
-- [Module Documentation](../Sources/) 
+- [API Reference](../reference/api-reference.md)
+- [Error Handling Example](../examples/error-handling/README.md)
+- [Security Implementation Example](../examples/security/README.md)
+- [Troubleshooting Guide](troubleshooting.md) 
