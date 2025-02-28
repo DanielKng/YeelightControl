@@ -254,7 +254,6 @@ options:
   indentWidth: 4
   tabWidth: 4
   defaultConfig: Debug
-  transitivelyLinkDependencies: true
 
 settings:
   base:
@@ -264,18 +263,9 @@ settings:
     CURRENT_PROJECT_VERSION: 1
     SWIFT_VERSION: 5.0
     ENABLE_BITCODE: NO
-    CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED: YES
-    CLANG_ANALYZER_NONNULL: YES
-    CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION: YES_AGGRESSIVE
-    CLANG_CXX_LANGUAGE_STANDARD: gnu++20
     CLANG_ENABLE_MODULES: YES
     CLANG_ENABLE_OBJC_ARC: YES
-    CLANG_ENABLE_OBJC_WEAK: YES
-    CLANG_WARN__DUPLICATE_METHOD_MATCH: YES
-    ENABLE_STRICT_OBJC_MSGSEND: YES
     ENABLE_TESTABILITY: YES
-    GCC_NO_COMMON_BLOCKS: YES
-    SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
     SWIFT_OPTIMIZATION_LEVEL: "-Onone"
     SWIFT_STRICT_CONCURRENCY: complete
 
@@ -295,8 +285,9 @@ targets:
         DEFINES_MODULE: YES
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_NAME: Core
-        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
-        SKIP_INSTALL: NO
+        SKIP_INSTALL: YES
+        SWIFT_INSTALL_OBJC_HEADER: NO
+        CLANG_ENABLE_MODULES: NO
     dependencies:
       - framework: SwiftUI
       - framework: Foundation
@@ -322,8 +313,9 @@ targets:
         DEFINES_MODULE: YES
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_NAME: UI
-        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
-        SKIP_INSTALL: NO
+        SKIP_INSTALL: YES
+        SWIFT_INSTALL_OBJC_HEADER: NO
+        CLANG_ENABLE_MODULES: NO
     dependencies:
       - target: Core
       - framework: SwiftUI
@@ -343,8 +335,9 @@ targets:
         DEFINES_MODULE: YES
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_NAME: Features
-        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
-        SKIP_INSTALL: NO
+        SKIP_INSTALL: YES
+        SWIFT_INSTALL_OBJC_HEADER: NO
+        CLANG_ENABLE_MODULES: NO
     dependencies:
       - target: Core
       - target: UI
@@ -366,7 +359,6 @@ targets:
         OTHER_LDFLAGS: [-ObjC]
         SWIFT_OPTIMIZATION_LEVEL: "-Onone"
         DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
-        CLANG_ENABLE_MODULES: YES
         DEFINES_MODULE: YES
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
@@ -393,6 +385,8 @@ targets:
         SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
         DEFINES_MODULE: YES
         GENERATE_INFOPLIST_FILE: YES
+        SWIFT_INSTALL_OBJC_HEADER: NO
+        CLANG_ENABLE_MODULES: NO
     dependencies:
       - target: Core
       - target: UI
