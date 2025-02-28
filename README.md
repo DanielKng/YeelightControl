@@ -9,8 +9,7 @@
 [![Platform](https://img.shields.io/badge/Platform-iOS%2015.0+-blue.svg)](https://developer.apple.com/ios/)
 [![Swift](https://img.shields.io/badge/Swift-5.5+-orange.svg)](https://swift.org)
 [![SwiftUI](https://img.shields.io/badge/Framework-SwiftUI-purple.svg)](https://developer.apple.com/xcode/swiftui/)
-[![Automation](https://img.shields.io/badge/Feature-Automation-green.svg)](#-automation)
-[![Offline](https://img.shields.io/badge/Support-Offline-yellow.svg)](#-offline-support)
+[![Build Status](https://github.com/DanielKng/YeelightControl/actions/workflows/ios.yml/badge.svg)](https://github.com/DanielKng/YeelightControl/actions)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
 [Features](#-key-features) • [Installation](#-getting-started) • [Documentation](docs/API.md) • [Contributing](CONTRIBUTING.md)
@@ -61,7 +60,7 @@ A modern iOS app for controlling Yeelight smart lighting devices. Built with Swi
 - **Advanced Settings** - Fine-tune every aspect
 - **Detailed Logging** - Track system behavior
 
-## �� Project Structure
+## 🛠 Project Structure
 
 ```
 Sources/
@@ -195,81 +194,4 @@ The project follows a clean, modular architecture with clear separation of conce
    ```
 
 3. **Open in Xcode**
-   ```bash
-   open Build/YeelightControl.xcodeproj
    ```
-
-### Development Workflow
-
-#### 1. Making Changes
-- Work in `/Sources` directory
-- Follow modular architecture
-- Keep features isolated
-
-#### 2. Before Testing
-```bash
-# Regenerate project
-./Scripts/setup_xcode_project.sh
-
-# Open in Xcode
-open Build/YeelightControl.xcodeproj
-```
-
-#### 3. Before Committing
-```bash
-# Clean and verify
-./Scripts/reorganize.sh
-```
-
-## 🛠 Development Tools
-
-### Project Scripts
-
-| Script | Purpose |
-|--------|----------|
-| `setup_xcode_project.sh` | Generates Xcode project |
-| `reorganize.sh` | Maintains project structure |
-| `git_push.sh` | Streamlines git operations |
-
-### Directory Management
-
-- `/Build` - Temporary, generated files
-- `/Sources` - All source code
-- `/Scripts` - Development utilities
-- `/Resources` - Assets and configs
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-| Problem | Solution |
-|---------|----------|
-| Build fails | Run `./Scripts/reorganize.sh && ./Scripts/setup_xcode_project.sh` |
-| Missing files | Check `Sources` directory structure |
-| Permission errors | Run `chmod +x Scripts/*.sh` |
-
-### Project Cleanup
-
-```bash
-# Full reset
-./Scripts/reorganize.sh
-rm -rf Build/
-./Scripts/setup_xcode_project.sh
-```
-
-## 📚 Additional Resources
-
-- [Contributing Guidelines](CONTRIBUTING.md)
-- [License](LICENSE)
-- [API Documentation](docs/API.md)
-
----
-
-<div align="center">
-
-Made with ❤️ by [Daniel Kng](https://github.com/DanielKng)
-
-[Report Bug](https://github.com/DanielKng/YeelightControl/issues/new?template=bug_report.md) · 
-[Request Feature](https://github.com/DanielKng/YeelightControl/issues/new?template=feature_request.md)
-
-</div>
