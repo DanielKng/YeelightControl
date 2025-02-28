@@ -38,6 +38,11 @@ YeelightControl is a comprehensive Swift framework for controlling Yeelight smar
   - [Authentication](guides/security.md#authentication)
   - [Data Protection](guides/security.md#data-protection)
   - [Best Practices](guides/security.md#best-practices)
+- [Testing Guide](guides/testing.md) - Testing best practices
+  - [Test Categories](guides/testing.md#test-categories)
+  - [Test Configuration](guides/testing.md#test-configuration)
+  - [Running Tests](guides/testing.md#running-tests)
+  - [Best Practices](guides/testing.md#best-practices)
 - [Troubleshooting](guides/troubleshooting.md) - Common issues and solutions
   - [Device Issues](guides/troubleshooting.md#device-issues)
   - [Network Issues](guides/troubleshooting.md#network-issues)
