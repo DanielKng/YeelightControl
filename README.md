@@ -129,37 +129,47 @@ YeelightControl/
 ├── Sources/           # Main source code
 │   ├── App/          # Main app target
 │   │   ├── YeelightControlApp.swift
-│   │   ├── ContentView.swift
-│   │   └── Info.plist
+│   │   └── ContentView.swift
 │   │
-│   ├── Widget/       # Widget extension
-│   │   ├── YeelightWidget.swift
-│   │   └── Info.plist
+│   ├── Core/         # Core functionality
+│   │   ├── Analytics/     # Analytics services
+│   │   ├── Background/    # Background processing
+│   │   ├── Configuration/ # App configuration
+│   │   ├── Device/       # Device management
+│   │   ├── Effect/       # Effect processing
+│   │   ├── Error/        # Error handling
+│   │   ├── Location/     # Location services
+│   │   ├── Network/      # Network operations
+│   │   ├── Notification/ # Notification handling
+│   │   ├── Permission/   # Permission management
+│   │   ├── Scene/        # Scene management
+│   │   ├── Security/     # Security features
+│   │   ├── Services/     # Core services
+│   │   ├── State/        # State management
+│   │   └── Storage/      # Data storage
 │   │
-│   ├── Models/       # Data models
-│   ├── Views/        # SwiftUI views
-│   ├── Controllers/  # View controllers
-│   ├── Utils/        # Utility functions
-│   ├── Extensions/   # Swift extensions
-│   └── Services/     # Core services
+│   ├── Features/     # Main features
+│   │   ├── Automation/   # Automation functionality
+│   │   ├── Effects/      # Light effects
+│   │   ├── Rooms/        # Room management
+│   │   └── Scenes/       # Scene management
+│   │
+│   ├── UI/          # User interface
+│   │   ├── Components/   # Reusable UI components
+│   │   ├── Views/        # Main views
+│   │   └── Widgets/      # Widget components
+│   │
+│   ├── Tests/       # Test files
+│   │   └── UITests/      # UI test cases
+│   │
+│   └── Widget/      # Widget extension
+│       └── YeelightWidget.swift
 │
-├── Resources/        # App resources
-│   ├── Assets/       # Images and assets
-│   └── Localization/ # Localization files
-│
-├── Scripts/         # Development scripts
-│   ├── setup_xcode_project.sh  # Generate Xcode project and configs
-│   ├── reorganize.sh           # Clean and maintain project structure
-│   └── git_push.sh            # Git push helper
-│
-├── Tests/          # Test files
-│   └── YeelightControlTests/  # Unit tests
-│
-└── .github/        # GitHub configuration
-
-Note: Configuration files (project.yml, Package.swift) are generated 
-      in Resources/Configs/ by setup_xcode_project.sh
+└── Resources/       # Project resources
+    └── Screenshots/ # App screenshots
 ```
+
+Note: The project structure has been simplified to focus on the main components. Additional configuration files and resources may be present in the actual project.
 
 ### Development Scripts
 
