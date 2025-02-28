@@ -25,13 +25,43 @@ mkdir -p "$CONFIGS_DIR"
 
 # Clean up previous build files
 if [ -d "$BUILD_DIR" ]; then
+    # Save the module map files if they exist
+    if [ -f "$SOURCES_DIR/Core/Core.modulemap" ]; then
+        cp "$SOURCES_DIR/Core/Core.modulemap" /tmp/Core.modulemap
+    fi
+    if [ -f "$SOURCES_DIR/UI/UI.modulemap" ]; then
+        cp "$SOURCES_DIR/UI/UI.modulemap" /tmp/UI.modulemap
+    fi
+    
     # Only remove non-symlink files and directories to preserve our symlinks
     find "$BUILD_DIR" -type f -not -name "project.yml" -delete
     find "$BUILD_DIR" -type l -delete  # Remove old symlinks
 fi
 
-# Create Sources directory in Build
-mkdir -p "$BUILD_DIR/Sources"
+# Create Sources directories in Build
+mkdir -p "$BUILD_DIR/Sources/Core"
+mkdir -p "$BUILD_DIR/Sources/UI"
+
+# Create Core module map file
+echo "📄 Creating module map files..."
+cat > "$SOURCES_DIR/Core/Core.modulemap" << 'EOL'
+framework module Core {
+  umbrella header "Core.h"
+  
+  export *
+  module * { export * }
+}
+EOL
+
+# Create UI module map file
+cat > "$SOURCES_DIR/UI/UI.modulemap" << 'EOL'
+framework module UI {
+  umbrella header "UI.h"
+  
+  export *
+  module * { export * }
+}
+EOL
 
 # Create symbolic links recursively
 create_symlinks() {
@@ -255,6 +285,7 @@ options:
   tabWidth: 4
   defaultConfig: Debug
   transitivelyLinkDependencies: true
+  settingPresets: all
 
 settings:
   base:
@@ -270,7 +301,8 @@ settings:
     SWIFT_OPTIMIZATION_LEVEL: "-Onone"
     SWIFT_STRICT_CONCURRENCY: complete
     ALWAYS_SEARCH_USER_PATHS: NO
-    FRAMEWORK_SEARCH_PATHS: $(inherited) $(PLATFORM_DIR)/Developer/Library/Frameworks
+    FRAMEWORK_SEARCH_PATHS: "$(inherited) $(BUILT_PRODUCTS_DIR)"
+    LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @loader_path/Frameworks"
 
 targets:
   Core:
@@ -289,11 +321,18 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_NAME: Core
         SWIFT_INSTALL_OBJC_HEADER: NO
-        CLANG_ENABLE_MODULES: NO
+        CLANG_ENABLE_MODULES: YES
         CURRENT_PROJECT_VERSION: 1
         VERSIONING_SYSTEM: apple-generic
         BUILD_LIBRARY_FOR_DISTRIBUTION: YES
         SKIP_INSTALL: NO
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
+        DYLIB_COMPATIBILITY_VERSION: "1"
+        DYLIB_CURRENT_VERSION: "1"
+        INSTALL_PATH: "@executable_path/Frameworks"
+        FRAMEWORK_SEARCH_PATHS: "$(inherited) $(BUILT_PRODUCTS_DIR)"
+        MODULEMAP_FILE: "$(SRCROOT)/Sources/Core/Core.modulemap"
+        SWIFT_INCLUDE_PATHS: "$(SRCROOT)/Sources"
     dependencies:
       - framework: SwiftUI
       - framework: Foundation
@@ -373,14 +412,19 @@ targets:
         DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
         DEFINES_MODULE: YES
         GENERATE_INFOPLIST_FILE: YES
-        LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/Frameworks @loader_path/Frameworks
+        FRAMEWORK_SEARCH_PATHS: "$(inherited) $(PROJECT_DIR)/Build/Products/Debug-iphoneos"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @loader_path/Frameworks"
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
     dependencies:
       - target: Core
         embed: true
+        link: true
       - target: UI
         embed: true
+        link: true
       - target: Features
         embed: true
+        link: true
       - framework: SwiftUI
         
   YeelightWidget:
@@ -416,8 +460,12 @@ schemes:
         Features: [run, test]
         YeelightControl: all
         YeelightWidget: [run, test]
-      parallelizeBuild: true
+      parallelizeBuild: false
       buildImplicitDependencies: true
+      preActions:
+        - script: rm -rf "${PROJECT_DIR}/Build/Products"
+          name: Clean Products
+          settingsTarget: Core
     run:
       config: Debug
       environmentVariables:
