@@ -1,277 +1,143 @@
 import Foundation
 import BackgroundTasks
 import Combine
-import UIKit
+import SwiftUI
 
-// MARK: - Background Managing Protocol
-protocol BackgroundManaging {
-    var isRefreshing: Bool { get }
-    var lastRefreshDate: Date? { get }
-    var refreshError: Error? { get }
-    
-    func startBackgroundRefresh()
-    func stopBackgroundRefresh()
-    func performRefresh() async throws
-}
-
-// MARK: - Background Manager Implementation
-final class UnifiedBackgroundManager: BackgroundManaging, ObservableObject {
+@MainActor
+public final class UnifiedBackgroundManager: ObservableObject {
     // MARK: - Published Properties
-    @Published private(set) var isRefreshing = false
-    @Published private(set) var lastRefreshDate: Date?
-    @Published private(set) var refreshError: Error?
+    @Published public private(set) var isBackgroundRefreshEnabled = false
+    @Published public private(set) var lastRefreshDate: Date?
+    @Published public private(set) var nextScheduledRefresh: Date?
     
     // MARK: - Private Properties
-    private let services: ServiceContainer
-    private let queue = DispatchQueue(label: "de.knng.app.yeelightcontrol.background", qos: .utility)
-    private let refreshTaskIdentifier = "de.knng.app.yeelightcontrol.refresh"
-    private var refreshTask: Task<Void, Never>?
-    private var refreshTimer: Timer?
-    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    private let deviceManager: UnifiedDeviceManager
+    private let configManager: UnifiedConfigurationManager
+    private let errorManager: UnifiedErrorManager
     private var cancellables = Set<AnyCancellable>()
     
-    // MARK: - Initialization
-    init(services: ServiceContainer = .shared) {
-        self.services = services
-        setupBackgroundTasks()
-        setupNotificationObservers()
-        setupConfigurationObserver()
+    // MARK: - Constants
+    private enum Constants {
+        static let appRefreshTaskIdentifier = "com.yeelight.control.refresh"
+        static let minimumRefreshInterval: TimeInterval = 15 * 60 // 15 minutes
+        static let maximumRefreshInterval: TimeInterval = 24 * 60 * 60 // 24 hours
     }
     
-    deinit {
-        cleanup()
+    // MARK: - Singleton
+    public static let shared = UnifiedBackgroundManager()
+    
+    private init() {
+        self.deviceManager = .shared
+        self.configManager = .shared
+        self.errorManager = .shared
+        registerBackgroundTasks()
+        setupObservers()
     }
     
     // MARK: - Public Methods
-    func startBackgroundRefresh() {
-        stopBackgroundRefresh()
-        
-        let interval = services.config.getValue(for: .minRefreshInterval) ?? 15 * 60
-        
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            self?.refreshTask = Task {
-                do {
-                    try await self?.performRefresh()
-                } catch {
-                    self?.services.logger.error("Periodic refresh failed: \(error.localizedDescription)", category: .background)
-                }
-            }
-        }
-        refreshTimer?.tolerance = 60 // 1 minute tolerance
-        
-        services.logger.info("Started background refresh with interval: \(interval) seconds", category: .background)
+    public func enableBackgroundRefresh() {
+        guard !isBackgroundRefreshEnabled else { return }
+        isBackgroundRefreshEnabled = true
+        scheduleBackgroundRefresh()
     }
     
-    func stopBackgroundRefresh() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
-        refreshTask?.cancel()
-        refreshTask = nil
-        
-        services.logger.info("Stopped background refresh", category: .background)
+    public func disableBackgroundRefresh() {
+        isBackgroundRefreshEnabled = false
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Constants.appRefreshTaskIdentifier)
+        nextScheduledRefresh = nil
     }
     
-    func performRefresh() async throws {
-        guard !isRefreshing else { return }
+    public func performBackgroundRefresh() async throws {
+        lastRefreshDate = Date()
         
-        isRefreshing = true
-        defer { isRefreshing = false }
-        
-        do {
-            services.logger.info("Starting background refresh", category: .background)
-            
-            // Discover new devices
-            await services.deviceManager.discoverDevices()
-            
-            // Update device states
-            let devices = try await services.storage.load(forKey: .devices) as [StoredDevice]
-            for device in devices {
-                if let yeelightDevice = services.deviceManager.getDevice(byId: device.id) {
-                    try await services.stateManager.syncState(for: yeelightDevice.id)
-                }
+        // Update device states
+        for device in deviceManager.devices {
+            do {
+                try await deviceManager.updateDeviceState(device)
+            } catch {
+                errorManager.handle(error, context: ["device_id": device.id])
             }
-            
-            // Clean up stale automations
-            try await cleanupStaleAutomations()
-            
-            // Update last refresh date
-            lastRefreshDate = Date()
-            refreshError = nil
-            
-            services.logger.info("Background refresh completed successfully", category: .background)
-            
-        } catch {
-            refreshError = error
-            services.logger.error("Background refresh failed: \(error.localizedDescription)", category: .background)
-            throw error
         }
+        
+        // Schedule next refresh
+        scheduleBackgroundRefresh()
     }
     
     // MARK: - Private Methods
-    private func cleanup() {
-        stopBackgroundRefresh()
-        
-        if backgroundTask != .invalid {
-            UIApplication.shared.endBackgroundTask(backgroundTask)
-            backgroundTask = .invalid
-        }
-    }
-    
-    private func setupBackgroundTasks() {
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: refreshTaskIdentifier, using: nil) { [weak self] task in
-            self?.handleBackgroundRefresh(task as! BGAppRefreshTask)
-        }
-    }
-    
-    private func setupNotificationObservers() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(applicationDidEnterBackground),
-            name: UIApplication.didEnterBackgroundNotification,
-            object: nil
-        )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(applicationWillEnterForeground),
-            name: UIApplication.willEnterForegroundNotification,
-            object: nil
-        )
-    }
-    
-    private func setupConfigurationObserver() {
-        services.config.configurationUpdates
-            .sink { [weak self] _ in
-                self?.handleConfigurationUpdate()
-            }
-            .store(in: &cancellables)
-    }
-    
-    private func handleConfigurationUpdate() {
-        // Restart background refresh with new configuration
-        if refreshTimer != nil {
-            stopBackgroundRefresh()
-            startBackgroundRefresh()
-        }
-    }
-    
-    private func handleBackgroundRefresh(_ task: BGAppRefreshTask) {
-        // Schedule next refresh before starting work
-        scheduleNextRefresh()
-        
-        let timeout = services.config.getValue(for: .backgroundTaskTimeout) ?? 30.0
-        
-        // Set expiration handler
-        task.expirationHandler = { [weak self] in
-            self?.cleanup()
-        }
-        
-        // Start refresh
-        refreshTask = Task {
-            do {
-                try await withTimeout(timeout) {
-                    try await self.performRefresh()
-                }
-                task.setTaskCompleted(success: true)
-            } catch {
-                services.logger.error("Background refresh task failed: \(error.localizedDescription)", category: .background)
+    private func registerBackgroundTasks() {
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Constants.appRefreshTaskIdentifier,
+            using: nil
+        ) { [weak self] task in
+            task.expirationHandler = {
                 task.setTaskCompleted(success: false)
             }
+            
+            Task { @MainActor [weak self] in
+                do {
+                    try await self?.performBackgroundRefresh()
+                    task.setTaskCompleted(success: true)
+                } catch {
+                    self?.errorManager.handle(error)
+                    task.setTaskCompleted(success: false)
+                }
+            }
         }
     }
     
-    private func scheduleNextRefresh() {
-        let request = BGAppRefreshTaskRequest(identifier: refreshTaskIdentifier)
-        let interval = services.config.getValue(for: .minRefreshInterval) ?? 15 * 60
-        request.earliestBeginDate = Date(timeIntervalSinceNow: interval)
+    private func scheduleBackgroundRefresh() {
+        guard isBackgroundRefreshEnabled else { return }
+        
+        let request = BGAppRefreshTaskRequest(identifier: Constants.appRefreshTaskIdentifier)
+        request.earliestBeginDate = calculateNextRefreshDate()
         
         do {
             try BGTaskScheduler.shared.submit(request)
-            services.logger.info("Scheduled next background refresh", category: .background)
+            nextScheduledRefresh = request.earliestBeginDate
         } catch {
-            services.logger.error("Failed to schedule background refresh: \(error.localizedDescription)", category: .background)
+            errorManager.handle(error)
         }
     }
     
-    private func cleanupStaleAutomations() async throws {
-        let automations = try await services.storage.load(forKey: .automations) as [Automation]
-        var updatedAutomations = automations
-        
-        // Remove automations with invalid device references
-        updatedAutomations.removeAll { automation in
-            for action in automation.actions {
-                switch action {
-                case .setPower(let deviceId, _),
-                     .setBrightness(let deviceId, _),
-                     .setScene(let deviceId, _),
-                     .setEffect(let deviceId, _),
-                     .setColor(let deviceId, _),
-                     .setColorTemperature(let deviceId, _):
-                    if services.deviceManager.getDevice(byId: deviceId) == nil {
-                        return true
-                    }
+    private func calculateNextRefreshDate() -> Date {
+        let now = Date()
+        let interval = max(
+            Constants.minimumRefreshInterval,
+            min(
+                configManager.configuration.appSettings.backgroundRefreshInterval ?? Constants.minimumRefreshInterval,
+                Constants.maximumRefreshInterval
+            )
+        )
+        return now.addingTimeInterval(interval)
+    }
+    
+    private func setupObservers() {
+        // Observe configuration changes
+        configManager.$configuration
+            .sink { [weak self] config in
+                if config.appSettings.backgroundRefreshEnabled {
+                    self?.enableBackgroundRefresh()
+                } else {
+                    self?.disableBackgroundRefresh()
                 }
             }
-            return false
-        }
+            .store(in: &cancellables)
         
-        if updatedAutomations.count != automations.count {
-            try await services.storage.save(updatedAutomations, forKey: .automations)
-            services.logger.info("Removed \(automations.count - updatedAutomations.count) stale automations", category: .background)
-        }
-    }
-    
-    private func withTimeout<T>(_ seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
-            }
-            
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw BackgroundError.timeout
-            }
-            
-            let result = try await group.next()
-            group.cancelAll()
-            return result ?? { throw BackgroundError.taskCancelled }()
-        }
-    }
-    
-    @objc private func applicationDidEnterBackground() {
-        scheduleNextRefresh()
-    }
-    
-    @objc private func applicationWillEnterForeground() {
-        // Perform a refresh when app comes to foreground if enough time has passed
-        if let lastRefresh = lastRefreshDate {
-            let interval = services.config.getValue(for: .minRefreshInterval) ?? 15 * 60
-            if Date().timeIntervalSince(lastRefresh) >= interval {
-                Task {
-                    try? await performRefresh()
-                }
-            }
+        // Initial state
+        if configManager.configuration.appSettings.backgroundRefreshEnabled {
+            enableBackgroundRefresh()
         }
     }
 }
 
-// MARK: - Background Errors
-enum BackgroundError: LocalizedError {
-    case refreshInProgress
-    case taskCancelled
-    case timeout
-    case systemError(String)
-    
-    var errorDescription: String? {
-        switch self {
-        case .refreshInProgress:
-            return "A refresh operation is already in progress"
-        case .taskCancelled:
-            return "Background task was cancelled"
-        case .timeout:
-            return "Background task timed out"
-        case .systemError(let message):
-            return "System error: \(message)"
+// MARK: - Configuration Extension
+extension Configuration.AppSettings {
+    public var backgroundRefreshInterval: TimeInterval? {
+        get {
+            UserDefaults.standard.value(forKey: "background_refresh_interval") as? TimeInterval
+        }
+        set {
+            UserDefaults.standard.setValue(newValue, forKey: "background_refresh_interval")
         }
     }
 } 

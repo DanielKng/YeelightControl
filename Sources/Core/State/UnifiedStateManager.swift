@@ -1,14 +1,15 @@
 import Foundation
 import Combine
+import SwiftUI
 
 // MARK: - State Managing Protocol
 protocol StateManaging {
-    var stateUpdates: AnyPublisher<DeviceState, Never> { get }
+    var deviceStates: [String: DeviceState] { get }
+    var stateUpdates: AnyPublisher<DeviceStateUpdate, Never> { get }
     
     func getState(for deviceId: String) -> DeviceState?
     func setState(_ state: DeviceState, for deviceId: String) async throws
-    func syncState(for deviceId: String) async throws
-    func resetState(for deviceId: String)
+    func removeState(for deviceId: String)
 }
 
 // MARK: - Device State
@@ -51,135 +52,58 @@ struct DeviceState: Codable, Equatable {
     }
 }
 
-// MARK: - State Manager Implementation
-final class UnifiedStateManager: StateManaging, ObservableObject {
-    // MARK: - Publishers
-    private let stateSubject = PassthroughSubject<DeviceState, Never>()
-    var stateUpdates: AnyPublisher<DeviceState, Never> {
-        stateSubject.eraseToAnyPublisher()
-    }
+@MainActor
+public final class UnifiedStateManager: ObservableObject {
+    // MARK: - Published Properties
+    @Published public private(set) var deviceStates: [String: DeviceState] = [:]
+    public let stateUpdates = PassthroughSubject<DeviceStateUpdate, Never>()
+    
+    // MARK: - Dependencies
+    private weak var storageManager: UnifiedStorageManager?
     
     // MARK: - Private Properties
-    private let services: ServiceContainer
-    private let queue = DispatchQueue(label: "de.knng.app.yeelightcontrol.state", qos: .userInitiated)
-    private var states: [String: DeviceState] = [:]
-    private var syncTasks: [String: Task<Void, Error>] = [:]
     private var cancellables = Set<AnyCancellable>()
     
-    // MARK: - Configuration
-    private struct Configuration {
-        var syncInterval: TimeInterval = 5
-        var maxRetryAttempts = 3
-        var retryDelay: TimeInterval = 1
-        var stateTimeout: TimeInterval = 10
-    }
+    // MARK: - Singleton
+    public static let shared = UnifiedStateManager()
     
-    // MARK: - Initialization
-    init(services: ServiceContainer = .shared) {
-        self.services = services
-        setupStateObservers()
+    private init() {
+        loadStates()
     }
     
     // MARK: - Public Methods
-    func getState(for deviceId: String) -> DeviceState? {
-        queue.sync {
-            states[deviceId]
-        }
+    public func getState(for deviceId: String) -> DeviceState? {
+        deviceStates[deviceId]
     }
     
-    func setState(_ state: DeviceState, for deviceId: String) async throws {
-        try await queue.run {
-            guard let device = services.deviceManager.getDevice(byId: deviceId) else {
-                throw StateError.deviceNotFound
-            }
-            
-            // Update device state
-            try await device.updateState(state)
-            
-            // Update local state
-            states[deviceId] = state
-            stateSubject.send(state)
-            
-            // Save state
-            try await saveState(state, for: deviceId)
-            
-            services.logger.info("Updated state for device \(deviceId)", category: .device)
-        }
+    public func setState(_ state: DeviceState, for deviceId: String) {
+        deviceStates[deviceId] = state
+        saveStates()
+        stateUpdates.send(DeviceStateUpdate(deviceId: deviceId, state: state))
     }
     
-    func syncState(for deviceId: String) async throws {
-        // Cancel existing sync task if any
-        syncTasks[deviceId]?.cancel()
-        
-        let task = Task {
-            try await queue.run {
-                guard let device = services.deviceManager.getDevice(byId: deviceId) else {
-                    throw StateError.deviceNotFound
-                }
-                
-                // Get device state
-                let state = try await device.getState()
-                
-                // Update local state
-                states[deviceId] = state
-                stateSubject.send(state)
-                
-                // Save state
-                try await saveState(state, for: deviceId)
-                
-                services.logger.info("Synced state for device \(deviceId)", category: .device)
-            }
-        }
-        
-        syncTasks[deviceId] = task
-        try await task.value
-    }
-    
-    func resetState(for deviceId: String) {
-        queue.async {
-            self.states.removeValue(forKey: deviceId)
-            self.syncTasks[deviceId]?.cancel()
-            self.syncTasks.removeValue(forKey: deviceId)
-            services.logger.info("Reset state for device \(deviceId)", category: .device)
-        }
+    public func removeState(for deviceId: String) {
+        deviceStates.removeValue(forKey: deviceId)
+        saveStates()
     }
     
     // MARK: - Private Methods
-    private func setupStateObservers() {
-        // Observe device removals
-        services.deviceManager.deviceUpdates
-            .sink { [weak self] update in
-                switch update {
-                case .removed(let deviceId):
-                    self?.resetState(for: deviceId)
-                default:
-                    break
-                }
+    private func loadStates() {
+        do {
+            if let states: [String: DeviceState] = try storageManager?.load([String: DeviceState].self, forKey: "device_states") {
+                deviceStates = states
             }
-            .store(in: &cancellables)
-        
-        // Observe network status
-        services.networkManager.$isConnected
-            .sink { [weak self] isConnected in
-                if isConnected {
-                    self?.syncAllStates()
-                }
-            }
-            .store(in: &cancellables)
-    }
-    
-    private func syncAllStates() {
-        Task {
-            let devices = services.deviceManager.getAllDevices()
-            for device in devices {
-                try? await syncState(for: device.id)
-            }
+        } catch {
+            print("Failed to load device states: \(error)")
         }
     }
     
-    private func saveState(_ state: DeviceState, for deviceId: String) async throws {
-        let key = StorageKey.deviceState(deviceId)
-        try await services.storage.save(state, forKey: key)
+    private func saveStates() {
+        do {
+            try storageManager?.save(deviceStates, forKey: "device_states")
+        } catch {
+            print("Failed to save device states: \(error)")
+        }
     }
 }
 

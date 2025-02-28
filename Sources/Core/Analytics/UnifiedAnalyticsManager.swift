@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 // MARK: - Analytics Managing Protocol
 protocol AnalyticsManaging {
@@ -58,117 +59,81 @@ enum AnalyticsMetric: String {
     case backgroundTaskCount
 }
 
-// MARK: - Analytics Manager Implementation
-final class UnifiedAnalyticsManager: AnalyticsManaging {
-    // MARK: - Private Properties
-    private let services: ServiceContainer
-    private let queue = DispatchQueue(label: "de.knng.app.yeelightcontrol.analytics", qos: .utility)
-    private var metrics: [AnalyticsMetric: Int] = [:]
-    private var sessionStartTime: Date?
-    private var cancellables = Set<AnyCancellable>()
+@MainActor
+public final class UnifiedAnalyticsManager: ObservableObject {
+    // MARK: - Published Properties
+    @Published public private(set) var isEnabled = false
+    @Published public private(set) var events: [AnalyticsEvent] = []
     
-    // MARK: - Configuration
-    private struct Configuration {
-        var batchSize = 50
-        var uploadInterval: TimeInterval = 300 // 5 minutes
-        var maxStorageSize = 10 * 1024 * 1024 // 10MB
-        var maxEventAge: TimeInterval = 7 * 24 * 60 * 60 // 7 days
+    // MARK: - Private Properties
+    private var cancellables = Set<AnyCancellable>()
+    private let queue = DispatchQueue(label: "com.yeelight.analytics", qos: .utility)
+    private let storage: UnifiedStorageManager
+    
+    // MARK: - Constants
+    private enum Constants {
+        static let maxEventCount = 1000
+        static let storageKey = "analytics_events"
+        static let batchSize = 50
     }
     
-    private let config = Configuration()
+    // MARK: - Singleton
+    public static let shared = UnifiedAnalyticsManager()
     
-    // MARK: - Initialization
-    init(services: ServiceContainer = .shared) {
-        self.services = services
-        setupObservers()
-        startPeriodicUpload()
+    private init() {
+        self.storage = .shared
+        loadEvents()
+        setupPeriodicUpload()
     }
     
     // MARK: - Public Methods
-    func trackEvent(_ event: AnalyticsEvent) {
-        queue.async { [weak self] in
-            self?.storeEvent(event)
-            self?.uploadEventsIfNeeded()
+    public func setEnabled(_ enabled: Bool) {
+        isEnabled = enabled
+        if !enabled {
+            clearEvents()
         }
     }
     
-    func startSession() {
-        sessionStartTime = Date()
-        trackEvent(AnalyticsEvent(name: "session_start", category: .user))
-    }
-    
-    func endSession() {
-        if let startTime = sessionStartTime {
-            let duration = Date().timeIntervalSince(startTime)
-            trackEvent(AnalyticsEvent(
-                name: "session_end",
-                category: .user,
-                parameters: ["duration": duration]
-            ))
-        }
-        sessionStartTime = nil
-    }
-    
-    func logError(_ error: Error, context: [String: Any]? = nil) {
-        var parameters: [String: Any] = [
-            "error_description": error.localizedDescription,
-            "error_domain": (error as NSError).domain,
-            "error_code": (error as NSError).code
-        ]
+    public func trackEvent(_ event: AnalyticsEvent) {
+        guard isEnabled else { return }
         
-        if let context = context {
-            parameters.merge(context) { current, _ in current }
+        events.append(event)
+        if events.count > Constants.maxEventCount {
+            events.removeFirst(events.count - Constants.maxEventCount)
         }
         
-        trackEvent(AnalyticsEvent(
-            name: "error",
-            category: .error,
-            parameters: parameters
-        ))
-        
-        incrementMetric(.errorCount)
+        saveEvents()
+        uploadEvents()
     }
     
-    func setUserProperty(_ value: Any?, forKey key: String) {
-        queue.async {
-            // Store user property for future events
-            UserDefaults.standard.set(value, forKey: "analytics_user_\(key)")
-        }
-    }
-    
-    func incrementMetric(_ metric: AnalyticsMetric) {
-        queue.async { [weak self] in
-            self?.metrics[metric, default: 0] += 1
-        }
+    public func clearEvents() {
+        events.removeAll()
+        try? storage.remove(forKey: Constants.storageKey)
     }
     
     // MARK: - Private Methods
-    private func setupObservers() {
-        // Track device changes
-        services.deviceManager.deviceUpdates
-            .sink { [weak self] update in
-                switch update {
-                case .added:
-                    self?.incrementMetric(.deviceCount)
-                case .removed:
-                    self?.decrementMetric(.deviceCount)
-                default:
-                    break
-                }
-            }
-            .store(in: &cancellables)
-        
-        // Track network requests
-        NotificationCenter.default
-            .publisher(for: .networkRequestCompleted)
-            .sink { [weak self] _ in
-                self?.incrementMetric(.networkRequests)
-            }
-            .store(in: &cancellables)
+    private func loadEvents() {
+        do {
+            let data = try storage.load(forKey: Constants.storageKey)
+            let decoder = JSONDecoder()
+            events = try decoder.decode([AnalyticsEvent].self, from: data)
+        } catch {
+            print("Failed to load analytics events: \(error)")
+        }
     }
     
-    private func startPeriodicUpload() {
-        Timer.publish(every: config.uploadInterval, on: .main, in: .common)
+    private func saveEvents() {
+        do {
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(events)
+            try storage.save(data, forKey: Constants.storageKey)
+        } catch {
+            print("Failed to save analytics events: \(error)")
+        }
+    }
+    
+    private func setupPeriodicUpload() {
+        Timer.publish(every: 300, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 self?.uploadEvents()
@@ -176,60 +141,46 @@ final class UnifiedAnalyticsManager: AnalyticsManaging {
             .store(in: &cancellables)
     }
     
-    private func storeEvent(_ event: AnalyticsEvent) {
-        Task {
-            do {
-                var events: [AnalyticsEvent] = (try? await services.storage.load(forKey: .analytics)) ?? []
-                events.append(event)
-                
-                // Remove old events if needed
-                let cutoffDate = Date().addingTimeInterval(-config.maxEventAge)
-                events = events.filter { $0.timestamp > cutoffDate }
-                
-                try await services.storage.save(events, forKey: .analytics)
-            } catch {
-                services.logger.error("Failed to store analytics event: \(error.localizedDescription)", category: .analytics)
-            }
-        }
-    }
-    
     private func uploadEvents() {
-        Task {
-            do {
-                let events: [AnalyticsEvent] = (try? await services.storage.load(forKey: .analytics)) ?? []
-                guard !events.isEmpty else { return }
-                
-                // Upload events (implement your upload logic here)
-                // For now, we'll just log them
-                services.logger.info("Would upload \(events.count) events", category: .analytics)
-                
-                // Clear uploaded events
-                try await services.storage.save([], forKey: .analytics)
-            } catch {
-                services.logger.error("Failed to upload analytics events: \(error.localizedDescription)", category: .analytics)
-            }
-        }
-    }
-    
-    private func uploadEventsIfNeeded() {
-        Task {
-            do {
-                let events: [AnalyticsEvent] = (try? await services.storage.load(forKey: .analytics)) ?? []
-                if events.count >= config.batchSize {
-                    uploadEvents()
-                }
-            } catch {
-                services.logger.error("Failed to check analytics events: \(error.localizedDescription)", category: .analytics)
-            }
-        }
-    }
-    
-    private func decrementMetric(_ metric: AnalyticsMetric) {
+        guard !events.isEmpty else { return }
+        
+        let eventsToUpload = Array(events.prefix(Constants.batchSize))
+        
         queue.async { [weak self] in
-            guard let self = self, let value = self.metrics[metric], value > 0 else { return }
-            self.metrics[metric] = value - 1
+            // Here you would implement the actual upload logic
+            // For example, sending to a analytics service
+            
+            DispatchQueue.main.async {
+                self?.events.removeFirst(min(eventsToUpload.count, self?.events.count ?? 0))
+                self?.saveEvents()
+            }
         }
     }
+}
+
+// MARK: - Analytics Event
+public struct AnalyticsEvent: Codable {
+    public let name: String
+    public let timestamp: Date
+    public let parameters: [String: String]
+    
+    public init(name: String, parameters: [String: String] = [:]) {
+        self.name = name
+        self.timestamp = Date()
+        self.parameters = parameters
+    }
+}
+
+// MARK: - Analytics Event Names
+public enum AnalyticsEventName {
+    public static let appLaunch = "app_launch"
+    public static let deviceDiscovered = "device_discovered"
+    public static let deviceConnected = "device_connected"
+    public static let deviceDisconnected = "device_disconnected"
+    public static let sceneActivated = "scene_activated"
+    public static let effectActivated = "effect_activated"
+    public static let settingsChanged = "settings_changed"
+    public static let errorOccurred = "error_occurred"
 }
 
 // MARK: - Notification Extension

@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import Combine
+import SwiftUI
 
 /// Protocol defining Yeelight management capabilities
 protocol YeelightManaging {
@@ -14,28 +15,93 @@ protocol YeelightManaging {
 }
 
 /// A manager responsible for managing Yeelight devices
-final class UnifiedYeelightManager: ObservableObject, YeelightManaging {
-    /// Published array of discovered devices
-    @Published private(set) var devices: [UnifiedYeelightDevice] = []
+@MainActor
+public final class UnifiedYeelightManager: ObservableObject {
+    // MARK: - Published Properties
+    @Published public private(set) var devices: [YeelightDevice] = []
+    @Published public private(set) var isDiscovering = false
     
-    /// Services container reference
-    private let services: ServiceContainer
+    // MARK: - Dependencies
+    private weak var deviceManager: UnifiedDeviceManager?
+    private weak var networkManager: UnifiedNetworkManager?
+    private weak var storageManager: UnifiedStorageManager?
     
-    /// Set of cancellables for managing subscriptions
+    // MARK: - Private Properties
+    private var deviceConnections: [String: YeelightConnection] = [:]
     private var cancellables = Set<AnyCancellable>()
     
-    /// Initialize with services container
-    init(services: ServiceContainer) {
-        self.services = services
-        setupSubscriptions()
-        setupMessageHandler()
+    // MARK: - Constants
+    private struct Constants {
+        static let defaultPort: UInt16 = 55443
+        static let defaultTimeout: TimeInterval = 5
+        static let reconnectInterval: TimeInterval = 5
+        static let maxReconnectAttempts = 3
     }
     
-    /// Sets up subscriptions for device discovery and status updates
+    // MARK: - Singleton
+    public static let shared = UnifiedYeelightManager()
+    
+    private init() {
+        setupSubscriptions()
+    }
+    
+    // MARK: - Public Methods
+    public func startDiscovery() {
+        guard !isDiscovering else { return }
+        isDiscovering = true
+        networkManager?.startDiscovery()
+    }
+    
+    public func stopDiscovery() {
+        isDiscovering = false
+        networkManager?.stopDiscovery()
+    }
+    
+    public func setPower(_ isOn: Bool, for device: YeelightDevice) {
+        guard let connection = deviceConnections[device.id] else {
+            connectToDevice(device)
+            return
+        }
+        
+        let command = YeelightCommand.setPower(isOn)
+        connection.send(command)
+    }
+    
+    public func setBrightness(_ level: Int, for device: YeelightDevice) {
+        guard let connection = deviceConnections[device.id] else {
+            connectToDevice(device)
+            return
+        }
+        
+        let command = YeelightCommand.setBrightness(level)
+        connection.send(command)
+    }
+    
+    public func setColorTemperature(_ temperature: Int, for device: YeelightDevice) {
+        guard let connection = deviceConnections[device.id] else {
+            connectToDevice(device)
+            return
+        }
+        
+        let command = YeelightCommand.setColorTemperature(temperature)
+        connection.send(command)
+    }
+    
+    public func setColor(red: Int, green: Int, blue: Int, for device: YeelightDevice) {
+        guard let connection = deviceConnections[device.id] else {
+            connectToDevice(device)
+            return
+        }
+        
+        let command = YeelightCommand.setColor(red: red, green: green, blue: blue)
+        connection.send(command)
+    }
+    
+    // MARK: - Private Methods
     private func setupSubscriptions() {
-        services.networkManager.networkStatusPublisher
+        networkManager?.connectionStatus
             .sink { [weak self] status in
-                if status == .satisfied {
+                if case .connected = status {
                     self?.startDiscovery()
                 } else {
                     self?.stopDiscovery()
@@ -44,116 +110,138 @@ final class UnifiedYeelightManager: ObservableObject, YeelightManaging {
             .store(in: &cancellables)
     }
     
-    /// Sets up the network message handler
-    private func setupMessageHandler() {
-        // Implementation will be handled by the network manager
-    }
-    
-    /// Starts device discovery
-    func startDiscovery() {
-        services.networkManager.startSSDP()
-    }
-    
-    /// Stops device discovery
-    func stopDiscovery() {
-        services.networkManager.stopSSDP()
-    }
-    
-    /// Controls a device's power state
-    func setPower(_ isOn: Bool, for device: UnifiedYeelightDevice) {
-        guard let command = formatCommand(.setPower(isOn)) else {
-            services.logger.log(.error, "Failed to format power command")
-            return
-        }
-        sendDeviceCommand(command, to: device)
-    }
-    
-    /// Sets brightness for a device
-    func setBrightness(_ level: Int, for device: UnifiedYeelightDevice) {
-        let brightness = max(1, min(100, level))
-        guard let command = formatCommand(.setBrightness(brightness)) else {
-            services.logger.log(.error, "Failed to format brightness command")
-            return
-        }
-        sendDeviceCommand(command, to: device)
-    }
-    
-    /// Sets color temperature for a device
-    func setColorTemperature(_ temperature: Int, for device: UnifiedYeelightDevice) {
-        let temp = max(1700, min(6500, temperature))
-        guard let command = formatCommand(.setColorTemperature(temp)) else {
-            services.logger.log(.error, "Failed to format color temperature command")
-            return
-        }
-        sendDeviceCommand(command, to: device)
-    }
-    
-    /// Sets RGB color for a device
-    func setColor(red: Int, green: Int, blue: Int, for device: UnifiedYeelightDevice) {
-        guard let command = formatCommand(.setRGB(red, green, blue)) else {
-            services.logger.log(.error, "Failed to format RGB command")
-            return
-        }
-        sendDeviceCommand(command, to: device)
-    }
-    
-    // MARK: - Private Methods
-    
-    private func sendDeviceCommand(_ command: String, to device: UnifiedYeelightDevice) {
-        let endpoint = NWEndpoint.hostPort(host: .init(device.ipAddress), port: .init(integerLiteral: UInt16(device.port)))
+    private func connectToDevice(_ device: YeelightDevice) {
+        let connection = YeelightConnection(device: device)
+        deviceConnections[device.id] = connection
         
-        services.networkManager.sendCommand(command, to: endpoint) { [weak self] result in
-            switch result {
-            case .success(let data):
-                self?.services.logger.log(.info, "Command successful: \(String(data: data, encoding: .utf8) ?? "")")
-            case .failure(let error):
-                self?.services.logger.log(.error, "Command failed: \(error)")
+        connection.stateUpdates
+            .sink { [weak self] state in
+                guard let self = self else { return }
+                var updatedDevice = device
+                updatedDevice.state = state
+                self.deviceManager?.updateDevice(updatedDevice)
+            }
+            .store(in: &cancellables)
+        
+        connection.connect()
+    }
+}
+
+// MARK: - Yeelight Connection
+private class YeelightConnection {
+    private let device: YeelightDevice
+    private var socket: NWConnection?
+    private var reconnectTask: Task<Void, Never>?
+    private var reconnectAttempts = 0
+    
+    let stateUpdates = PassthroughSubject<DeviceState, Never>()
+    
+    init(device: YeelightDevice) {
+        self.device = device
+    }
+    
+    func connect() {
+        let endpoint = NWEndpoint.hostPort(
+            host: NWEndpoint.Host(device.ipAddress),
+            port: NWEndpoint.Port(integerLiteral: UInt16(device.port))
+        )
+        
+        let connection = NWConnection(to: endpoint, using: .tcp)
+        connection.stateUpdateHandler = { [weak self] state in
+            self?.handleConnectionState(state)
+        }
+        
+        connection.start(queue: .main)
+        socket = connection
+    }
+    
+    func disconnect() {
+        socket?.cancel()
+        socket = nil
+        reconnectTask?.cancel()
+    }
+    
+    func send(_ command: YeelightCommand) {
+        guard let socket = socket else {
+            connect()
+            return
+        }
+        
+        let data = command.data
+        socket.send(content: data, completion: .contentProcessed { [weak self] error in
+            if let error = error {
+                print("Failed to send command: \(error)")
+                self?.handleError(error)
+            }
+        })
+    }
+    
+    private func handleConnectionState(_ state: NWConnection.State) {
+        switch state {
+        case .ready:
+            reconnectAttempts = 0
+            // Start listening for responses
+            receiveNextMessage()
+            
+        case .failed(let error):
+            handleError(error)
+            
+        case .cancelled:
+            socket = nil
+            
+        default:
+            break
+        }
+    }
+    
+    private func handleError(_ error: Error) {
+        print("Connection error: \(error)")
+        socket?.cancel()
+        socket = nil
+        
+        if reconnectAttempts < UnifiedYeelightManager.Constants.maxReconnectAttempts {
+            reconnectTask = Task {
+                try? await Task.sleep(nanoseconds: UInt64(UnifiedYeelightManager.Constants.reconnectInterval * 1_000_000_000))
+                reconnectAttempts += 1
+                connect()
             }
         }
     }
     
-    private func formatCommand(_ command: UnifiedYeelightCommand) -> String? {
-        let baseCommand: [String: Any]
-        
-        switch command {
-        case .setPower(let isOn):
-            baseCommand = [
-                "id": UUID().uuidString,
-                "method": "set_power",
-                "params": [isOn ? "on" : "off", "smooth", 500]
-            ]
-        case .setBrightness(let level):
-            baseCommand = [
-                "id": UUID().uuidString,
-                "method": "set_bright",
-                "params": [level, "smooth", 500]
-            ]
-        case .setColorTemperature(let temp):
-            baseCommand = [
-                "id": UUID().uuidString,
-                "method": "set_ct_abx",
-                "params": [temp, "smooth", 500]
-            ]
-        case .setRGB(let r, let g, let b):
-            let rgb = (r * 65536) + (g * 256) + b
-            baseCommand = [
-                "id": UUID().uuidString,
-                "method": "set_rgb",
-                "params": [rgb, "smooth", 500]
-            ]
-        }
-        
-        do {
-            let jsonData = try JSONSerialization.data(withJSONObject: baseCommand)
-            guard let jsonString = String(data: jsonData, encoding: .utf8) else {
-                services.logger.log(.error, "Failed to encode command as UTF-8 string")
-                return nil
+    private func receiveNextMessage() {
+        socket?.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] content, _, isComplete, error in
+            if let error = error {
+                self?.handleError(error)
+                return
             }
-            return jsonString + "\r\n"
-        } catch {
-            services.logger.log(.error, "Failed to serialize command: \(error)")
-            return nil
+            
+            if let data = content {
+                self?.handleResponse(data)
+            }
+            
+            if !isComplete {
+                self?.receiveNextMessage()
+            }
         }
+    }
+    
+    private func handleResponse(_ data: Data) {
+        // Parse response and update state
+        // Implementation depends on the Yeelight protocol
+    }
+}
+
+// MARK: - Yeelight Command
+private enum YeelightCommand {
+    case setPower(Bool)
+    case setBrightness(Int)
+    case setColorTemperature(Int)
+    case setColor(red: Int, green: Int, blue: Int)
+    
+    var data: Data {
+        // Convert command to JSON data according to Yeelight protocol
+        // Implementation depends on the specific command format
+        Data()
     }
 }
 

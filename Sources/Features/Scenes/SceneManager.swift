@@ -1,296 +1,174 @@
 import Foundation
 import Combine
+import SwiftUI
 
-protocol SceneManaging {
-    func createScene(_ scene: Scene) async throws
-    func updateScene(_ scene: Scene) async throws
-    func deleteScene(_ id: String) async throws
-    func getScene(_ id: String) async throws -> Scene
-    func getAllScenes() async throws -> [Scene]
-    func activateScene(_ id: String) async throws
-    func deactivateScene(_ id: String) async throws
-    var scenesPublisher: AnyPublisher<[Scene], Never> { get }
-}
-
-struct Scene: Codable, Identifiable {
-    let id: String
-    var name: String
-    var icon: String?
-    var deviceStates: [String: DeviceState]
-    var schedule: SceneSchedule?
-    var isActive: Bool
-    var createdAt: Date
-    var updatedAt: Date
-}
-
-struct SceneSchedule: Codable {
-    var daysOfWeek: Set<DayOfWeek>
-    var startTime: TimeOfDay
-    var endTime: TimeOfDay?
-    var isEnabled: Bool
+@MainActor
+public final class UnifiedSceneManager: ObservableObject, SceneManaging {
+    // MARK: - Published Properties
+    @Published public private(set) var scenes: [Scene] = []
+    public let sceneUpdates = PassthroughSubject<SceneUpdate, Never>()
     
-    enum DayOfWeek: Int, Codable, CaseIterable {
-        case sunday = 1, monday, tuesday, wednesday, thursday, friday, saturday
-    }
-}
-
-final class SceneManager: SceneManaging {
-    private let services: ServiceContainer
-    private let storage: StorageManaging
-    private let deviceManager: DeviceManaging
-    private let scenesSubject = CurrentValueSubject<[Scene], Never>([])
-    private var subscriptions = Set<AnyCancellable>()
-    private var activeScenes: Set<String> = []
-    private var scheduleTimer: Timer?
+    // MARK: - Dependencies
+    private weak var deviceManager: UnifiedDeviceManager?
+    private weak var storageManager: UnifiedStorageManager?
     
-    init(services: ServiceContainer) {
-        self.services = services
-        self.storage = services.storageManager
-        self.deviceManager = services.deviceManager
-        
-        setupSubscriptions()
+    // MARK: - Private Properties
+    private var activeScenes: [String: Scene] = [:]
+    private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - Singleton
+    public static let shared = UnifiedSceneManager()
+    
+    private init() {
         loadScenes()
-        startScheduleTimer()
     }
     
-    deinit {
-        scheduleTimer?.invalidate()
+    // MARK: - Public Methods
+    public func getScene(byId id: String) -> Scene? {
+        scenes.first { $0.id == id }
     }
     
-    var scenesPublisher: AnyPublisher<[Scene], Never> {
-        scenesSubject.eraseToAnyPublisher()
+    public func getAllScenes() -> [Scene] {
+        scenes
     }
     
-    func createScene(_ scene: Scene) async throws {
-        var scenes = scenesSubject.value
+    public func createScene(_ scene: Scene) async throws {
+        guard !scenes.contains(where: { $0.id == scene.id }) else {
+            throw SceneError.alreadyExists
+        }
         
         // Validate scene
-        try await validateScene(scene)
+        try validateScene(scene)
         
         scenes.append(scene)
-        try await saveScenes(scenes)
-        scenesSubject.send(scenes)
+        try await saveScenes()
+        sceneUpdates.send(.created(scene))
     }
     
-    func updateScene(_ scene: Scene) async throws {
-        var scenes = scenesSubject.value
+    public func updateScene(_ scene: Scene) async throws {
         guard let index = scenes.firstIndex(where: { $0.id == scene.id }) else {
             throw SceneError.notFound
         }
         
         // Validate scene
-        try await validateScene(scene)
+        try validateScene(scene)
         
         scenes[index] = scene
-        try await saveScenes(scenes)
-        scenesSubject.send(scenes)
+        try await saveScenes()
+        sceneUpdates.send(.updated(scene))
         
         // If scene is active, reapply it
-        if activeScenes.contains(scene.id) {
-            try await activateScene(scene.id)
+        for deviceId in activeScenes.keys where activeScenes[deviceId]?.id == scene.id {
+            try await applyScene(scene, to: [deviceId])
         }
     }
     
-    func deleteScene(_ id: String) async throws {
-        var scenes = scenesSubject.value
-        guard let index = scenes.firstIndex(where: { $0.id == id }) else {
+    public func deleteScene(_ scene: Scene) async throws {
+        guard !scene.isPreset else {
+            throw SceneError.cannotDeletePreset
+        }
+        
+        guard scenes.contains(where: { $0.id == scene.id }) else {
             throw SceneError.notFound
         }
         
-        // Deactivate scene if active
-        if activeScenes.contains(id) {
-            try await deactivateScene(id)
-        }
+        scenes.removeAll { $0.id == scene.id }
+        try await saveScenes()
+        sceneUpdates.send(.deleted(scene.id))
         
-        scenes.remove(at: index)
-        try await saveScenes(scenes)
-        scenesSubject.send(scenes)
+        // Deactivate scene on all devices where it's active
+        for deviceId in activeScenes.keys where activeScenes[deviceId]?.id == scene.id {
+            try await deactivateScene(on: deviceId)
+        }
     }
     
-    func getScene(_ id: String) async throws -> Scene {
-        guard let scene = scenesSubject.value.first(where: { $0.id == id }) else {
+    public func applyScene(_ scene: Scene, to deviceIds: [String]) async throws {
+        guard let scene = getScene(byId: scene.id) else {
             throw SceneError.notFound
         }
-        return scene
-    }
-    
-    func getAllScenes() async throws -> [Scene] {
-        return scenesSubject.value
-    }
-    
-    func activateScene(_ id: String) async throws {
-        let scene = try await getScene(id)
         
-        // Apply device states
-        for (deviceId, state) in scene.deviceStates {
+        var failedDevices: [(String, Error)] = []
+        
+        for deviceId in deviceIds {
             do {
-                try await deviceManager.updateDeviceState(deviceId, state: state)
-            } catch {
-                throw SceneError.activationFailed(deviceId: deviceId, error: error)
-            }
-        }
-        
-        activeScenes.insert(id)
-        
-        // Update scene status
-        var updatedScene = scene
-        updatedScene.isActive = true
-        try await updateScene(updatedScene)
-    }
-    
-    func deactivateScene(_ id: String) async throws {
-        let scene = try await getScene(id)
-        
-        // Reset devices to default state
-        for deviceId in scene.deviceStates.keys {
-            do {
-                try await deviceManager.updateDeviceState(deviceId, state: .init(power: true))
-            } catch {
-                print("Failed to reset device \(deviceId): \(error)")
-            }
-        }
-        
-        activeScenes.remove(id)
-        
-        // Update scene status
-        var updatedScene = scene
-        updatedScene.isActive = false
-        try await updateScene(updatedScene)
-    }
-    
-    private func setupSubscriptions() {
-        deviceManager.deviceStatePublisher
-            .sink { [weak self] updates in
-                Task {
-                    await self?.handleDeviceStateUpdates(updates)
+                guard let device = deviceManager?.getDevice(byId: deviceId) else {
+                    throw SceneError.deviceNotFound
                 }
-            }
-            .store(in: &subscriptions)
-    }
-    
-    private func loadScenes() {
-        Task {
-            do {
-                let scenes: [Scene] = try await storage.load(.scenes)
-                scenesSubject.send(scenes)
                 
-                // Reactivate active scenes
-                for scene in scenes where scene.isActive {
-                    try await activateScene(scene.id)
+                guard device.state.isOnline else {
+                    throw SceneError.activationFailed(deviceId: deviceId, error: NetworkError.deviceOffline)
                 }
+                
+                // Get device state from scene
+                guard let deviceState = scene.deviceStates[deviceId] else {
+                    throw SceneError.invalidState
+                }
+                
+                // Store active scene
+                activeScenes[deviceId] = scene
+                
+                // Update device with scene state
+                var updatedDevice = device
+                updatedDevice.state = deviceState
+                deviceManager?.updateDevice(updatedDevice)
+                
             } catch {
-                print("Failed to load scenes: \(error)")
-                scenesSubject.send([])
+                failedDevices.append((deviceId, error))
             }
+        }
+        
+        // If any devices failed, throw error but continue with successful ones
+        if !failedDevices.isEmpty {
+            throw SceneError.activationFailed(
+                deviceId: failedDevices[0].0,
+                error: failedDevices[0].1
+            )
+        }
+        
+        sceneUpdates.send(.applied(scene, deviceIds))
+    }
+    
+    // MARK: - Private Methods
+    private func loadScenes() {
+        do {
+            if let loadedScenes: [Scene] = try storageManager?.load([Scene].self, forKey: "scenes") {
+                scenes = loadedScenes
+            }
+        } catch {
+            print("Failed to load scenes: \(error)")
         }
     }
     
-    private func saveScenes(_ scenes: [Scene]) async throws {
-        try await storage.save(scenes, for: .scenes)
+    private func saveScenes() async throws {
+        try storageManager?.save(scenes, forKey: "scenes")
     }
     
-    private func validateScene(_ scene: Scene) async throws {
+    private func validateScene(_ scene: Scene) throws {
         // Check for duplicate names
-        let scenes = scenesSubject.value
-        if let existingScene = scenes.first(where: { $0.name == scene.name && $0.id != scene.id }) {
+        if scenes.contains(where: { $0.name == scene.name && $0.id != scene.id }) {
             throw SceneError.duplicateName
         }
         
-        // Validate devices exist
-        for deviceId in scene.deviceStates.keys {
-            guard let _ = try? await deviceManager.getDevice(deviceId) else {
-                throw SceneError.deviceNotFound(deviceId)
+        // Validate device states
+        for (deviceId, _) in scene.deviceStates {
+            guard deviceManager?.getDevice(byId: deviceId) != nil else {
+                throw SceneError.deviceNotFound
             }
+        }
+    }
+    
+    private func deactivateScene(on deviceId: String) async throws {
+        guard let device = deviceManager?.getDevice(byId: deviceId) else {
+            throw SceneError.deviceNotFound
         }
         
-        // Validate schedule if present
-        if let schedule = scene.schedule {
-            if schedule.startTime.hour < 0 || schedule.startTime.hour > 23 ||
-                schedule.startTime.minute < 0 || schedule.startTime.minute > 59 {
-                throw SceneError.invalidSchedule
-            }
-            if let endTime = schedule.endTime {
-                if endTime.hour < 0 || endTime.hour > 23 ||
-                    endTime.minute < 0 || endTime.minute > 59 {
-                    throw SceneError.invalidSchedule
-                }
-            }
-        }
-    }
-    
-    private func startScheduleTimer() {
-        scheduleTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            Task {
-                await self?.checkScheduledScenes()
-            }
-        }
-    }
-    
-    private func checkScheduledScenes() async {
-        let currentDate = Date()
-        let calendar = Calendar.current
-        let hour = calendar.component(.hour, from: currentDate)
-        let minute = calendar.component(.minute, from: currentDate)
-        let weekday = calendar.component(.weekday, from: currentDate)
-        let currentTime = TimeOfDay(hour: hour, minute: minute)
+        // Remove active scene
+        activeScenes.removeValue(forKey: deviceId)
         
-        for scene in scenesSubject.value {
-            guard let schedule = scene.schedule, schedule.isEnabled else { continue }
-            
-            if schedule.daysOfWeek.contains(SceneSchedule.DayOfWeek(rawValue: weekday)!) {
-                if schedule.startTime == currentTime {
-                    do {
-                        try await activateScene(scene.id)
-                    } catch {
-                        print("Failed to activate scheduled scene \(scene.id): \(error)")
-                    }
-                } else if let endTime = schedule.endTime, endTime == currentTime {
-                    do {
-                        try await deactivateScene(scene.id)
-                    } catch {
-                        print("Failed to deactivate scheduled scene \(scene.id): \(error)")
-                    }
-                }
-            }
-        }
-    }
-    
-    private func handleDeviceStateUpdates(_ updates: [DeviceStateUpdate]) async {
-        // Handle device state changes that might affect active scenes
-        for update in updates {
-            if update.state.power == false {
-                // Check if this affects any active scenes
-                let affectedScenes = scenesSubject.value.filter { scene in
-                    scene.isActive && scene.deviceStates.keys.contains(update.deviceId)
-                }
-                
-                for scene in affectedScenes {
-                    do {
-                        try await deactivateScene(scene.id)
-                    } catch {
-                        print("Failed to deactivate scene \(scene.id) after device power off: \(error)")
-                    }
-                }
-            }
-        }
-    }
-}
-
-enum SceneError: LocalizedError {
-    case notFound
-    case deviceNotFound(String)
-    case duplicateName
-    case invalidSchedule
-    case activationFailed(deviceId: String, error: Error)
-    
-    var errorDescription: String? {
-        switch self {
-        case .notFound: return "Scene not found"
-        case .deviceNotFound(let deviceId): return "Device not found: \(deviceId)"
-        case .duplicateName: return "Scene name already exists"
-        case .invalidSchedule: return "Invalid scene schedule"
-        case .activationFailed(let deviceId, let error):
-            return "Failed to activate scene for device \(deviceId): \(error.localizedDescription)"
-        }
+        // Reset device to default state
+        var updatedDevice = device
+        updatedDevice.state.brightness = 100
+        updatedDevice.state.colorTemperature = 4000
+        deviceManager?.updateDevice(updatedDevice)
     }
 } 

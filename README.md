@@ -2,107 +2,241 @@
 
 <div align="center">
 
-![YeelightControl](https://raw.githubusercontent.com/DanielKng/YeelightControl/main/Resources/header.png)
+![YeelightControl Header](Resources/header.png)
 
-*My modern iOS app for controlling Yeelight smart lighting devices*
+> Transform your space with intelligent lighting control
 
-[![Swift Version](https://img.shields.io/badge/Swift-5.5+-orange.svg)](https://swift.org)
 [![Platform](https://img.shields.io/badge/Platform-iOS%2015.0+-blue.svg)](https://developer.apple.com/ios/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Swift](https://img.shields.io/badge/Swift-5.5+-orange.svg)](https://swift.org)
 [![SwiftUI](https://img.shields.io/badge/Framework-SwiftUI-purple.svg)](https://developer.apple.com/xcode/swiftui/)
-[![Build Status](https://github.com/DanielKng/YeelightControl/actions/workflows/swift.yml/badge.svg)](https://github.com/DanielKng/YeelightControl/actions)
-[![Issues](https://img.shields.io/github/issues/DanielKng/YeelightControl)](https://github.com/DanielKng/YeelightControl/issues)
-[![Pull Requests](https://img.shields.io/github/issues-pr/DanielKng/YeelightControl)](https://github.com/DanielKng/YeelightControl/pulls)
+[![Automation](https://img.shields.io/badge/Feature-Automation-green.svg)](#-automation)
+[![Offline](https://img.shields.io/badge/Support-Offline-yellow.svg)](#-offline-support)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
-</div>
+[Features](#-key-features) • [Installation](#-getting-started) • [Documentation](docs/API.md) • [Contributing](CONTRIBUTING.md)
 
-## ✨ What is YeelightControl?
+---
 
-I've created YeelightControl to transform your iPhone into a powerful smart lighting command center. You can control your Yeelight devices with an elegant, intuitive interface I've designed for everyday use and creative lighting projects.
-
-<div align="center">
+<p align="center">
   <img src="Resources/Screenshots/home.png" width="200" alt="Home Screen"/>
-  <img src="Resources/Screenshots/controls.png" width="200" alt="Light Controls"/>
+  &nbsp;&nbsp;&nbsp;
   <img src="Resources/Screenshots/scenes.png" width="200" alt="Scene Management"/>
+  &nbsp;&nbsp;&nbsp;
+  <img src="Resources/Screenshots/automation.png" width="200" alt="Automation"/>
+</p>
+
 </div>
 
-## 🚀 Key Features
+A modern iOS app for controlling Yeelight smart lighting devices. Built with SwiftUI and following a modular architecture.
 
-### 💡 Smart Control
-- **Instant Control**: I've made it easy to adjust power, brightness, and color with a tap
-- **Group Management**: You can control multiple lights simultaneously
-- **Room Organization**: I've added ways to organize lights by location
-- **Status Monitoring**: You'll get real-time device status updates
+## ✨ Key Features
 
-### 🎨 Creative Lighting
-- **Dynamic Color Flows**: Create moving color patterns with my custom flow editor
-- **Music Visualization**: I've built a system for lights that react to sound
-- **Scene Presets**: You can save and recall your favorite settings
-- **Custom Transitions**: I've implemented smooth fades between states
+### 🎨 Creative Lighting Control
+- **Dynamic Color Flows** - Create mesmerizing patterns and transitions
+- **Music Sync** - Light effects that pulse with your music
+- **Scene Presets** - Save and recall your perfect lighting setups
+- **Group Control** - Manage multiple lights simultaneously
 
-### ⚡ Smart Automation
-- **Time-Based Triggers**: I've made it possible to schedule lights to change automatically
-- **Sunrise/Sunset Sync**: Your lights can align with natural light cycles
-- **Location Awareness**: I've added triggers based on your location
-- **Multi-Device Routines**: You can coordinate complex lighting scenes
+### 🤖 Smart Automation
+- **Time-Based Triggers** - Schedule automatic light changes
+- **Location Awareness** - Lights respond to your presence
+- **Sunrise/Sunset** - Sync with natural light cycles
+- **Custom Rules** - Create complex automation scenarios
 
-### 🔌 Advanced Features
-- **Home Screen Widgets**: I've created widgets so you can control lights without opening the app
-- **Virtual LED Strips**: You can combine lights for chase effects
-- **Offline Support**: I've ensured you can control devices without internet
-- **Backup & Restore**: You can save your configurations
+### 🔌 Advanced Capabilities
+- **Offline Support** - Full functionality without internet
+- **Quick Actions** - Control from home screen widgets
+- **Virtual LED Strips** - Combine lights for chase effects
+- **Secure Control** - Local network communication
 
-## 📱 Quick Start Guide
+### 💡 Device Features
+- **Instant Control** - Quick brightness and color adjustments
+- **Room Organization** - Group lights by location
+- **Status Monitoring** - Real-time device updates
+- **Energy Saving** - Optimize power consumption
 
-### First-Time Setup
+### 🛠 Power User Tools
+- **Network Diagnostics** - Built-in connectivity testing
+- **Backup & Restore** - Save your configurations
+- **Advanced Settings** - Fine-tune every aspect
+- **Detailed Logging** - Track system behavior
 
-1. **Enable LAN Control on Your Yeelight Devices**
-   - Open the official Yeelight app
-   - Go to device settings
-   - Enable "LAN Control"
-   
-2. **Install YeelightControl**
-   - Download from the App Store
-   - Launch the app
-   - Grant local network permission when prompted
+## �� Project Structure
 
-3. **Discover Your Devices**
-   - Ensure your iPhone is on the same WiFi as your Yeelight devices
-   - The app will automatically discover available devices
-   - Tap a device to start controlling it
+```
+Sources/
+├── App/                    # Main app entry point
+│   ├── YeelightControlApp.swift
+│   └── ContentView.swift
+│
+├── Core/                   # Core functionality and services
+│   ├── Analytics/         # Analytics tracking
+│   ├── Background/        # Background task handling
+│   │   └── UnifiedBackgroundManager.swift
+│   ├── Configuration/     # App configuration
+│   ├── Device/           # Device management
+│   │   ├── UnifiedYeelightManager.swift
+│   │   ├── UnifiedDeviceManager.swift
+│   │   └── YeelightModels.swift
+│   ├── Effect/           # Effect handling
+│   ├── Error/            # Centralized error handling
+│   │   ├── UnifiedErrorHandler.swift
+│   │   ├── DomainErrors.swift
+│   │   └── LoggingTypes.swift
+│   ├── Location/         # Location services
+│   ├── Network/          # Network communication
+│   ├── Notification/     # Push notifications
+│   ├── Permission/       # Permission handling
+│   ├── Scene/            # Scene management
+│   ├── Security/         # Security features
+│   ├── Services/         # Core service protocols
+│   ├── State/            # State management
+│   └── Storage/          # Data persistence
+│       └── UnifiedStorageManager.swift
+│
+├── Features/              # Feature-specific implementations
+│   ├── Automation/       # Automation features
+│   │   └── AutomationManager.swift
+│   ├── Effects/          # Light effects
+│   │   └── EffectManager.swift
+│   ├── Rooms/            # Room management
+│   │   └── RoomManager.swift
+│   └── Scenes/           # Scene management
+│       └── SceneManager.swift
+│
+├── UI/                    # UI components and views
+│   ├── Components/       # Reusable UI components
+│   └── Views/            # Feature-specific views
+│       ├── MainView.swift
+│       ├── SettingsView.swift
+│       ├── NetworkTestsView.swift
+│       ├── DeviceViews/
+│       │   ├── DeviceCard.swift
+│       │   ├── DeviceDetailView.swift
+│       │   └── DeviceSetupView.swift
+│       ├── SceneViews/
+│       │   ├── SceneListView.swift
+│       │   ├── SceneCreator.swift
+│       │   └── ScenePreview.swift
+│       └── EffectViews/
+│           ├── EffectsListView.swift
+│           ├── FlowEffectEditor.swift
+│           └── ColorFlowView.swift
+│
+├── Tests/                 # Test files
+│   └── UITests/          # UI Tests
+│       ├── MainViewUITests.swift
+│       ├── MusicSyncUITests.swift
+│       └── SceneEditorUITests.swift
+│
+└── Widget/                # Widget extension
+    ├── YeelightWidget.swift
+    ├── WidgetBundle.swift
+    └── DeviceControlWidget.swift
+```
 
-### Tips for Best Experience
+## 🏗 Architecture
 
-- Keep your Yeelight devices' firmware updated
-- For my music sync features, use in a quiet environment
-- I recommend creating rooms first, then adding devices to them
-- Experiment with scenes for quick mood changes
+The project follows a clean, modular architecture with clear separation of concerns:
 
-## 🎬 Features in Action
+### Core Module
+> Foundation of the application, containing essential services and managers.
 
-### Music Sync Mode
+- **Device Management** - Device discovery and control
+- **Error Handling** - Centralized error management
+- **Storage** - Data persistence layer
+- **Network** - Communication protocols
+- **Security** - Authentication and encryption
 
-I've created a way to transform your space with lights that pulse and change with your music:
+### Features Module
+> Self-contained feature implementations building on core functionality.
 
-<div align="center">
-  <img src="Resources/Screenshots/music-sync.png" width="300" alt="Music Sync Feature"/>
-</div>
+- **Automation** - Scheduling and triggers
+- **Scenes** - Lighting scene management
+- **Effects** - Dynamic lighting effects
+- **Rooms** - Space organization
 
-### Virtual LED Strip
+### UI Module
+> SwiftUI views and components organized by feature.
 
-I've implemented a system to combine multiple lights to create chase effects and waves:
+- **Components** - Reusable UI elements
+- **Views** - Feature-specific interfaces
+  - Device management
+  - Scene creation
+  - Effect configuration
 
-<div align="center">
-  <img src="Resources/Screenshots/led-strip.png" width="300" alt="Virtual LED Strip"/>
-</div>
+## 🚀 Getting Started
 
-### Scene Creation
+### Prerequisites
 
-I've built a powerful editor to design and save custom lighting scenes for any occasion:
+- macOS Ventura or later
+- Xcode 15.2+
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 
-<div align="center">
-  <img src="Resources/Screenshots/scene-editor.png" width="300" alt="Scene Editor"/>
-</div>
+### Installation
+
+1. **Clone and Setup**
+   ```bash
+   # Clone repository
+   git clone https://github.com/DanielKng/YeelightControl.git
+   cd YeelightControl
+
+   # Make scripts executable
+   chmod +x Scripts/*.sh
+   ```
+
+2. **Project Generation**
+   ```bash
+   # Clean and organize
+   ./Scripts/reorganize.sh
+
+   # Generate Xcode project
+   ./Scripts/setup_xcode_project.sh
+   ```
+
+3. **Open in Xcode**
+   ```bash
+   open Build/YeelightControl.xcodeproj
+   ```
+
+### Development Workflow
+
+#### 1. Making Changes
+- Work in `/Sources` directory
+- Follow modular architecture
+- Keep features isolated
+
+#### 2. Before Testing
+```bash
+# Regenerate project
+./Scripts/setup_xcode_project.sh
+
+# Open in Xcode
+open Build/YeelightControl.xcodeproj
+```
+
+#### 3. Before Committing
+```bash
+# Clean and verify
+./Scripts/reorganize.sh
+```
+
+## 🛠 Development Tools
+
+### Project Scripts
+
+| Script | Purpose |
+|--------|----------|
+| `setup_xcode_project.sh` | Generates Xcode project |
+| `reorganize.sh` | Maintains project structure |
+| `git_push.sh` | Streamlines git operations |
+
+### Directory Management
+
+- `/Build` - Temporary, generated files
+- `/Sources` - All source code
+- `/Scripts` - Development utilities
+- `/Resources` - Assets and configs
 
 ## 🔧 Troubleshooting
 
@@ -110,311 +244,29 @@ I've built a powerful editor to design and save custom lighting scenes for any o
 
 | Problem | Solution |
 |---------|----------|
-| **Devices not discovered** | Ensure "LAN Control" is enabled in the official Yeelight app. Check that your iPhone and lights are on the same WiFi network. |
-| **Music sync not responsive** | Increase sensitivity in settings. Ensure microphone permission is granted. Try in a quieter environment. |
-| **Widgets not updating** | Enable background app refresh for YeelightControl in iOS settings. Try removing and re-adding the widget. |
+| Build fails | Run `./Scripts/reorganize.sh && ./Scripts/setup_xcode_project.sh` |
+| Missing files | Check `Sources` directory structure |
+| Permission errors | Run `chmod +x Scripts/*.sh` |
 
-Need more help? Check the [full troubleshooting guide](https://github.com/DanielKng/YeelightControl/wiki/Troubleshooting) in our wiki.
+### Project Cleanup
 
----
-
-## 💻 Developer Information
-
-### Project Structure
-
-I've designed YeelightControl with a clean and modular project structure:
-
-```
-YeelightControl/
-├── Sources/           # Main source code
-│   ├── App/          # Main app target
-│   │   ├── YeelightControlApp.swift
-│   │   └── ContentView.swift
-│   │
-│   ├── Core/         # Core functionality
-│   │   ├── Analytics/     # Analytics services
-│   │   ├── Background/    # Background processing
-│   │   ├── Configuration/ # App configuration
-│   │   ├── Device/       # Device management
-│   │   ├── Effect/       # Effect processing
-│   │   ├── Error/        # Error handling
-│   │   ├── Location/     # Location services
-│   │   ├── Network/      # Network operations
-│   │   ├── Notification/ # Notification handling
-│   │   ├── Permission/   # Permission management
-│   │   ├── Scene/        # Scene management
-│   │   ├── Security/     # Security features
-│   │   ├── Services/     # Core services
-│   │   ├── State/        # State management
-│   │   └── Storage/      # Data storage
-│   │
-│   ├── Features/     # Main features
-│   │   ├── Automation/   # Automation functionality
-│   │   ├── Effects/      # Light effects
-│   │   ├── Rooms/        # Room management
-│   │   └── Scenes/       # Scene management
-│   │
-│   ├── UI/          # User interface
-│   │   ├── Components/   # Reusable UI components
-│   │   └── Views/        # Main views
-│   │
-│   ├── Tests/       # Test files
-│   │   └── UITests/      # UI test cases
-│   │
-│   └── Widget/      # Widget extension
-│       ├── DeviceControlWidget.swift  # Home screen widget implementation
-│       └── WidgetBundle.swift         # Widget bundle configuration
-│
-└── Resources/       # Project resources
-    └── Screenshots/ # App screenshots
+```bash
+# Full reset
+./Scripts/reorganize.sh
+rm -rf Build/
+./Scripts/setup_xcode_project.sh
 ```
 
-Note: The project structure has been simplified to focus on the main components. Additional configuration files and resources may be present in the actual project.
+## 📚 Additional Resources
 
-### Development Scripts
-
-I've provided several utility scripts to help maintain the project:
-
-1. **Project Setup**
-   ```bash
-   ./Scripts/setup_xcode_project.sh
-   ```
-   - Generates Xcode project using XcodeGen
-   - Creates necessary directory structure
-   - Sets up main app and widget targets
-   - Configures build settings
-   - Creates initial SwiftUI views
-   - Generates configuration files in Resources/Configs/
-   - Sets up proper scheme configurations
-
-2. **Project Cleanup and Reorganization**
-   ```bash
-   ./Scripts/reorganize.sh
-   ```
-   - Creates verified backup of current state
-   - Cleans derived data and temporary files
-   - Removes build artifacts and old backups
-   - Maintains consistent directory structure
-   - Safely restores files with verification
-   - Performs multiple safety checks
-   - Auto-recovers from failures
-   - Maintains proper file permissions
-   - Verifies Swift file count at each step
-
-3. **Git Push Helper**
-   ```bash
-   ./Scripts/git_push.sh
-   ```
-   - Shows pending changes
-   - Prompts for confirmation
-   - Collects commit message
-   - Handles git add, commit, and push
-   - Supports any current branch
-
-### Development Workflow
-
-I've designed the development workflow to be smooth and maintainable:
-
-1. **Initial Setup**
-   ```bash
-   # Clone and setup
-   git clone https://github.com/DanielKng/YeelightControl.git
-   cd YeelightControl
-   chmod +x Scripts/*.sh
-   
-   # Install required tools
-   brew install xcodegen
-   
-   # Generate project and configs
-   ./Scripts/setup_xcode_project.sh
-   ```
-
-2. **Daily Development**
-   - Work directly in the `/Sources` directory
-   - All source code changes should be made in the appropriate `/Sources` subdirectories
-   - The `/Build` and `/Resources/Configs` directories are temporary and automatically generated
-   - Run `./Scripts/setup_xcode_project.sh` when you need to test in Xcode
-   - Use your preferred editor to modify source files
-   - Changes are tracked in git from the `/Sources` and `/Resources` directories (except `/Resources/Configs`)
-
-3. **Before Committing**
-   ```bash
-   # Clean and reorganize project
-   ./Scripts/reorganize.sh
-   ```
-
-4. **After Pulling Updates**
-   ```bash
-   # Clean, reorganize, and regenerate project
-   ./Scripts/reorganize.sh
-   ./Scripts/setup_xcode_project.sh
-   ```
-
-### Project Maintenance
-
-The project uses several strategies to maintain cleanliness and organization:
-
-1. **Build Management**
-   - Build directory is temporary and regenerated
-   - Never commit Build directory contents
-   - Use cleanup script before commits
-
-2. **Resource Management**
-   - Keep Resources directory organized
-   - Use Assets catalog for images
-   - Maintain localization files
-
-3. **Source Organization**
-   - Follow modular architecture
-   - Keep features isolated
-   - Use clear naming conventions
-
-4. **Script Management**
-   - Scripts are in dedicated directory
-   - Symbolic links for convenience
-   - Regular cleanup and maintenance
-
-### Advanced Troubleshooting
-
-#### Build Issues
-
-1. **Clean Build Fails**
-   ```bash
-   # Full cleanup
-   ./Scripts/cleanup.sh
-   rm -rf ~/Library/Developer/Xcode/DerivedData/*YeelightControl*
-   rm -rf Build/
-   
-   # Regenerate
-   ./Scripts/setup_xcode_project.sh
-   ```
-
-2. **Symbolic Link Issues**
-   ```bash
-   # Check symbolic links
-   ls -la
-   
-   # Recreate if needed
-   ./Scripts/reorganize.sh
-   ```
-
-3. **Resource Missing**
-   ```bash
-   # Verify resources
-   ls -la Resources/
-   
-   # Restore from backup
-   git checkout Resources/
-   ```
-
-4. **Script Permission Issues**
-   ```bash
-   # Fix permissions
-   chmod +x Scripts/*.sh
-   chmod +x *.sh  # For symbolic links
-   ```
-
-#### Project Structure Issues
-
-1. **Missing Directories**
-   ```bash
-   # Recreate structure
-   ./Scripts/reorganize.sh
-   
-   # Verify
-   tree -L 3
-   ```
-
-2. **Backup Recovery**
-   ```bash
-   # Check backups
-   ls -la temp_backup/
-   
-   # Restore specific backup
-   cp -R temp_backup/backup_YYYYMMDD_HHMMSS/* .
-   ```
-
-3. **Git Issues**
-   ```bash
-   # Clean untracked files
-   git clean -fdx
-   
-   # Reset to clean state
-   git reset --hard HEAD
-   ./Scripts/reorganize.sh
-   ```
-
-#### Common Error Solutions
-
-| Error | Solution |
-|-------|----------|
-| **"Build directory not found"** | Run `./Scripts/setup_xcode_project.sh` to regenerate |
-| **"Permission denied"** | Run `chmod +x Scripts/*.sh` and try again |
-| **"Resource not found"** | Check symbolic links with `ls -la` |
-| **"Script not found"** | Ensure you're in project root directory |
-| **"Invalid project structure"** | Run `./Scripts/reorganize.sh` to fix |
-
-#### Performance Issues
-
-1. **Slow Build Times**
-   - Clean DerivedData
-   - Remove Build directory
-   - Close other Xcode projects
-   - Reset simulator state
-
-2. **Git Performance**
-   ```bash
-   # Optimize repository
-   git gc --aggressive --prune=now
-   git repack -a -d --depth=250 --window=250
-   ```
-
-3. **Xcode Issues**
-   - Reset window arrangement
-   - Clear derived data
-   - Reset simulator content
-   - Restart Xcode
-
-## 👥 Contributing
-
-I welcome contributions! See my [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Areas for Improvement
-
-- Additional device type support
-- HomeKit integration
-- Localization to more languages
-- Advanced automation conditions
-
-## 📄 License
-
-I'm making YeelightControl available under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-I couldn't have built this project without the amazing work of:
-
-- [Apple](https://developer.apple.com)
-  - [SwiftUI](https://developer.apple.com/xcode/swiftui/) - Modern UI framework
-  - [Combine](https://developer.apple.com/documentation/combine) - Reactive programming
-  - [SF Symbols](https://developer.apple.com/sf-symbols/) - Beautiful system icons
-  - [WidgetKit](https://developer.apple.com/documentation/widgetkit) - Home screen widgets
-
-- [Yeelight](https://www.yeelight.com)
-  - [Inter-Operation Specification](https://www.yeelight.com/download/Yeelight_Inter-Operation_Spec.pdf) - Comprehensive API documentation
-  - Local Network Control Protocol - Enabling direct device communication
-
-- Open Source Community
-  - [Swift Package Manager](https://swift.org/package-manager/) - Dependency management
-  - [Swift](https://swift.org) - Programming language
-  - [Bonjour](https://developer.apple.com/bonjour/) - Network discovery
-
-Special thanks to all contributors and testers who have helped me improve this project.
+- [Contributing Guidelines](CONTRIBUTING.md)
+- [License](LICENSE)
+- [API Documentation](docs/API.md)
 
 ---
 
 <div align="center">
-  
+
 Made with ❤️ by [Daniel Kng](https://github.com/DanielKng)
 
 [Report Bug](https://github.com/DanielKng/YeelightControl/issues/new?template=bug_report.md) · 

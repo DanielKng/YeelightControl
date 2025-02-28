@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import Combine
+import SwiftUI
 
 // MARK: - Location Managing Protocol
 protocol LocationManaging {
@@ -18,11 +19,12 @@ protocol LocationManaging {
     func requestLocation()
 }
 
-// MARK: - Location Manager Implementation
-final class UnifiedLocationManager: NSObject, LocationManaging, ObservableObject {
+@MainActor
+public final class UnifiedLocationManager: NSObject, LocationManaging, ObservableObject {
     // MARK: - Published Properties
-    @Published private(set) var currentLocation: CLLocation?
-    @Published private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    @Published public private(set) var currentLocation: CLLocation?
+    @Published public private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    @Published public private(set) var isMonitoringLocation = false
     
     // MARK: - Publishers
     var locationUpdates: AnyPublisher<CLLocation, Never> {
@@ -40,9 +42,13 @@ final class UnifiedLocationManager: NSObject, LocationManaging, ObservableObject
     private let authorizationSubject = PassthroughSubject<CLAuthorizationStatus, Never>()
     private var monitoredRegions: Set<CLRegion> = []
     private var cancellables = Set<AnyCancellable>()
+    private var locationUpdateHandler: ((CLLocation) -> Void)?
+    
+    // MARK: - Singleton
+    public static let shared = UnifiedLocationManager()
     
     // MARK: - Initialization
-    override init() {
+    private override init() {
         self.services = .shared
         super.init()
         setupLocationManager()
@@ -50,6 +56,50 @@ final class UnifiedLocationManager: NSObject, LocationManaging, ObservableObject
     }
     
     // MARK: - Public Methods
+    public func requestAuthorization() {
+        locationManager.requestWhenInUseAuthorization()
+    }
+    
+    public func startMonitoringLocation() {
+        guard CLLocationManager.locationServicesEnabled() else {
+            print("Location services are disabled")
+            return
+        }
+        
+        guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
+            print("Location authorization not granted")
+            return
+        }
+        
+        locationManager.startUpdatingLocation()
+        isMonitoringLocation = true
+    }
+    
+    public func stopMonitoringLocation() {
+        locationManager.stopUpdatingLocation()
+        isMonitoringLocation = false
+    }
+    
+    public func getCurrentLocation() async throws -> CLLocation {
+        try await withCheckedThrowingContinuation { continuation in
+            locationUpdateHandler = { location in
+                self.locationUpdateHandler = nil
+                continuation.resume(returning: location)
+            }
+            
+            startMonitoringLocation()
+            
+            // Set a timeout
+            Task {
+                try await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+                if let handler = self.locationUpdateHandler {
+                    self.locationUpdateHandler = nil
+                    handler(self.currentLocation ?? CLLocation())
+                }
+            }
+        }
+    }
+    
     func requestWhenInUseAuthorization() {
         locationManager.requestWhenInUseAuthorization()
     }
@@ -92,9 +142,10 @@ final class UnifiedLocationManager: NSObject, LocationManaging, ObservableObject
     // MARK: - Private Methods
     private func setupLocationManager() {
         locationManager.delegate = self
-        updateLocationManagerConfiguration()
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.distanceFilter = 10 // meters
         
-        // Get initial authorization status
+        // Update initial authorization status
         authorizationStatus = locationManager.authorizationStatus
     }
     
@@ -117,22 +168,36 @@ final class UnifiedLocationManager: NSObject, LocationManaging, ObservableObject
 
 // MARK: - Location Manager Delegate
 extension UnifiedLocationManager: CLLocationManagerDelegate {
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         currentLocation = location
+        locationUpdateHandler?(location)
         locationSubject.send(location)
         services.logger.debug("Location updated: \(location.coordinate)", category: .system)
     }
     
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         services.logger.error("Location update failed: \(error.localizedDescription)", category: .system)
         services.errorHandler.handle(error)
     }
     
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        authorizationStatus = status
-        authorizationSubject.send(status)
-        services.logger.info("Location authorization status changed: \(status.rawValue)", category: .system)
+    public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        authorizationStatus = manager.authorizationStatus
+        authorizationSubject.send(manager.authorizationStatus)
+        services.logger.info("Location authorization status changed: \(manager.authorizationStatus.rawValue)", category: .system)
+        
+        switch manager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            if isMonitoringLocation {
+                startMonitoringLocation()
+            }
+        case .denied, .restricted:
+            stopMonitoringLocation()
+        case .notDetermined:
+            break
+        @unknown default:
+            break
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {

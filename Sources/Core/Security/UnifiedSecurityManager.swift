@@ -2,6 +2,8 @@ import Foundation
 import Security
 import CryptoKit
 import LocalAuthentication
+import Combine
+import SwiftUI
 
 // MARK: - Security Managing Protocol
 protocol SecurityManaging {
@@ -33,11 +35,17 @@ enum BiometryType {
     }
 }
 
-// MARK: - Security Manager Implementation
-final class UnifiedSecurityManager: SecurityManaging {
+@MainActor
+public final class UnifiedSecurityManager: ObservableObject {
+    // MARK: - Published Properties
+    @Published public private(set) var isAuthenticated = false
+    @Published public private(set) var biometricType: LABiometryType = .none
+    @Published public private(set) var isBiometricsAvailable = false
+    
     // MARK: - Private Properties
     private let services: ServiceContainer
     private let context = LAContext()
+    private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Configuration
     private struct Configuration {
@@ -49,9 +57,19 @@ final class UnifiedSecurityManager: SecurityManaging {
     
     private let config = Configuration()
     
+    // MARK: - Constants
+    private enum Constants {
+        static let keychainService = "com.yeelight.control"
+        static let biometricReason = "Authenticate to access Yeelight Control"
+    }
+    
+    // MARK: - Singleton
+    public static let shared = UnifiedSecurityManager()
+    
     // MARK: - Initialization
-    init(services: ServiceContainer = .shared) {
+    private init(services: ServiceContainer = .shared) {
         self.services = services
+        checkBiometricAvailability()
     }
     
     // MARK: - Encryption Methods
@@ -162,26 +180,23 @@ final class UnifiedSecurityManager: SecurityManaging {
     }
     
     // MARK: - Authentication Methods
-    func authenticate(reason: String) async throws -> Bool {
-        let context = LAContext()
-        var error: NSError?
-        
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            if let error = error {
-                throw SecurityError.biometricAuthenticationFailed(error.localizedDescription)
-            }
-            return false
+    public func authenticate() async throws {
+        guard isBiometricsAvailable else {
+            throw SecurityError.biometricsNotAvailable
         }
         
-        return try await withCheckedThrowingContinuation { continuation in
-            context.evaluatePolicy(
-                .deviceOwnerAuthenticationWithBiometrics,
-                localizedReason: reason
-            ) { success, error in
-                if let error = error {
-                    continuation.resume(throwing: SecurityError.biometricAuthenticationFailed(error.localizedDescription))
-                } else {
-                    continuation.resume(returning: success)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
+                                 localizedReason: Constants.biometricReason) { success, error in
+                Task { @MainActor in
+                    if success {
+                        self.isAuthenticated = true
+                        continuation.resume()
+                    } else if let error = error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(throwing: SecurityError.authenticationFailed)
+                    }
                 }
             }
         }
@@ -206,6 +221,13 @@ final class UnifiedSecurityManager: SecurityManaging {
             return .none
         }
     }
+    
+    // MARK: - Private Methods
+    private func checkBiometricAvailability() {
+        var error: NSError?
+        isBiometricsAvailable = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+        biometricType = context.biometryType
+    }
 }
 
 // MARK: - Security Error
@@ -220,6 +242,10 @@ enum SecurityError: LocalizedError {
     case accessControlCreationFailed(String)
     case biometricAuthenticationFailed(String)
     case biometryNotAvailable
+    case biometricsNotAvailable
+    case authenticationFailed
+    case keychainUpdateFailed
+    case keychainClearFailed
     
     var errorDescription: String? {
         switch self {
@@ -243,6 +269,14 @@ enum SecurityError: LocalizedError {
             return "Biometric authentication failed: \(reason)"
         case .biometryNotAvailable:
             return "Biometric authentication not available"
+        case .biometricsNotAvailable:
+            return "Biometric authentication is not available on this device"
+        case .authenticationFailed:
+            return "Biometric authentication failed"
+        case .keychainUpdateFailed:
+            return "Failed to update data in keychain"
+        case .keychainClearFailed:
+            return "Failed to clear all data from keychain"
         }
     }
 }

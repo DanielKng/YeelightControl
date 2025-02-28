@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import Combine
+import SwiftUI
 
 // MARK: - Notification Managing Protocol
 protocol NotificationManaging {
@@ -141,196 +142,176 @@ enum NotificationUpdate {
     case authorizationChanged(Bool)
 }
 
-// MARK: - Notification Manager Implementation
-final class UnifiedNotificationManager: NSObject, NotificationManaging {
+@MainActor
+public final class UnifiedNotificationManager: NSObject, ObservableObject {
     // MARK: - Published Properties
-    @Published private(set) var notificationSettings: NotificationSettings = NotificationSettings(
-        authorizationStatus: .notDetermined,
-        alertSetting: false,
-        soundSetting: false,
-        badgeSetting: false,
-        criticalAlertSetting: false,
-        providesAppNotificationSettings: false
-    )
-    
-    // MARK: - Publishers
-    private let notificationSubject = PassthroughSubject<NotificationUpdate, Never>()
-    var notificationUpdates: AnyPublisher<NotificationUpdate, Never> {
-        notificationSubject.eraseToAnyPublisher()
-    }
+    @Published public private(set) var isNotificationsEnabled = false
+    @Published public private(set) var pendingNotifications: [UNNotificationRequest] = []
+    @Published public private(set) var deliveredNotifications: [UNNotification] = []
     
     // MARK: - Private Properties
-    private let services: ServiceContainer
-    private let center = UNUserNotificationCenter.current()
+    private let notificationCenter = UNUserNotificationCenter.current()
+    private let analytics: UnifiedAnalyticsManager
+    private let errorManager: UnifiedErrorManager
     private var cancellables = Set<AnyCancellable>()
     
-    // MARK: - Configuration
-    private struct Configuration {
-        var defaultSound = true
-        var defaultBadge = true
-        var criticalAlertsEnabled = false
-        var provisionalEnabled = true
-        var announcementsEnabled = false
+    // MARK: - Constants
+    private enum Constants {
+        static let deviceStateCategory = "device_state"
+        static let automationCategory = "automation"
+        static let errorCategory = "error"
+        
+        static let defaultSound = UNNotificationSound.default
+        static let criticalSound = UNNotificationSound.defaultCritical
     }
     
-    private let config = Configuration()
+    // MARK: - Singleton
+    public static let shared = UnifiedNotificationManager()
     
-    // MARK: - Initialization
-    init(services: ServiceContainer = .shared) {
-        self.services = services
+    private override init() {
+        self.analytics = .shared
+        self.errorManager = .shared
         super.init()
-        
-        center.delegate = self
-        setupCategories()
-        refreshSettings()
+        notificationCenter.delegate = self
+        checkNotificationStatus()
+        refreshNotificationLists()
     }
     
     // MARK: - Public Methods
-    func requestAuthorization() async throws {
-        let options: UNAuthorizationOptions = [
-            .alert,
-            .sound,
-            .badge,
-            config.criticalAlertsEnabled ? .criticalAlert : [],
-            config.provisionalEnabled ? .provisional : [],
-            config.announcementsEnabled ? .announcement : []
-        ]
+    public func requestAuthorization() async throws {
+        let options: UNAuthorizationOptions = [.alert, .sound, .badge]
+        isNotificationsEnabled = try await notificationCenter.requestAuthorization(options: options)
         
-        let granted = try await center.requestAuthorization(options: options)
-        notificationSubject.send(.authorizationChanged(granted))
-        await refreshSettings()
-    }
-    
-    func scheduleNotification(_ notification: AppNotification) async throws {
-        let content = UNMutableNotificationContent()
-        content.title = notification.title
-        content.body = notification.body
-        content.categoryIdentifier = notification.category.rawValue
-        content.userInfo = notification.userInfo
-        
-        if config.defaultSound {
-            content.sound = .default
-        }
-        
-        let request = UNNotificationRequest(
-            identifier: notification.id,
-            content: content,
-            trigger: notification.trigger.unTrigger
-        )
-        
-        try await center.add(request)
-        services.logger.info("Scheduled notification: \(notification.title)", category: .notification)
-    }
-    
-    func cancelNotification(withId id: String) async {
-        await center.removePendingNotificationRequests(withIdentifiers: [id])
-        services.logger.info("Cancelled notification: \(id)", category: .notification)
-    }
-    
-    func cancelAllNotifications() async {
-        await center.removeAllPendingNotificationRequests()
-        services.logger.info("Cancelled all notifications", category: .notification)
-    }
-    
-    func handleNotificationResponse(_ response: UNNotificationResponse) {
-        let notification = response.notification
-        let userInfo = notification.request.content.userInfo
-        let id = notification.request.identifier
-        
-        notificationSubject.send(.notificationResponded(id, response.actionIdentifier))
-        services.logger.info("Handled notification response: \(response.actionIdentifier)", category: .notification)
-        
-        // Track analytics
-        services.analyticsManager.trackEvent(AnalyticsEvent(
-            name: "notification_response",
-            category: .user,
-            parameters: [
-                "notification_id": id,
-                "action": response.actionIdentifier,
-                "category": notification.request.content.categoryIdentifier
-            ]
+        analytics.trackEvent(AnalyticsEvent(
+            name: "notification_authorization_requested",
+            parameters: ["authorized": String(isNotificationsEnabled)]
         ))
     }
     
-    func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any]) async {
-        guard let title = userInfo["title"] as? String,
-              let body = userInfo["body"] as? String,
-              let categoryString = userInfo["category"] as? String,
-              let category = NotificationCategory(rawValue: categoryString) else {
-            services.logger.error("Invalid remote notification format", category: .notification)
-            return
-        }
+    public func scheduleDeviceStateNotification(
+        title: String,
+        body: String,
+        deviceId: String
+    ) async throws {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = Constants.defaultSound
+        content.categoryIdentifier = Constants.deviceStateCategory
+        content.userInfo = ["device_id": deviceId]
         
-        let notification = AppNotification(
-            title: title,
-            body: body,
-            category: category,
-            trigger: .immediate,
-            userInfo: userInfo as? [String: Any] ?? [:]
+        let request = UNNotificationRequest(
+            identifier: "device_state_\(deviceId)_\(Date().timeIntervalSince1970)",
+            content: content,
+            trigger: nil
         )
         
-        notificationSubject.send(.notificationReceived(notification))
-        services.logger.info("Received remote notification: \(title)", category: .notification)
+        try await notificationCenter.add(request)
+        await refreshNotificationLists()
+    }
+    
+    public func scheduleAutomationNotification(
+        title: String,
+        body: String,
+        automationId: String
+    ) async throws {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = Constants.defaultSound
+        content.categoryIdentifier = Constants.automationCategory
+        content.userInfo = ["automation_id": automationId]
+        
+        let request = UNNotificationRequest(
+            identifier: "automation_\(automationId)_\(Date().timeIntervalSince1970)",
+            content: content,
+            trigger: nil
+        )
+        
+        try await notificationCenter.add(request)
+        await refreshNotificationLists()
+    }
+    
+    public func scheduleErrorNotification(
+        title: String,
+        error: Error
+    ) async throws {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = error.localizedDescription
+        content.sound = Constants.criticalSound
+        content.categoryIdentifier = Constants.errorCategory
+        
+        let request = UNNotificationRequest(
+            identifier: "error_\(Date().timeIntervalSince1970)",
+            content: content,
+            trigger: nil
+        )
+        
+        try await notificationCenter.add(request)
+        await refreshNotificationLists()
+    }
+    
+    public func removeAllPendingNotifications() {
+        notificationCenter.removeAllPendingNotificationRequests()
+        pendingNotifications.removeAll()
+    }
+    
+    public func removeAllDeliveredNotifications() {
+        notificationCenter.removeAllDeliveredNotifications()
+        deliveredNotifications.removeAll()
     }
     
     // MARK: - Private Methods
-    private func setupCategories() {
-        let categories = NotificationCategory.allCases.map { category in
-            UNNotificationCategory(
-                identifier: category.rawValue,
-                actions: category.actions,
-                intentIdentifiers: [],
-                options: .customDismissAction
-            )
+    private func checkNotificationStatus() {
+        Task {
+            let settings = await notificationCenter.notificationSettings()
+            isNotificationsEnabled = settings.authorizationStatus == .authorized
         }
-        
-        center.setNotificationCategories(Set(categories))
     }
     
-    private func refreshSettings() async {
-        let settings = await center.notificationSettings()
+    private func refreshNotificationLists() async {
+        async let pending = notificationCenter.pendingNotificationRequests()
+        async let delivered = notificationCenter.deliveredNotifications()
         
-        let newSettings = NotificationSettings(
-            authorizationStatus: settings.authorizationStatus,
-            alertSetting: settings.alertSetting == .enabled,
-            soundSetting: settings.soundSetting == .enabled,
-            badgeSetting: settings.badgeSetting == .enabled,
-            criticalAlertSetting: settings.criticalAlertSetting == .enabled,
-            providesAppNotificationSettings: settings.providesAppNotificationSettings
-        )
-        
-        notificationSettings = newSettings
-        notificationSubject.send(.settingsChanged(newSettings))
+        let (pendingList, deliveredList) = await (pending, delivered)
+        pendingNotifications = pendingList
+        deliveredNotifications = deliveredList
     }
 }
 
 // MARK: - UNUserNotificationCenterDelegate
 extension UnifiedNotificationManager: UNUserNotificationCenterDelegate {
-    func userNotificationCenter(
+    public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        let content = notification.request.content
+        analytics.trackEvent(AnalyticsEvent(
+            name: "notification_presented",
+            parameters: [
+                "category": notification.request.content.categoryIdentifier,
+                "id": notification.request.identifier
+            ]
+        ))
         
-        let notification = AppNotification(
-            id: notification.request.identifier,
-            title: content.title,
-            body: content.body,
-            category: NotificationCategory(rawValue: content.categoryIdentifier) ?? .system,
-            trigger: .immediate,
-            userInfo: content.userInfo
-        )
-        
-        notificationSubject.send(.notificationReceived(notification))
-        
+        await refreshNotificationLists()
         return [.banner, .sound, .badge]
     }
     
-    func userNotificationCenter(
+    public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        handleNotificationResponse(response)
+        analytics.trackEvent(AnalyticsEvent(
+            name: "notification_response",
+            parameters: [
+                "category": response.notification.request.content.categoryIdentifier,
+                "id": response.notification.request.identifier,
+                "action": response.actionIdentifier
+            ]
+        ))
+        
+        await refreshNotificationLists()
     }
 }
 

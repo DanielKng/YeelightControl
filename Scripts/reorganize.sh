@@ -1,184 +1,184 @@
 #!/bin/bash
 
-set -e  # Exit on any error
+# Exit on any error
+set -e
 
-# Get the directory where the script is located
+# Script directory and project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
-# Colors for output
+# Directory paths
+SOURCES_DIR="$PROJECT_ROOT/Sources"
+BUILD_DIR="$PROJECT_ROOT/Build"
+BACKUP_DIR="$PROJECT_ROOT/temp_backup/backup_$(date +%Y%m%d_%H%M%S)"
+
+# Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Safety check function
-check_directory_safety() {
-    local dir="$1"
-    local swift_files=$(find "$dir" -name "*.swift" 2>/dev/null | wc -l | tr -d ' ')
-    if [ "$swift_files" -gt 0 ]; then
-        echo -e "${GREEN}✓ Found $swift_files Swift files in $dir${NC}"
-        return 0
-    else
-        echo -e "${RED}⚠️  No Swift files found in $dir. Stopping for safety.${NC}"
-        return 1
-    fi
+# Function to log messages
+log() {
+    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] $1${NC}"
 }
 
-# Backup function with verification
-create_verified_backup() {
-    local timestamp=$(date +%Y%m%d_%H%M%S)
-    local backup_dir="$PROJECT_ROOT/temp_backup/backup_$timestamp"
+warn() {
+    echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1${NC}"
+}
+
+error() {
+    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"
+    exit 1
+}
+
+# Function to create backup
+create_backup() {
+    log "Creating backup in $BACKUP_DIR"
+    mkdir -p "$BACKUP_DIR"
+    cp -R "$SOURCES_DIR" "$BACKUP_DIR/"
     
-    echo "🔄 Creating verified backup..."
-    
-    # Count original files
-    local original_swift_count=$(find "$PROJECT_ROOT/Sources" -name "*.swift" 2>/dev/null | wc -l | tr -d ' ')
-    if [ "$original_swift_count" -eq 0 ]; then
-        echo -e "${RED}❌ No Swift files found in project. Cannot proceed without valid source files.${NC}"
-        exit 1
+    # Verify backup
+    if [ ! -d "$BACKUP_DIR/Sources" ]; then
+        error "Backup creation failed"
     fi
+    log "Backup created successfully"
+}
+
+# Function to verify directory structure
+verify_directory_structure() {
+    local expected_dirs=(
+        "App"
+        "Core/Analytics"
+        "Core/Background"
+        "Core/Configuration"
+        "Core/Device"
+        "Core/Effect"
+        "Core/Error"
+        "Core/Location"
+        "Core/Network"
+        "Core/Notification"
+        "Core/Permission"
+        "Core/Scene"
+        "Core/Security"
+        "Core/Services"
+        "Core/State"
+        "Core/Storage"
+        "Features/Automation"
+        "Features/Effects"
+        "Features/Rooms"
+        "Features/Scenes"
+        "UI/Components"
+        "UI/Views"
+        "Tests/UITests"
+        "Widget"
+    )
     
-    # Create backup
-    mkdir -p "$backup_dir"
-    
-    # Backup with verification
-    echo "📦 Backing up project files..."
-    if [ -d "$PROJECT_ROOT/Sources" ]; then
-        cp -a "$PROJECT_ROOT/Sources" "$backup_dir/"
-        local backup_swift_count=$(find "$backup_dir/Sources" -name "*.swift" 2>/dev/null | wc -l | tr -d ' ')
-        if [ "$backup_swift_count" != "$original_swift_count" ]; then
-            echo -e "${RED}❌ Backup verification failed! Expected $original_swift_count files, found $backup_swift_count${NC}"
-            exit 1
-        fi
-        echo -e "${GREEN}✓ Sources backup verified ($backup_swift_count Swift files)${NC}"
-    fi
-    
-    # Backup other directories
-    for dir in "Resources" ".github" "Tests"; do
-        if [ -d "$PROJECT_ROOT/$dir" ]; then
-            cp -a "$PROJECT_ROOT/$dir" "$backup_dir/"
-            echo -e "${GREEN}✓ $dir backup complete${NC}"
+    log "Verifying directory structure..."
+    for dir in "${expected_dirs[@]}"; do
+        if [ ! -d "$SOURCES_DIR/$dir" ]; then
+            mkdir -p "$SOURCES_DIR/$dir"
+            warn "Created missing directory: $dir"
         fi
     done
-    
-    echo "$backup_dir"
 }
 
-# Restore function with verification
-restore_with_verification() {
-    local src="$1"
-    local dst="$2"
-    local name="$3"
+# Function to clean build artifacts
+clean_build_artifacts() {
+    log "Cleaning build artifacts..."
+    if [ -d "$BUILD_DIR" ]; then
+        rm -rf "$BUILD_DIR"
+    fi
     
-    if [ -d "$src" ]; then
-        local before_count=$(find "$dst" -name "*.swift" 2>/dev/null | wc -l | tr -d ' ')
-        cp -a "$src/." "$dst/"
-        local after_count=$(find "$dst" -name "*.swift" 2>/dev/null | wc -l | tr -d ' ')
-        
-        if [ "$after_count" -lt "$before_count" ] && [ "$before_count" -gt 0 ]; then
-            echo -e "${RED}❌ Restore verification failed for $name! Files were lost in transfer.${NC}"
-            echo -e "${RED}   Before: $before_count Swift files, After: $after_count Swift files${NC}"
-            exit 1
+    # Clean old backups (keep last 5)
+    cd "$PROJECT_ROOT"
+    if [ -d "temp_backup" ]; then
+        cd temp_backup
+        ls -t | tail -n +6 | xargs -I {} rm -rf {}
+    fi
+}
+
+# Function to verify Swift files
+verify_swift_files() {
+    log "Verifying Swift files..."
+    local swift_files=$(find "$SOURCES_DIR" -name "*.swift")
+    local swift_count=$(echo "$swift_files" | wc -l)
+    
+    if [ "$swift_count" -lt 1 ]; then
+        error "No Swift files found in the project"
+    fi
+    
+    # Check for basic Swift file validity
+    for file in $swift_files; do
+        if [ ! -s "$file" ]; then
+            warn "Empty Swift file found: $file"
         fi
         
-        # Set permissions
-        find "$dst" -type f -exec chmod 644 {} \;
-        find "$dst" -type d -exec chmod 755 {} \;
-        
-        echo -e "${GREEN}✓ $name restored and verified ($after_count Swift files)${NC}"
+        # Check for import statements
+        if ! grep -q "^import" "$file"; then
+            warn "No import statements found in: $file"
+        fi
+    done
+}
+
+# Function to verify file permissions
+verify_permissions() {
+    log "Verifying file permissions..."
+    find "$SOURCES_DIR" -type f -name "*.swift" -exec chmod 644 {} \;
+    find "$SOURCES_DIR" -type d -exec chmod 755 {} \;
+    
+    if [ -d "$SCRIPT_DIR" ]; then
+        find "$SCRIPT_DIR" -type f -name "*.sh" -exec chmod +x {} \;
     fi
 }
 
-echo "🔄 Starting project cleanup and reorganization..."
+# Function to clean empty directories
+clean_empty_dirs() {
+    log "Cleaning empty directories..."
+    find "$SOURCES_DIR" -type d -empty -delete
+}
 
-# Verify current state
-if ! check_directory_safety "$PROJECT_ROOT/Sources"; then
-    echo -e "${YELLOW}⚠️  Current state may be unsafe. Creating backup before proceeding...${NC}"
-fi
+# Function to verify symlinks
+verify_symlinks() {
+    log "Verifying symlinks..."
+    find "$SOURCES_DIR" -type l | while read symlink; do
+        if [ ! -e "$symlink" ]; then
+            warn "Broken symlink found: $symlink"
+            rm "$symlink"
+        fi
+    done
+}
 
-# Create and verify backup
-BACKUP_DIR=$(create_verified_backup)
-echo -e "${GREEN}✓ Verified backup created at: $BACKUP_DIR${NC}"
+# Main execution
+main() {
+    log "Starting project reorganization..."
+    
+    # Create backup first
+    create_backup
+    
+    # Clean and verify
+    clean_build_artifacts
+    verify_directory_structure
+    verify_swift_files
+    verify_symlinks
+    clean_empty_dirs
+    verify_permissions
+    
+    log "Project reorganization completed successfully"
+}
 
-# Clean derived data and temporary files
-echo "🧹 Cleaning derived data and temporary files..."
-rm -rf ~/Library/Developer/Xcode/DerivedData/*YeelightControl* 2>/dev/null || true
-find "$PROJECT_ROOT" -name ".DS_Store" -delete 2>/dev/null || true
-find "$PROJECT_ROOT" -name "*.swp" -delete 2>/dev/null || true
-find "$PROJECT_ROOT" -name "*.swo" -delete 2>/dev/null || true
-find "$PROJECT_ROOT" -name "*~" -delete 2>/dev/null || true
-
-# Clean build artifacts
-echo "📦 Cleaning build artifacts..."
-if [ -d "$PROJECT_ROOT/Build" ]; then
-    rm -rf "$PROJECT_ROOT/Build"/*
-fi
-rm -f "$PROJECT_ROOT"/*.xcodeproj 2>/dev/null || true
-rm -f "$PROJECT_ROOT"/*.xcworkspace 2>/dev/null || true
-rm -f "$PROJECT_ROOT"/Package.resolved 2>/dev/null || true
-
-# Clean old backups (older than 7 days)
-echo "🗑️  Cleaning old backups..."
-if [ -d "$PROJECT_ROOT/temp_backup" ]; then
-    find "$PROJECT_ROOT/temp_backup" -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
-fi
-
-# Create directory structure
-echo "📁 Creating directory structure..."
-mkdir -p "$PROJECT_ROOT/Sources/"{Core,Features,UI,Tests}
-mkdir -p "$PROJECT_ROOT/Sources/Core/"{Analytics,Background,Configuration,Device,Effect,Error,Location,Network,Notification,Permission,Scene,Security,Services,State,Storage}
-mkdir -p "$PROJECT_ROOT/Sources/Features/"{Automation,Effects,Rooms,Scenes}
-mkdir -p "$PROJECT_ROOT/Sources/UI/"{Components,Views,Widgets}
-mkdir -p "$PROJECT_ROOT/Sources/UI/Components/Common"
-mkdir -p "$PROJECT_ROOT/Sources/Tests/"{UITests,UnitTests}
-mkdir -p "$PROJECT_ROOT/Resources/"{Assets,Configs,Localization}
-mkdir -p "$PROJECT_ROOT/Tests/YeelightControlTests"
-
-# Restore from backup with verification
-echo "📥 Restoring files with verification..."
-restore_with_verification "$BACKUP_DIR/Sources" "$PROJECT_ROOT/Sources" "Sources"
-restore_with_verification "$BACKUP_DIR/Resources" "$PROJECT_ROOT/Resources" "Resources"
-restore_with_verification "$BACKUP_DIR/.github" "$PROJECT_ROOT/.github" ".github"
-restore_with_verification "$BACKUP_DIR/Tests" "$PROJECT_ROOT/Tests" "Tests"
-
-# Move configuration files
-echo "📝 Moving configuration files..."
-if [ -f "$PROJECT_ROOT/Package.swift" ]; then
-    mv "$PROJECT_ROOT/Package.swift" "$PROJECT_ROOT/Resources/Configs/"
-    echo -e "${GREEN}✓ Moved Package.swift to Resources/Configs${NC}"
-fi
-
-if [ -f "$PROJECT_ROOT/project.yml" ]; then
-    mv "$PROJECT_ROOT/project.yml" "$PROJECT_ROOT/Resources/Configs/"
-    echo -e "${GREEN}✓ Moved project.yml to Resources/Configs${NC}"
-fi
-
-# Clean empty directories
-echo "🧹 Cleaning empty directories..."
-find "$PROJECT_ROOT" -type d -empty -delete 2>/dev/null || true
-
-# Set script permissions
-echo "🔒 Setting script permissions..."
-chmod +x "$PROJECT_ROOT/Scripts/"*.sh 2>/dev/null || true
-
-# Final verification
-echo "🔍 Final verification..."
-final_swift_count=$(find "$PROJECT_ROOT/Sources" -name "*.swift" | wc -l | tr -d ' ')
-if [ "$final_swift_count" -eq 0 ]; then
-    echo -e "${RED}❌ CRITICAL ERROR: No Swift files found after reorganization!${NC}"
-    echo -e "${YELLOW}Attempting automatic recovery from backup...${NC}"
-    cp -a "$BACKUP_DIR/Sources/." "$PROJECT_ROOT/Sources/"
-    recovered_count=$(find "$PROJECT_ROOT/Sources" -name "*.swift" | wc -l | tr -d ' ')
-    if [ "$recovered_count" -gt 0 ]; then
-        echo -e "${GREEN}✓ Recovery successful. Found $recovered_count Swift files.${NC}"
-    else
-        echo -e "${RED}❌ Recovery failed. Please restore from backup manually: $BACKUP_DIR${NC}"
-        exit 1
+# Execute main function with error handling
+if main; then
+    log "✅ All tasks completed successfully"
+else
+    error "❌ Reorganization failed"
+    # Restore from backup if something went wrong
+    if [ -d "$BACKUP_DIR" ]; then
+        warn "Restoring from backup..."
+        rm -rf "$SOURCES_DIR"
+        cp -R "$BACKUP_DIR/Sources" "$PROJECT_ROOT/"
+        verify_permissions
+        log "Restored from backup"
     fi
-fi
-
-echo -e "${GREEN}✨ Project cleanup and reorganization complete!${NC}"
-echo -e "${GREEN}💾 Backup saved to: $BACKUP_DIR${NC}"
-echo -e "${GREEN}📊 Final Swift file count: $final_swift_count${NC}"
-echo -e "${YELLOW}ℹ️  Run ./Scripts/setup_xcode_project.sh to regenerate the Xcode project${NC}" 
+    exit 1
+fi 

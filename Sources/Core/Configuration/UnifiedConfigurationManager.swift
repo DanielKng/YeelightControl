@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 // MARK: - Configuration Managing Protocol
 protocol ConfigurationManaging {
@@ -82,101 +83,147 @@ enum ConfigValue: Codable, Equatable {
 }
 
 // MARK: - Configuration Manager Implementation
-final class UnifiedConfigurationManager: ConfigurationManaging, ObservableObject {
-    // MARK: - Publishers
-    private let configurationSubject = PassthroughSubject<Void, Never>()
-    var configurationUpdates: AnyPublisher<Void, Never> {
-        configurationSubject.eraseToAnyPublisher()
-    }
+@MainActor
+public final class UnifiedConfigurationManager: ObservableObject {
+    // MARK: - Published Properties
+    @Published public private(set) var configuration: Configuration
+    @Published public private(set) var isDirty = false
     
     // MARK: - Private Properties
-    private let storage: StorageManaging
-    private let queue = DispatchQueue(label: "de.knng.app.yeelightcontrol.config", qos: .userInitiated)
-    private var cache: [ConfigKey: ConfigValue] = [:]
+    private let storage: UnifiedStorageManager
+    private var cancellables = Set<AnyCancellable>()
     
-    // MARK: - Default Configuration
-    private let defaults: [ConfigKey: ConfigValue] = [
-        // Network defaults
-        .discoveryTimeout: .timeInterval(30),
-        .discoveryRetryCount: .int(3),
-        .discoveryRetryDelay: .timeInterval(5),
-        .useBonjourDiscovery: .bool(true),
-        .ssdpDiscoveryPort: .int(1982),
-        
-        // Background defaults
-        .minRefreshInterval: .timeInterval(15 * 60),
-        .maxRetryAttempts: .int(3),
-        .retryDelay: .timeInterval(5),
-        .backgroundTaskTimeout: .timeInterval(30),
-        
-        // Location defaults
-        .desiredAccuracy: .double(100),
-        .distanceFilter: .double(100),
-        .activityType: .int(0),
-        .pausesLocationUpdatesAutomatically: .bool(true),
-        .allowsBackgroundLocationUpdates: .bool(false),
-        
-        // Logger defaults
-        .maxLogFileSize: .int(10 * 1024 * 1024),
-        .maxLogFiles: .int(5),
-        .minDiskSpace: .int(100 * 1024 * 1024),
-        .rotationInterval: .timeInterval(24 * 60 * 60),
-        .isFileLoggingEnabled: .bool(true),
-        
-        // App defaults
-        .theme: .string("system"),
-        .autoDiscoveryEnabled: .bool(true),
-        .defaultTransitionDuration: .int(1000),
-        .defaultBrightness: .int(100),
-        .defaultColorTemperature: .int(4000)
-    ]
+    // MARK: - Constants
+    private enum Constants {
+        static let configurationKey = "app_configuration"
+        static let autosaveInterval: TimeInterval = 30
+    }
     
-    // MARK: - Initialization
-    init(storage: StorageManaging) {
-        self.storage = storage
+    // MARK: - Singleton
+    public static let shared = UnifiedConfigurationManager()
+    
+    private init() {
+        self.storage = .shared
+        self.configuration = Self.defaultConfiguration
         loadConfiguration()
+        setupAutosave()
     }
     
     // MARK: - Public Methods
-    func getValue<T>(for key: ConfigKey) -> T? {
-        queue.sync {
-            guard let value = cache[key] else {
-                return defaults[key]?.getValue()
-            }
-            return value.getValue()
-        }
+    public func updateConfiguration(_ update: (inout Configuration) -> Void) {
+        var newConfig = configuration
+        update(&newConfig)
+        configuration = newConfig
+        isDirty = true
+        saveConfiguration()
     }
     
-    func setValue<T>(_ value: T, for key: ConfigKey) throws {
-        try queue.sync {
-            let configValue = ConfigValue(value: value)
-            cache[key] = configValue
-            try saveConfiguration()
-            configurationSubject.send()
-        }
-    }
-    
-    func resetToDefaults() {
-        queue.sync {
-            cache = defaults
-            try? saveConfiguration()
-            configurationSubject.send()
-        }
+    public func resetToDefaults() {
+        configuration = Self.defaultConfiguration
+        isDirty = true
+        saveConfiguration()
     }
     
     // MARK: - Private Methods
     private func loadConfiguration() {
         do {
-            cache = try storage.load(forKey: .configuration)
+            let data = try storage.load(forKey: Constants.configurationKey)
+            let decoder = JSONDecoder()
+            configuration = try decoder.decode(Configuration.self, from: data)
+            isDirty = false
         } catch {
-            cache = defaults
-            try? saveConfiguration()
+            print("Failed to load configuration: \(error)")
+            configuration = Self.defaultConfiguration
         }
     }
     
-    private func saveConfiguration() throws {
-        try storage.save(cache, forKey: .configuration)
+    private func saveConfiguration() {
+        do {
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(configuration)
+            try storage.save(data, forKey: Constants.configurationKey)
+            isDirty = false
+        } catch {
+            print("Failed to save configuration: \(error)")
+        }
     }
+    
+    private func setupAutosave() {
+        Timer.publish(every: Constants.autosaveInterval, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self, self.isDirty else { return }
+                self.saveConfiguration()
+            }
+            .store(in: &cancellables)
+    }
+    
+    private static var defaultConfiguration: Configuration {
+        Configuration(
+            deviceSettings: .init(
+                defaultBrightness: 50,
+                defaultColorTemperature: 4000,
+                autoConnect: true,
+                discoveryTimeout: 10
+            ),
+            networkSettings: .init(
+                discoveryPort: 1982,
+                controlPort: 55443,
+                discoveryInterval: 5,
+                connectionTimeout: 5
+            ),
+            appSettings: .init(
+                theme: .system,
+                analyticsEnabled: true,
+                notificationsEnabled: true,
+                backgroundRefreshEnabled: true
+            ),
+            securitySettings: .init(
+                biometricsEnabled: true,
+                autoLockTimeout: 300
+            )
+        )
+    }
+}
+
+// MARK: - Configuration Types
+public struct Configuration: Codable {
+    public var deviceSettings: DeviceSettings
+    public var networkSettings: NetworkSettings
+    public var appSettings: AppSettings
+    public var securitySettings: SecuritySettings
+    
+    public struct DeviceSettings: Codable {
+        public var defaultBrightness: Int
+        public var defaultColorTemperature: Int
+        public var autoConnect: Bool
+        public var discoveryTimeout: TimeInterval
+    }
+    
+    public struct NetworkSettings: Codable {
+        public var discoveryPort: Int
+        public var controlPort: Int
+        public var discoveryInterval: TimeInterval
+        public var connectionTimeout: TimeInterval
+    }
+    
+    public struct AppSettings: Codable {
+        public var theme: Theme
+        public var analyticsEnabled: Bool
+        public var notificationsEnabled: Bool
+        public var backgroundRefreshEnabled: Bool
+    }
+    
+    public struct SecuritySettings: Codable {
+        public var biometricsEnabled: Bool
+        public var autoLockTimeout: TimeInterval
+    }
+}
+
+public enum Theme: String, Codable {
+    case light
+    case dark
+    case system
 }
 
 // MARK: - ConfigValue Extensions

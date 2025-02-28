@@ -5,6 +5,7 @@ import Contacts
 import AVFoundation
 import UserNotifications
 import Combine
+import SwiftUI
 
 // MARK: - Permission Managing Protocol
 protocol PermissionManaging {
@@ -65,6 +66,105 @@ enum PermissionStatus {
 enum PermissionUpdate {
     case statusChanged(Permission, PermissionStatus)
     case error(Permission, Error)
+}
+
+@MainActor
+public final class UnifiedPermissionManager: ObservableObject {
+    // MARK: - Published Properties
+    @Published public private(set) var locationPermissionStatus: CLAuthorizationStatus = .notDetermined
+    @Published public private(set) var notificationPermissionStatus: UNAuthorizationStatus = .notDetermined
+    @Published public private(set) var backgroundRefreshStatus: Bool = false
+    
+    // MARK: - Private Properties
+    private let locationManager: UnifiedLocationManager
+    private let notificationManager: UnifiedNotificationManager
+    private let backgroundManager: UnifiedBackgroundManager
+    private let analytics: UnifiedAnalyticsManager
+    private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - Singleton
+    public static let shared = UnifiedPermissionManager()
+    
+    private init() {
+        self.locationManager = .shared
+        self.notificationManager = .shared
+        self.backgroundManager = .shared
+        self.analytics = .shared
+        setupObservers()
+        checkPermissionStatuses()
+    }
+    
+    // MARK: - Public Methods
+    public func requestLocationPermission() async {
+        locationManager.requestAuthorization()
+        trackPermissionRequest(type: "location")
+    }
+    
+    public func requestNotificationPermission() async {
+        do {
+            try await notificationManager.requestAuthorization()
+            await checkNotificationPermission()
+            trackPermissionRequest(type: "notification")
+        } catch {
+            print("Failed to request notification permission: \(error)")
+        }
+    }
+    
+    public func requestBackgroundRefresh() {
+        backgroundManager.enableBackgroundRefresh()
+        trackPermissionRequest(type: "background_refresh")
+    }
+    
+    // MARK: - Private Methods
+    private func setupObservers() {
+        // Location permission changes
+        NotificationCenter.default.publisher(for: .locationAuthorizationChanged)
+            .sink { [weak self] _ in
+                self?.checkLocationPermission()
+            }
+            .store(in: &cancellables)
+        
+        // Background refresh changes
+        NotificationCenter.default.publisher(for: UIApplication.backgroundRefreshStatusDidChangeNotification)
+            .sink { [weak self] _ in
+                self?.checkBackgroundRefreshStatus()
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func checkPermissionStatuses() {
+        checkLocationPermission()
+        checkBackgroundRefreshStatus()
+        
+        Task {
+            await checkNotificationPermission()
+        }
+    }
+    
+    private func checkLocationPermission() {
+        locationPermissionStatus = CLLocationManager().authorizationStatus
+    }
+    
+    private func checkNotificationPermission() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        notificationPermissionStatus = settings.authorizationStatus
+    }
+    
+    private func checkBackgroundRefreshStatus() {
+        backgroundRefreshStatus = UIApplication.shared.backgroundRefreshStatus == .available
+    }
+    
+    private func trackPermissionRequest(type: String) {
+        analytics.trackEvent(AnalyticsEvent(
+            name: "permission_requested",
+            parameters: ["type": type]
+        ))
+    }
+}
+
+// MARK: - Notification Names
+extension Notification.Name {
+    static let locationAuthorizationChanged = Notification.Name("locationAuthorizationChanged")
 }
 
 // MARK: - Permission Manager Implementation

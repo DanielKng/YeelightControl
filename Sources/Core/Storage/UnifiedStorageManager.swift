@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 // MARK: - Storage Managing Protocol
 protocol StorageManaging {
@@ -96,32 +97,36 @@ enum StorageDirectory: String {
     }
 }
 
-// MARK: - Storage Manager Implementation
-final class UnifiedStorageManager: StorageManaging {
+@MainActor
+public final class UnifiedStorageManager: ObservableObject, StorageManaging {
+    // MARK: - Published Properties
+    @Published public private(set) var lastSaveDate: Date?
+    @Published public private(set) var lastLoadDate: Date?
+    @Published public private(set) var isLoading = false
+    
     // MARK: - Private Properties
-    private let queue = DispatchQueue(label: "de.knng.app.yeelightcontrol.storage", qos: .userInitiated)
+    private let fileManager = FileManager.default
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
-    private let fileManager = FileManager.default
+    private let queue = DispatchQueue(label: "com.yeelightcontrol.storage", qos: .utility)
     
-    // MARK: - Configuration
-    private struct Configuration {
-        var maxCacheSize: Int = 50 * 1024 * 1024  // 50MB
-        var maxBackupCount = 5
-        var useEncryption = true
-        var compressionEnabled = true
+    // MARK: - Constants
+    private struct Constants {
+        static let storageDirectory = "YeelightControl"
+        static let backupDirectory = "Backups"
+        static let fileExtension = "json"
     }
     
-    private let config = Configuration()
+    // MARK: - Singleton
+    public static let shared = UnifiedStorageManager()
     
-    // MARK: - Initialization
-    init() {
-        setupDirectories()
-        setupCoding()
+    private init() {
+        setupStorage()
+        setupEncoder()
     }
     
     // MARK: - Public Methods
-    func save<T: Encodable>(_ value: T, forKey key: StorageKey) async throws {
+    public func save<T: Encodable>(_ value: T, forKey key: StorageKey) async throws {
         try await queue.run {
             let url = getURL(for: key)
             let data = try encoder.encode(value)
@@ -138,32 +143,42 @@ final class UnifiedStorageManager: StorageManaging {
             } else if key.directory == .backups {
                 try cleanupBackupsIfNeeded()
             }
+            
+            Task { @MainActor in
+                lastSaveDate = Date()
+            }
         }
     }
     
-    func load<T: Decodable>(forKey key: StorageKey) async throws -> T {
+    public func load<T: Decodable>(forKey key: StorageKey) async throws -> T {
         try await queue.run {
             let url = getURL(for: key)
             let data = try Data(contentsOf: url)
-            return try decoder.decode(T.self, from: data)
+            let value = try decoder.decode(T.self, from: data)
+            
+            Task { @MainActor in
+                lastLoadDate = Date()
+            }
+            
+            return value
         }
     }
     
-    func remove(forKey key: StorageKey) async throws {
+    public func remove(forKey key: StorageKey) async throws {
         try await queue.run {
             let url = getURL(for: key)
             try fileManager.removeItem(at: url)
         }
     }
     
-    func exists(forKey key: StorageKey) -> Bool {
+    public func exists(forKey key: StorageKey) -> Bool {
         queue.sync {
             let url = getURL(for: key)
             return fileManager.fileExists(atPath: url.path)
         }
     }
     
-    func clear() async throws {
+    public func clear() async throws {
         try await queue.run {
             for directory in StorageDirectory.allCases {
                 let url = directory.url
@@ -175,21 +190,71 @@ final class UnifiedStorageManager: StorageManaging {
         }
     }
     
-    // MARK: - Private Methods
-    private func setupDirectories() {
-        for directory in StorageDirectory.allCases {
-            try? createDirectoryIfNeeded(for: directory)
+    public func createBackup() async throws -> URL {
+        let backupURL = try getBackupURL()
+        let storageURL = try getStorageURL()
+        
+        // Create backup directory if needed
+        try fileManager.createDirectory(at: backupURL, withIntermediateDirectories: true)
+        
+        // Create backup folder with timestamp
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let backupFolderURL = backupURL.appendingPathComponent(timestamp)
+        try fileManager.createDirectory(at: backupFolderURL, withIntermediateDirectories: true)
+        
+        // Copy all files to backup
+        let contents = try fileManager.contentsOfDirectory(at: storageURL, includingPropertiesForKeys: nil)
+        try contents.forEach { sourceURL in
+            let destinationURL = backupFolderURL.appendingPathComponent(sourceURL.lastPathComponent)
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        }
+        
+        return backupFolderURL
+    }
+    
+    public func restoreFromBackup(_ backupURL: URL) async throws {
+        guard fileManager.fileExists(atPath: backupURL.path) else {
+            throw StorageError.backupNotFound
+        }
+        
+        let storageURL = try getStorageURL()
+        
+        // Clear current storage
+        try clear()
+        
+        // Copy backup files to storage
+        let contents = try fileManager.contentsOfDirectory(at: backupURL, includingPropertiesForKeys: nil)
+        try contents.forEach { sourceURL in
+            let destinationURL = storageURL.appendingPathComponent(sourceURL.lastPathComponent)
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
         }
     }
     
-    private func setupCoding() {
-        encoder.dateEncodingStrategy = .iso8601
-        decoder.dateDecodingStrategy = .iso8601
-        
-        if config.compressionEnabled {
-            encoder.dataEncodingStrategy = .base64
-            decoder.dataDecodingStrategy = .base64
+    // MARK: - Private Methods
+    private func setupStorage() {
+        do {
+            let url = try getStorageURL()
+            try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+        } catch {
+            print("Failed to setup storage: \(error)")
         }
+    }
+    
+    private func setupEncoder() {
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .prettyPrinted
+        decoder.dateDecodingStrategy = .iso8601
+    }
+    
+    private func getStorageURL() throws -> URL {
+        try fileManager.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent(Constants.storageDirectory)
+    }
+    
+    private func getBackupURL() throws -> URL {
+        try fileManager.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent(Constants.storageDirectory)
+            .appendingPathComponent(Constants.backupDirectory)
     }
     
     private func getURL(for key: StorageKey) -> URL {
@@ -260,6 +325,7 @@ enum StorageError: LocalizedError {
     case directoryCreationFailed
     case encryptionFailed
     case diskSpaceLow
+    case backupNotFound
     
     var errorDescription: String? {
         switch self {
@@ -277,6 +343,8 @@ enum StorageError: LocalizedError {
             return "Failed to encrypt/decrypt data"
         case .diskSpaceLow:
             return "Insufficient disk space"
+        case .backupNotFound:
+            return "Backup not found"
         }
     }
 }
