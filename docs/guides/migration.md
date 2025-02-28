@@ -116,9 +116,7 @@ do {
 
 ### Getting Help
 - Review documentation
-- Check GitHub issues
-- Join Discord community
-- Contact support team
+- Check [GitHub issues](https://github.com/DanielKng/YeelightControl/issues)
 
 ### Reporting Issues
 - Use GitHub issues
