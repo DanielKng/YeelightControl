@@ -2,6 +2,25 @@
 
 This guide provides detailed steps to resolve the compilation errors in the YeelightControl project.
 
+## Progress Update
+
+We've made significant progress in resolving the build issues:
+
+1. ✅ Removed duplicate `Core_Color` definitions by:
+   - Moving the definition to a dedicated `ColorTypes.swift` file
+   - Removing duplicate definitions from other files
+   - Adding comments to indicate where the type is defined
+
+2. ✅ Removed duplicate effect-related types:
+   - `Core_Effect` is now defined only in `Effect.swift`
+   - `Core_EffectType` is now defined only in `EffectType.swift`
+   - `Core_EffectParameters` is now defined only in `EffectParameters.swift`
+   - `Core_EffectUpdate` is now defined only in `EffectUpdate.swift`
+
+3. ✅ Removed duplicate scene-related types from `UnifiedSceneManager.swift`
+
+4. ✅ Created proper separation between device and Yeelight types
+
 ## Root Causes
 
 The project has several structural issues that lead to compilation errors:
@@ -12,72 +31,55 @@ The project has several structural issues that lead to compilation errors:
 4. **Actor Isolation Problems**: Actor-isolated properties are used to satisfy nonisolated protocol requirements
 5. **Missing Type Definitions**: Some referenced types are not defined in the codebase
 
-## Step-by-Step Fix Plan
+## Remaining Issues to Fix
 
-### 1. Establish Clear Type Hierarchy
+### 1. Storage-related Type Duplications
 
-Create a clear hierarchy for all Core types:
+The `Core_StorageKey` and `Core_StorageDirectory` enums are defined in both:
+- `Sources/Core/Types/Storage/StorageTypes.swift`
+- `Sources/Core/Storage/UnifiedStorageManager.swift`
 
-```swift
-// Example structure
-namespace Core {
-    namespace Network {
-        // Network types
-    }
-    
-    namespace Device {
-        // Device types
-    }
-    
-    // etc.
-}
-```
+**Solution:**
+1. Keep only one definition in `StorageTypes.swift`
+2. Remove the duplicate definitions from `UnifiedStorageManager.swift`
+3. Add comments indicating where the types are defined
 
-### 2. Fix Type Redeclarations
+### 2. Analytics-related Type Duplications
 
-For each redeclared type:
+Analytics-related types are defined in multiple places:
+- `Sources/Core/Types/Analytics/AnalyticsTypes.swift`
+- `Sources/Core/Analytics/UnifiedAnalyticsManager.swift`
 
-1. Identify all occurrences of the type (e.g., `Core_NetworkError`)
-2. Keep only one definition in the appropriate file
-3. Update all references to use the single definition
+**Solution:**
+1. Keep only one definition in `AnalyticsTypes.swift`
+2. Remove the duplicate definitions from `UnifiedAnalyticsManager.swift`
+3. Add comments indicating where the types are defined
 
-Example files to fix:
-- `ErrorTypes.swift`
-- `NetworkTypes.swift`
-- `NotificationTypes.swift`
+### 3. Configuration-related Type Duplications
 
-### 3. Resolve Protocol Conformance Issues
+Configuration-related types are defined in multiple places:
+- `Sources/Core/Types/Configuration/ConfigurationTypes.swift`
+- `Sources/Core/Configuration/UnifiedConfigurationManager.swift`
 
-For each type with conformance issues:
+**Solution:**
+1. Keep only one definition in `ConfigurationTypes.swift`
+2. Remove the duplicate definitions from `UnifiedConfigurationManager.swift`
+3. Add comments indicating where the types are defined
 
-1. Identify the required protocol methods and properties
-2. Implement all required methods and properties
-3. Ensure the implementations match the protocol requirements
+### 4. TypeDefinitions.swift Issues
 
-Example:
-```swift
-// Protocol
-protocol Core_BaseService {
-    func initialize() async
-    func shutdown() async
-}
+The `TypeDefinitions.swift` file contains many type definitions that are duplicated elsewhere.
 
-// Implementation
-extension UnifiedConfigurationManager: Core_BaseService {
-    public func initialize() async {
-        // Implementation
-    }
-    
-    public func shutdown() async {
-        // Implementation
-    }
-}
-```
+**Solution:**
+1. Review all type definitions in this file
+2. Remove duplicates and add comments indicating where the types are defined
+3. Consider refactoring this file to be a central place for type aliases rather than definitions
 
-### 4. Address Actor Isolation Issues
+### 5. Actor Isolation Issues
 
-For actor-isolated properties used in protocols:
+Actor-isolated properties are used to satisfy nonisolated protocol requirements.
 
+**Solution:**
 1. Mark protocol requirements as `nonisolated` where appropriate
 2. Use `nonisolated` getters for properties that need to be accessed outside the actor
 3. Consider using publishers for state that needs to be observed
@@ -99,7 +101,33 @@ actor UnifiedLocationManager: Core_LocationManaging {
 }
 ```
 
-### 5. Fix Missing Type Definitions
+## Step-by-Step Fix Plan
+
+### 1. Fix Remaining Type Redeclarations
+
+For each redeclared type:
+
+1. Identify all occurrences of the type (e.g., `Core_StorageKey`)
+2. Keep only one definition in the appropriate file
+3. Update all references to use the single definition
+
+### 2. Resolve Protocol Conformance Issues
+
+For each type with conformance issues:
+
+1. Identify the required protocol methods and properties
+2. Implement all required methods and properties
+3. Ensure the implementations match the protocol requirements
+
+### 3. Address Actor Isolation Issues
+
+For actor-isolated properties used in protocols:
+
+1. Mark protocol requirements as `nonisolated` where appropriate
+2. Use `nonisolated` getters for properties that need to be accessed outside the actor
+3. Consider using publishers for state that needs to be observed
+
+### 4. Fix Missing Type Definitions
 
 For each missing type:
 
@@ -107,38 +135,33 @@ For each missing type:
 2. Create the appropriate definition
 3. Update all references to use the new definition
 
-Example missing types:
-- `AppPermissionType` → Replace with `Core_PermissionType`
-- `LogCategory` → Create this enum if missing
+## Critical Files to Fix Next
 
-## Critical Files to Fix First
+1. **Core/Types/Storage/StorageTypes.swift** and **Core/Storage/UnifiedStorageManager.swift**
+   - Resolve duplicate `Core_StorageKey` and `Core_StorageDirectory` definitions
+   - Keep definitions only in `StorageTypes.swift`
 
-1. **Core/Types/Error/ErrorTypes.swift**
-   - Remove duplicate enum definitions
-   - Keep only typealiases and unique types
+2. **Core/Types/Analytics/AnalyticsTypes.swift** and **Core/Analytics/UnifiedAnalyticsManager.swift**
+   - Resolve duplicate analytics-related type definitions
+   - Keep definitions only in `AnalyticsTypes.swift`
 
-2. **Core/Types/Network/NetworkTypes.swift**
-   - Remove duplicate `Core_NetworkError` definition
-   - Ensure `Core_NetworkAPIManaging` is used consistently
+3. **Core/Types/Configuration/ConfigurationTypes.swift** and **Core/Configuration/UnifiedConfigurationManager.swift**
+   - Resolve duplicate configuration-related type definitions
+   - Keep definitions only in `ConfigurationTypes.swift`
 
-3. **Core/Types/Permission/PermissionTypes.swift**
-   - Resolve `Core_PermissionStatus` ambiguity
-   - Ensure `Core_PermissionType` is used instead of `AppPermissionType`
+4. **Core/Types/TypeDefinitions.swift**
+   - Remove or properly organize duplicate type definitions
+   - Add comments indicating where types are defined
 
-4. **Core/Types/Notification/NotificationTypes.swift**
-   - Fix `Core_NotificationRequest` Hashable conformance
-   - Ensure `Core_AppNotificationCategory` and `Core_AppNotificationTrigger` are properly defined
-
-5. **Core/Types/Yeelight/CoreYeelightTypes.swift** and **Core/Types/Device/YeelightTypes.swift**
-   - Ensure clear separation between these files
-   - Use consistent naming for Yeelight-related types
+5. **Core/Services/ServiceContainer.swift**
+   - Ensure proper type aliases are used consistently
 
 ## Testing the Fixes
 
 After implementing the fixes:
 
 1. Run the setup script again: `./Scripts/setup_xcode_project.sh`
-2. Build the project: `cd Build && xcodebuild -project YeelightControl.xcodeproj -scheme YeelightControl -destination "platform=iOS Simulator,id=65B712EF-66D5-40DC-8306-E34D0376F218" build`
+2. Build the project: `cd Build && xcodebuild -project YeelightControl.xcodeproj -scheme YeelightControl -configuration Debug CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO`
 3. Address any remaining errors one by one
 
 ## Long-term Recommendations
