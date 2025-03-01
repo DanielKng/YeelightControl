@@ -1,30 +1,28 @@
 import Foundation
 
-public enum NetworkError: LocalizedError, Hashable {
-    case invalidURL
-    case invalidResponse
-    case invalidData
-    case connectionFailed
-    case timeout
-    case unauthorized
-    case serverError
-    case unknown
-    
-    public var errorDescription: String? {
-        switch self {
-        case .invalidURL: return "Invalid URL"
-        case .invalidResponse: return "Invalid response from server"
-        case .invalidData: return "Invalid data received"
-        case .connectionFailed: return "Connection failed"
-        case .timeout: return "Request timed out"
-        case .unauthorized: return "Unauthorized access"
-        case .serverError: return "Server error"
-        case .unknown: return "Unknown network error"
-        }
-    }
-}
+// Create typealiases to disambiguate types
+public typealias CoreNetworkError = Core_NetworkError
+public typealias CoreLocationError = Core_LocationError
+public typealias CoreConfigurationError = Core_ConfigurationError
+public typealias CoreDeviceError = Core_DeviceError
+public typealias CoreSecurityError = Core_SecurityError
+public typealias CoreStorageError = Core_StorageError
+public typealias CorePermissionError = Core_PermissionError
+public typealias CoreEffectError = Core_EffectError
+public typealias CoreSceneError = Core_SceneError
+public typealias CoreAppError = Core_AppError
+public typealias CoreYeelightError = Core_YeelightError
 
-public enum LocationError: LocalizedError, Hashable {
+// MARK: - Core Error Types
+
+// These are defined in other files, so we don't redefine them here:
+// Core_NetworkError
+// Core_SecurityError
+// Core_StorageError
+// Core_ConfigurationError
+// Core_YeelightError
+
+public enum Core_LocationError: LocalizedError, Hashable {
     case unauthorized
     case servicesDisabled
     case invalidCoordinates
@@ -44,27 +42,7 @@ public enum LocationError: LocalizedError, Hashable {
     }
 }
 
-public enum ConfigurationError: LocalizedError, Hashable {
-    case invalidKey
-    case invalidValue
-    case serializationFailed
-    case persistenceFailed
-    case notFound
-    case unknown
-    
-    public var errorDescription: String? {
-        switch self {
-        case .invalidKey: return "Invalid configuration key"
-        case .invalidValue: return "Invalid configuration value"
-        case .serializationFailed: return "Configuration serialization failed"
-        case .persistenceFailed: return "Configuration persistence failed"
-        case .notFound: return "Configuration not found"
-        case .unknown: return "Unknown configuration error"
-        }
-    }
-}
-
-public enum DeviceError: LocalizedError, Hashable {
+public enum Core_DeviceError: LocalizedError, Hashable {
     case notFound
     case connectionFailed
     case commandFailed
@@ -86,43 +64,7 @@ public enum DeviceError: LocalizedError, Hashable {
     }
 }
 
-public enum SecurityError: LocalizedError, Hashable {
-    case unauthorized
-    case invalidCredentials
-    case encryptionFailed
-    case decryptionFailed
-    case unknown
-    
-    public var errorDescription: String? {
-        switch self {
-        case .unauthorized: return "Unauthorized access"
-        case .invalidCredentials: return "Invalid credentials"
-        case .encryptionFailed: return "Encryption failed"
-        case .decryptionFailed: return "Decryption failed"
-        case .unknown: return "Unknown security error"
-        }
-    }
-}
-
-public enum StorageError: LocalizedError, Hashable {
-    case readFailed
-    case writeFailed
-    case deleteFailed
-    case notFound
-    case unknown
-    
-    public var errorDescription: String? {
-        switch self {
-        case .readFailed: return "Storage read failed"
-        case .writeFailed: return "Storage write failed"
-        case .deleteFailed: return "Storage delete failed"
-        case .notFound: return "Storage item not found"
-        case .unknown: return "Unknown storage error"
-        }
-    }
-}
-
-public enum PermissionError: LocalizedError, Hashable {
+public enum Core_PermissionError: LocalizedError, Hashable {
     case denied
     case restricted
     case notDetermined
@@ -138,7 +80,7 @@ public enum PermissionError: LocalizedError, Hashable {
     }
 }
 
-public enum EffectError: LocalizedError, Hashable {
+public enum Core_EffectError: LocalizedError, Hashable {
     case invalidParameters
     case executionFailed
     case unknown
@@ -152,7 +94,7 @@ public enum EffectError: LocalizedError, Hashable {
     }
 }
 
-public enum SceneError: LocalizedError, Hashable {
+public enum Core_SceneError: LocalizedError, Hashable {
     case invalidDevices
     case activationFailed
     case unknown
@@ -166,30 +108,45 @@ public enum SceneError: LocalizedError, Hashable {
     }
 }
 
-public enum AppError: LocalizedError, Hashable {
-    case network(NetworkError)
-    case location(LocationError)
-    case configuration(ConfigurationError)
-    case device(DeviceError)
-    case security(SecurityError)
-    case storage(StorageError)
-    case permission(PermissionError)
-    case effect(EffectError)
-    case scene(SceneError)
-    case unknown
+public enum Core_AppError: LocalizedError, Hashable, Identifiable {
+    case configuration(CoreConfigurationError)
+    case storage(CoreStorageError)
+    case network(CoreNetworkError)
+    case security(CoreSecurityError)
+    case yeelight(CoreYeelightError)
+    case general(String)
+    
+    public var id: String {
+        switch self {
+        case .configuration(let error):
+            return "config-\(error.hashValue)"
+        case .storage(let error):
+            return "storage-\(error.hashValue)"
+        case .network(let error):
+            return "network-\(error.hashValue)"
+        case .security(let error):
+            return "security-\(error.hashValue)"
+        case .yeelight(let error):
+            return "yeelight-\(error.hashValue)"
+        case .general(let message):
+            return "general-\(message.hashValue)"
+        }
+    }
     
     public var errorDescription: String? {
         switch self {
-        case .network(let error): return error.errorDescription
-        case .location(let error): return error.errorDescription
-        case .configuration(let error): return error.errorDescription
-        case .device(let error): return error.errorDescription
-        case .security(let error): return error.errorDescription
-        case .storage(let error): return error.errorDescription
-        case .permission(let error): return error.errorDescription
-        case .effect(let error): return error.errorDescription
-        case .scene(let error): return error.errorDescription
-        case .unknown: return "Unknown application error"
+        case .configuration(let error):
+            return error.localizedDescription
+        case .storage(let error):
+            return error.localizedDescription
+        case .network(let error):
+            return error.localizedDescription
+        case .security(let error):
+            return error.localizedDescription
+        case .yeelight(let error):
+            return error.localizedDescription
+        case .general(let message):
+            return message
         }
     }
 } 
