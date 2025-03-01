@@ -1,12 +1,10 @@
 import Foundation
 import Combine
 
-// Create typealiases to disambiguate types
-public typealias CoreTheme = Core_Theme
-public typealias CoreConfiguration = Core_Configuration
-public typealias CoreConfigValue = Core_ConfigValue
+// Typealiases are defined in ServiceContainer.swift
+// Removing duplicate definitions to resolve ambiguity errors
 
-// Core_Theme is defined in UnifiedThemeManager.swift
+// Core_Theme is defined in ThemeTypes.swift
 // No need to redefine it here
 
 public struct Core_Configuration: Codable, Hashable {
@@ -46,18 +44,8 @@ public struct Core_Configuration: Codable, Hashable {
     }
 }
 
-// Use the ConfigKey from ConfigurationProtocols.swift
-// public enum ConfigKey: String, Codable, Hashable {
-//     case theme
-//     case notifications
-//     case location
-//     case analytics
-//     case backgroundRefresh
-//     case deviceSettings
-//     case sceneSettings
-//     case effectSettings
-//     case configuration
-// }
+// Core_ConfigKey is defined in ConfigurationProtocols.swift
+// No need to redefine it here
 
 public enum Core_ConfigValue: Codable, Hashable {
     case bool(Bool)
@@ -112,23 +100,39 @@ public enum Core_ConfigValue: Codable, Hashable {
     }
 }
 
-// Use the Core_ConfigurationError from ConfigurationProtocols.swift
-// public enum ConfigurationError: LocalizedError {
-//     case valueNotFound
-//     case unsupportedType
-//     case saveFailed
-//     case loadFailed
-//     
-//     public var errorDescription: String? {
-//         switch self {
-//         case .valueNotFound:
-//             return "Configuration value not found"
-//         case .unsupportedType:
-//             return "Unsupported configuration value type"
-//         case .saveFailed:
-//             return "Failed to save configuration"
-//         case .loadFailed:
-//             return "Failed to load configuration"
-//         }
-//     }
-// } 
+// MARK: - Configuration Error
+public enum Core_ConfigurationError: Error, Hashable, Equatable {
+    case valueNotFound(Core_ConfigKey)
+    case invalidType
+    case saveFailed
+    case loadFailed
+    
+    public static func == (lhs: Core_ConfigurationError, rhs: Core_ConfigurationError) -> Bool {
+        switch (lhs, rhs) {
+        case (.valueNotFound(let lhsKey), .valueNotFound(let rhsKey)):
+            return lhsKey == rhsKey
+        case (.invalidType, .invalidType):
+            return true
+        case (.saveFailed, .saveFailed):
+            return true
+        case (.loadFailed, .loadFailed):
+            return true
+        default:
+            return false
+        }
+    }
+    
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .valueNotFound(let key):
+            hasher.combine(0)
+            hasher.combine(key)
+        case .invalidType:
+            hasher.combine(1)
+        case .saveFailed:
+            hasher.combine(2)
+        case .loadFailed:
+            hasher.combine(3)
+        }
+    }
+} 

@@ -2,120 +2,137 @@ import Foundation
 import Network
 import Combine
 
-// Define a type alias for the Core module's NetworkManaging protocol
-typealias CoreNetworkManaging = NetworkManaging
+// MARK: - Type Aliases
 
-// Use Core_NetworkError instead of NetworkError
-public typealias NetworkError = Core_NetworkError
+public typealias CoreNetworkManaging = Core_NetworkManaging
+
+// MARK: - Network Message Handler Protocol
 
 /// Protocol for network message handling
-public protocol UnifiedNetworkMessageHandler: AnyObject {
+public protocol Core_NetworkMessageHandler: AnyObject {
     func didReceiveMessage(_ message: Data)
-    func didUpdateConnectionStatus(_ status: NWConnection.State)
+    func didUpdateConnectionStatus(_ status: Bool)
 }
 
-/// Protocol defining network management capabilities
-public protocol NetworkManaging: AnyObject {
-    /// Check if network is reachable
-    var isReachable: Bool { get }
-    
-    /// Check if network is monitoring
-    var isMonitoring: Bool { get }
-    
-    /// Start monitoring network status
-    func startMonitoring()
-    
-    /// Stop monitoring network status
-    func stopMonitoring()
-    
-    /// Send data over network
-    func send(_ data: Data) throws
-    
-    /// Add a message handler
-    func addMessageHandler(_ handler: UnifiedNetworkMessageHandler)
-    
-    /// Remove a message handler
-    func removeMessageHandler(_ handler: UnifiedNetworkMessageHandler)
-}
+// MARK: - Network Manager
 
-/// Unified manager for handling network operations
-public final class UnifiedNetworkManager: NetworkManaging {
+/// Actor responsible for managing network connectivity and message handling
+public actor UnifiedNetworkManager: Core_NetworkManaging, Core_BaseService {
     // MARK: - Properties
     
-    /// Network path monitor
-    private let monitor: NWPathMonitor
+    private var monitor: NWPathMonitor?
+    private var messageHandlers: [Core_NetworkMessageHandler] = []
+    private var isMonitoring = false
+    private var isReachable = false
+    private let monitorQueue: DispatchQueue
+    private var _isEnabled: Bool = true
     
-    /// Queue for network operations
-    private let queue: DispatchQueue
+    @Published public private(set) var serviceStatus: Core_ServiceStatus = .inactive
     
-    /// Message handlers
-    private var messageHandlers = NSHashTable<AnyObject>.weakObjects()
+    // MARK: - Core_BaseService
     
-    /// Network status
-    public private(set) var isReachable = false
+    nonisolated public var isEnabled: Bool {
+        get {
+            let task = Task { () -> Bool in
+                return await _isEnabled
+            }
+            return (try? task.result.get()) ?? false
+        }
+    }
     
-    /// Monitoring status
-    public private(set) var isMonitoring = false
+    public var serviceIdentifier: String {
+        return "core.network"
+    }
     
     // MARK: - Initialization
     
     public init() {
+        self.monitorQueue = DispatchQueue(label: "com.yeelight.networkMonitor", qos: .utility)
         self.monitor = NWPathMonitor()
-        self.queue = DispatchQueue(label: "com.yeelightcontrol.network")
-        setupMonitor()
     }
     
-    deinit {
-        stopMonitoring()
-    }
+    // MARK: - Core_NetworkManaging
     
-    // MARK: - NetworkManaging Methods
-    
-    public func startMonitoring() {
+    public func startMonitoring() async {
         guard !isMonitoring else { return }
-        monitor.start(queue: queue)
+        
         isMonitoring = true
+        setupMonitor()
+        serviceStatus = .active
     }
     
-    public func stopMonitoring() {
-        guard isMonitoring else { return }
-        monitor.cancel()
-        isMonitoring = false
-    }
-    
-    public func send(_ data: Data) throws {
-        guard isReachable else {
-            throw Core_NetworkError.connectionFailed
-        }
-        // Implementation for sending data
-    }
-    
-    public func addMessageHandler(_ handler: UnifiedNetworkMessageHandler) {
-        messageHandlers.add(handler)
-    }
-    
-    public func removeMessageHandler(_ handler: UnifiedNetworkMessageHandler) {
-        messageHandlers.remove(handler)
+    public func stopMonitoring() async {
+        await stopMonitoringInternal()
+        serviceStatus = .inactive
     }
     
     // MARK: - Private Methods
     
-    private func setupMonitor() {
-        monitor.pathUpdateHandler = { [weak self] path in
-            guard let self else { return }
-            self.isReachable = path.status == .satisfied
+    private func stopMonitoringInternal() async {
+        guard isMonitoring, let monitor = monitor else { return }
+        
+        monitor.cancel()
+        isMonitoring = false
+    }
+    
+    public func send(_ data: Data) async throws {
+        guard isReachable else {
+            throw Core_NetworkError.connectionFailed
+        }
+        
+        // Implementation would depend on the specific network protocol
+    }
+    
+    public func addMessageHandler(_ handler: Core_NetworkMessageHandler) async {
+        if !messageHandlers.contains(where: { $0 === handler }) {
+            messageHandlers.append(handler)
         }
     }
     
-    private func notifyHandlers(message: Data) {
-        for case let handler as UnifiedNetworkMessageHandler in messageHandlers.allObjects {
+    public func removeMessageHandler(_ handler: Core_NetworkMessageHandler) async {
+        messageHandlers.removeAll(where: { $0 === handler })
+    }
+    
+    // MARK: - Core_NetworkManaging Protocol Methods
+    
+    public func request<T: Decodable>(_ endpoint: String, method: String, headers: [String: String]?, body: Data?) async throws -> T {
+        // Implementation for making network requests
+        throw Core_NetworkError.connectionFailed
+    }
+    
+    public func download(_ url: URL) async throws -> Data {
+        // Implementation for downloading data
+        throw Core_NetworkError.connectionFailed
+    }
+    
+    private func setupMonitor() {
+        guard let monitor = monitor else { return }
+        
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self = self else { return }
+            
+            Task {
+                await self.updateReachabilityStatus(path.status == .satisfied)
+            }
+        }
+        
+        monitor.start(queue: monitorQueue)
+    }
+    
+    private func updateReachabilityStatus(_ isReachable: Bool) async {
+        self.isReachable = isReachable
+        await updateConnectionStatus(isReachable)
+    }
+    
+    private func notifyHandlers(_ message: Data) async {
+        for handler in messageHandlers {
             handler.didReceiveMessage(message)
         }
     }
     
-    private func updateConnectionStatus(_ status: NWConnection.State) {
-        for case let handler as UnifiedNetworkMessageHandler in messageHandlers.allObjects {
-            handler.didUpdateConnectionStatus(status)
+    private func updateConnectionStatus(_ isConnected: Bool) async {
+        for handler in messageHandlers {
+            handler.didUpdateConnectionStatus(isConnected)
         }
     }
 }

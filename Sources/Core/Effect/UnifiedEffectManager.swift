@@ -3,40 +3,26 @@ import Combine
 import SwiftUI
 
 // MARK: - Effect Manager Protocol
-public protocol EffectManaging: AnyObject {
-    var isEnabled: Bool { get set }
-    var effects: [Effect] { get }
-    
-    var effectUpdates: AnyPublisher<Effect, Never> { get }
-    
-    func getEffect(withId id: String) async -> Effect?
-    func getAllEffects() async -> [Effect]
-    func createEffect(name: String, type: EffectType, parameters: EffectParameters) async -> Effect
-    func updateEffect(_ effect: Effect) async -> Effect
-    func deleteEffect(_ effect: Effect) async
-    func startEffect(_ effect: Effect) async
-    func stopEffect(_ effect: Effect) async
-    func applyEffect(_ effect: Effect, to deviceIds: [String]) async
-}
+// The Core_EffectManaging protocol is defined in ServiceProtocols.swift
 
 // MARK: - Effect Manager Implementation
-public final class UnifiedEffectManager: EffectManaging, ObservableObject {
+public final class UnifiedEffectManager: Core_EffectManaging, ObservableObject {
     // MARK: - Properties
     
     @Published private(set) var _effects: [Effect] = []
     public var effects: [Effect] { _effects }
     
-    private let storageManager: any StorageManaging
+    private let storageManager: any Core_StorageManaging
     private let deviceManager: any Core_DeviceManaging
     private let effectSubject = PassthroughSubject<Effect, Never>()
     private var effectTimers: [String: Timer] = [:]
     
     // MARK: - Initialization
     
-    public init(storageManager: any StorageManaging, deviceManager: any Core_DeviceManaging) {
+    public init(storageManager: any Core_StorageManaging, deviceManager: any Core_DeviceManaging) {
         self.storageManager = storageManager
         self.deviceManager = deviceManager
-        self.isEnabled = true
+        self._isEnabled = true
         
         Task {
             await loadEffects()
@@ -45,7 +31,10 @@ public final class UnifiedEffectManager: EffectManaging, ObservableObject {
     
     // MARK: - BaseService
     
-    public var isEnabled: Bool
+    public nonisolated var isEnabled: Bool {
+        get { _isEnabled }
+    }
+    private var _isEnabled: Bool
     
     // MARK: - EffectManaging
     
@@ -66,9 +55,16 @@ public final class UnifiedEffectManager: EffectManaging, ObservableObject {
         }
     }
     
-    public func applyEffect(_ effect: Effect, to deviceIds: [String]) async {
-        // Implementation for applying the effect to devices
-        // This would typically involve sending commands to the devices
+    public func applyEffect(_ effect: Core_Effect, to device: Core_Device) async throws {
+        // Convert Core_Effect to Effect and apply it
+        if let localEffect = effects.first(where: { $0.id == effect.id }) {
+            await applyEffect(localEffect, to: [device.id])
+        }
+    }
+    
+    public func getAvailableEffects() -> [Core_Effect] {
+        // Convert local effects to Core_Effect
+        return effects
     }
     
     public func createEffect(name: String, type: EffectType, parameters: EffectParameters) async -> Effect {
@@ -126,6 +122,13 @@ public final class UnifiedEffectManager: EffectManaging, ObservableObject {
         
         await updateEffect(updatedEffect)
         stopEffectTimer(updatedEffect)
+    }
+    
+    public func applyEffect(_ effect: Effect, to deviceIds: [String]) async {
+        // Implementation for applying the effect to devices
+        // This would typically involve sending commands to the devices
+        print("Applying effect \(effect.name) to devices: \(deviceIds)")
+        // Actual implementation would go here
     }
     
     // MARK: - Private Methods

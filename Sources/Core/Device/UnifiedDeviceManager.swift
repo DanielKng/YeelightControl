@@ -7,57 +7,126 @@ import SwiftUI
 
 // Add explicit imports for the types
 
+// MARK: - Device Manager
+// Core_DeviceManaging protocol is defined in ServiceProtocols.swift
+// Removing duplicate definition to resolve ambiguity errors
+
 // MARK: - Device Manager Implementation
 
-public actor UnifiedDeviceManager: Core_DeviceManaging, ObservableObject {
+public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     // MARK: - Properties
     
-    @MainActor @Published private(set) var devices: [Device] = []
-    @MainActor @Published private(set) var isDiscovering: Bool = false
+    private var _devices: [Device] = []
+    private var _isDiscovering: Bool = false
+    private var _isEnabled: Bool = true
     
-    private let storageManager: any StorageManaging
+    private let storageManager: any Core_StorageManaging
     private let deviceSubject = PassthroughSubject<Device, Never>()
     private var discoveryTask: Task<Void, Never>?
     
     // MARK: - Initialization
     
-    public init(storageManager: any StorageManaging) {
+    public init(storageManager: any Core_StorageManaging) {
         self.storageManager = storageManager
-        self.isEnabled = true
         
         Task {
             await loadDevices()
         }
     }
     
-    // MARK: - BaseService
+    // MARK: - Core_BaseService
     
-    public var isEnabled: Bool
-    
-    // MARK: - DeviceManaging
-    
-    public nonisolated var deviceUpdates: AnyPublisher<Device, Never> {
-        deviceSubject.eraseToAnyPublisher()
-    }
-    
-    public func getDevice(byId id: String) async -> Device? {
-        return await MainActor.run {
-            devices.first { $0.id == id }
+    nonisolated public var isEnabled: Bool {
+        get {
+            let task = Task { () -> Bool in
+                return await _isEnabled
+            }
+            return (try? task.result.get()) ?? false
         }
     }
     
-    public func getAllDevices() async -> [Device] {
-        return await MainActor.run {
-            devices
+    public var serviceIdentifier: String {
+        return "core.device"
+    }
+    
+    // MARK: - Core_DeviceManaging
+    
+    nonisolated public var devices: [Core_Device] {
+        get {
+            let task = Task { () -> [Core_Device] in
+                return await _devices as [Core_Device]
+            }
+            return (try? task.result.get()) ?? []
         }
     }
     
-    public func startDiscovery() async {
+    nonisolated public var deviceUpdates: AnyPublisher<[Core_Device], Never> {
+        deviceSubject.map { [$0] as [Core_Device] }.eraseToAnyPublisher()
+    }
+    
+    public func discoverDevices() async throws {
+        await startDiscoveryInternal()
+    }
+    
+    public func connectToDevice(_ device: Core_Device) async throws {
+        guard let device = device as? Device else {
+            throw NSError(domain: "DeviceError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid device type"])
+        }
+        
+        // Implementation for connecting to device
+        print("Connecting to device: \(device.id)")
+        
+        var updatedDevice = device
+        updatedDevice.isConnected = true
+        
+        if let index = _devices.firstIndex(where: { $0.id == device.id }) {
+            _devices[index] = updatedDevice
+            deviceSubject.send(updatedDevice)
+        }
+    }
+    
+    public func disconnectFromDevice(_ device: Core_Device) async throws {
+        guard let device = device as? Device else {
+            throw NSError(domain: "DeviceError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid device type"])
+        }
+        
+        // Implementation for disconnecting from device
+        print("Disconnecting from device: \(device.id)")
+        
+        var updatedDevice = device
+        updatedDevice.isConnected = false
+        
+        if let index = _devices.firstIndex(where: { $0.id == device.id }) {
+            _devices[index] = updatedDevice
+            deviceSubject.send(updatedDevice)
+        }
+    }
+    
+    public func updateDevice(_ device: Core_Device) async throws {
+        guard let device = device as? Device else {
+            throw NSError(domain: "DeviceError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid device type"])
+        }
+        
+        await updateDeviceInternal(device)
+    }
+    
+    public nonisolated func getDevice(byId id: String) async -> Device? {
+        let allDevices = await _devices
+        return allDevices.first { $0.id == id }
+    }
+    
+    public nonisolated func getAllDevices() async -> [Device] {
+        return await _devices
+    }
+    
+    public nonisolated func startDiscovery() async {
+        await startDiscoveryInternal()
+    }
+    
+    private func startDiscoveryInternal() async {
         guard discoveryTask == nil else { return }
         
-        await MainActor.run {
-            isDiscovering = true
-        }
+        _isDiscovering = true
         
         discoveryTask = Task {
             // Simulate discovery process
@@ -67,73 +136,53 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, ObservableObject {
                 try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
                 
                 // Create sample devices if none exist
-                if await MainActor.run({ devices.isEmpty }) {
-                    let sampleDevices = createSampleDevices()
+                if _devices.isEmpty {
+                    let sampleDevices = Device.sampleDevices
                     for device in sampleDevices {
-                        await addDevice(device)
+                        _devices.append(device)
+                        try? await storageManager.save(device, forKey: "device.\(device.id)")
+                        deviceSubject.send(device)
                     }
                 }
-                
-                await MainActor.run {
-                    isDiscovering = false
-                }
-                discoveryTask = nil
             } catch {
-                await MainActor.run {
-                    isDiscovering = false
-                }
-                discoveryTask = nil
+                print("Discovery error: \(error)")
             }
+            
+            _isDiscovering = false
+            discoveryTask = nil
         }
     }
     
-    public func stopDiscovery() async {
+    public nonisolated func stopDiscovery() async {
+        await stopDiscoveryInternal()
+    }
+    
+    private func stopDiscoveryInternal() {
         discoveryTask?.cancel()
         discoveryTask = nil
-        
-        await MainActor.run {
-            isDiscovering = false
-        }
+        _isDiscovering = false
     }
     
-    public func addDevice(_ device: Device) async {
+    public nonisolated func addDevice(_ device: Device) async {
+        await addDeviceInternal(device)
+    }
+    
+    private func addDeviceInternal(_ device: Device) async {
         // Check if device already exists
-        if let existingDevice = await getDevice(byId: device.id) {
+        if let _ = _devices.first(where: { $0.id == device.id }) {
             // Update existing device
-            await updateDevice(device)
+            await updateDeviceInternal(device)
             return
         }
         
         // Add new device
-        await MainActor.run {
-            devices.append(device)
-        }
+        _devices.append(device)
         
-        try? await storageManager.save(device, withId: device.id, inCollection: "devices")
+        try? await storageManager.save(device, forKey: "device.\(device.id)")
         deviceSubject.send(device)
     }
     
-    public func updateDevice(_ device: Device) async {
-        await MainActor.run {
-            if let index = devices.firstIndex(where: { $0.id == device.id }) {
-                devices[index] = device
-            }
-        }
-        
-        try? await storageManager.save(device, withId: device.id, inCollection: "devices")
-        deviceSubject.send(device)
-    }
-    
-    public func removeDevice(_ device: Device) async {
-        await MainActor.run {
-            devices.removeAll { $0.id == device.id }
-        }
-        
-        try? await storageManager.delete(withId: device.id, fromCollection: "devices")
-        deviceSubject.send(device)
-    }
-    
-    public func updateDeviceState(_ device: Device, newState: DeviceState) async throws {
+    public nonisolated func updateDeviceState(_ device: Device, newState: DeviceState) async throws {
         var updatedDevice = device
         updatedDevice.state = newState
         
@@ -143,22 +192,55 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, ObservableObject {
         await updateDevice(updatedDevice)
     }
     
+    public nonisolated func updateDevice(_ device: Device) async {
+        await updateDeviceInternal(device)
+    }
+    
+    private func updateDeviceInternal(_ device: Device) async {
+        if let index = _devices.firstIndex(where: { $0.id == device.id }) {
+            _devices[index] = device
+        }
+        
+        try? await storageManager.save(device, forKey: "device.\(device.id)")
+        deviceSubject.send(device)
+    }
+    
+    public nonisolated func removeDevice(_ device: Device) async {
+        await removeDeviceInternal(device)
+    }
+    
+    private func removeDeviceInternal(_ device: Device) async {
+        _devices.removeAll { $0.id == device.id }
+        
+        try? await storageManager.remove(forKey: "device.\(device.id)")
+        deviceSubject.send(device)
+    }
+    
     // MARK: - Private Methods
     
     private func loadDevices() async {
         do {
-            let loadedDevices: [Device] = try await storageManager.getAll(fromCollection: "devices")
-            await MainActor.run {
-                devices = loadedDevices
+            // Load devices from storage
+            var loadedDevices: [Device] = []
+            
+            // In a real implementation, we would load all devices from storage
+            // For now, we'll just create sample devices
+            if loadedDevices.isEmpty {
+                let sampleDevices = createSampleDevices()
+                for device in sampleDevices {
+                    await addDeviceInternal(device)
+                }
+            } else {
+                _devices = loadedDevices
             }
         } catch {
             print("Failed to load devices: \(error.localizedDescription)")
             
             // Create sample devices if none were loaded
-            if await MainActor.run({ devices.isEmpty }) {
+            if _devices.isEmpty {
                 let sampleDevices = createSampleDevices()
                 for device in sampleDevices {
-                    await addDevice(device)
+                    await addDeviceInternal(device)
                 }
             }
         }

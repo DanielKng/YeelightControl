@@ -1,12 +1,14 @@
 import Foundation
 
 // Create typealiases to disambiguate types
-public typealias CoreNetworkError = Core_NetworkError
+// Removing duplicate typealias declarations that are already defined elsewhere
+// public typealias CoreNetworkError = Core_NetworkError
+// public typealias CoreConfigurationError = Core_ConfigurationError
+// public typealias CoreSecurityError = Core_SecurityError
+// public typealias CoreStorageError = Core_StorageError
+
 public typealias CoreLocationError = Core_LocationError
-public typealias CoreConfigurationError = Core_ConfigurationError
 public typealias CoreDeviceError = Core_DeviceError
-public typealias CoreSecurityError = Core_SecurityError
-public typealias CoreStorageError = Core_StorageError
 public typealias CorePermissionError = Core_PermissionError
 public typealias CoreEffectError = Core_EffectError
 public typealias CoreSceneError = Core_SceneError
@@ -109,12 +111,18 @@ public enum Core_SceneError: LocalizedError, Hashable {
 }
 
 public enum Core_AppError: LocalizedError, Hashable, Identifiable {
-    case configuration(CoreConfigurationError)
-    case storage(CoreStorageError)
-    case network(CoreNetworkError)
-    case security(CoreSecurityError)
-    case yeelight(CoreYeelightError)
+    case configuration(Core_ConfigurationError)
+    case storage(Core_StorageError)
+    case network(Core_NetworkError)
+    case security(Core_SecurityError)
+    case yeelight(Core_YeelightError)
     case general(String)
+    case location(Core_LocationError)
+    case device(Core_DeviceError)
+    case permission(Core_PermissionError)
+    case effect(Core_EffectError)
+    case scene(Core_SceneError)
+    case unknown
     
     public var id: String {
         switch self {
@@ -130,6 +138,18 @@ public enum Core_AppError: LocalizedError, Hashable, Identifiable {
             return "yeelight-\(error.hashValue)"
         case .general(let message):
             return "general-\(message.hashValue)"
+        case .location(let error):
+            return "location-\(error.hashValue)"
+        case .device(let error):
+            return "device-\(error.hashValue)"
+        case .permission(let error):
+            return "permission-\(error.hashValue)"
+        case .effect(let error):
+            return "effect-\(error.hashValue)"
+        case .scene(let error):
+            return "scene-\(error.hashValue)"
+        case .unknown:
+            return "unknown"
         }
     }
     
@@ -147,6 +167,26 @@ public enum Core_AppError: LocalizedError, Hashable, Identifiable {
             return error.localizedDescription
         case .general(let message):
             return message
+        case .location(let error):
+            return "Location error: \(error)"
+        case .device(let error):
+            return "Device error: \(error)"
+        case .permission(let error):
+            return "Permission error: \(error)"
+        case .effect(let error):
+            return "Effect error: \(error)"
+        case .scene(let error):
+            return "Scene error: \(error)"
+        case .unknown:
+            return "Unknown error occurred"
         }
+    }
+    
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    public static func == (lhs: Core_AppError, rhs: Core_AppError) -> Bool {
+        return lhs.id == rhs.id
     }
 } 

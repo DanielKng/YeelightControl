@@ -30,7 +30,7 @@ import Combine
 
 // MARK: - Security Error
 
-public enum Core_SecurityError: Error {
+public enum Core_SecurityError: Error, Hashable {
     case keychainError(status: OSStatus)
     case dataConversionError
     case authenticationFailed
@@ -62,29 +62,4 @@ extension Core_SecurityError: LocalizedError {
             return "Unknown security error"
         }
     }
-}
-
-// MARK: - Security Managing Protocol
-
-public protocol Core_SecurityManaging {
-    /// Saves a secure value to the keychain
-    func saveSecureValue(_ value: String, for key: String) throws
-    
-    /// Gets a secure value from the keychain
-    func getSecureValue(for key: String) throws -> String
-    
-    /// Deletes a secure value from the keychain
-    func deleteSecureValue(for key: String) throws
-    
-    /// Clears all secure values from the keychain
-    func clearAllSecureValues() throws
-    
-    /// Checks if the device supports biometric authentication
-    func canAuthenticate() -> Bool
-    
-    /// Authenticates the user using biometrics
-    func authenticateUser() async throws
-    
-    /// Generates a random token of the specified length
-    func generateRandomToken(length: Int) -> String
 } 

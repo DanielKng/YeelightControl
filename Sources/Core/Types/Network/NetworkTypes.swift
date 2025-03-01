@@ -10,9 +10,63 @@ public enum Core_HTTPMethod: String {
     case patch = "PATCH"
 }
 
+// MARK: - Network Request Method
+
+public enum Core_NetworkRequestMethod: String, Codable {
+    case get = "GET"
+    case post = "POST"
+    case put = "PUT"
+    case delete = "DELETE"
+    case patch = "PATCH"
+    case head = "HEAD"
+    case options = "OPTIONS"
+}
+
+// MARK: - Network Request
+
+public struct Core_NetworkRequest {
+    public let url: URL
+    public let method: Core_NetworkRequestMethod
+    public let headers: [String: String]
+    public let body: Data?
+    public let timeout: TimeInterval
+    
+    public init(
+        url: URL,
+        method: Core_NetworkRequestMethod = .get,
+        headers: [String: String] = [:],
+        body: Data? = nil,
+        timeout: TimeInterval = 30
+    ) {
+        self.url = url
+        self.method = method
+        self.headers = headers
+        self.body = body
+        self.timeout = timeout
+    }
+}
+
+// MARK: - Network Response
+
+public struct Core_NetworkResponse {
+    public let statusCode: Int
+    public let headers: [String: String]
+    public let body: Data?
+    
+    public init(
+        statusCode: Int,
+        headers: [String: String],
+        body: Data?
+    ) {
+        self.statusCode = statusCode
+        self.headers = headers
+        self.body = body
+    }
+}
+
 // MARK: - Network Error
 
-public enum Core_NetworkError: Error {
+public enum Core_NetworkError: Error, Hashable {
     case connectionFailed
     case invalidCommand
     case invalidResponse

@@ -45,6 +45,20 @@ public enum Core_AnalyticsCategory: String, Codable, CaseIterable {
     case analytics
 }
 
+// MARK: - Analytics Metric
+public enum Core_AnalyticsMetric: String {
+    case deviceCount
+    case roomCount
+    case sceneCount
+    case effectCount
+    case automationCount
+    case networkRequests
+    case errorCount
+    case sessionDuration
+    case appLaunchTime
+    case backgroundTaskCount
+}
+
 // MARK: - Analytics Protocols
 @preconcurrency public protocol Core_AnalyticsManaging: Core_BaseService {
     /// Publisher for analytics events

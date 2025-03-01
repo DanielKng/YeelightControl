@@ -85,7 +85,7 @@ public struct SceneSchedule: Codable, Equatable, Hashable {
 
 // MARK: - Scene Update
 
-public struct Core_SceneUpdate {
+public struct SceneUpdateEvent {
     public let scene: Scene
     public let updateType: UpdateType
     

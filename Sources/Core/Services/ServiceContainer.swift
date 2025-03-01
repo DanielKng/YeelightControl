@@ -4,53 +4,7 @@ import Foundation
 import SwiftUI
 
 // MARK: - Type Aliases for Core Service Protocols
-// These typealiases help with backward compatibility
-public typealias CoreBaseService = Core_BaseService
-public typealias CoreNetworkManaging = Core_NetworkManaging
-public typealias CoreSecurityManaging = Core_SecurityManaging
-public typealias CoreNotificationManaging = Core_NotificationManaging
-public typealias CoreSceneManaging = Core_SceneManaging
-public typealias CoreYeelightManaging = Core_YeelightManaging
-public typealias CoreLocationManaging = Core_LocationManaging
-public typealias CoreDeviceManaging = Core_DeviceManaging
-public typealias CoreEffectManaging = Core_EffectManaging
-public typealias CoreConfigurationManaging = Core_ConfigurationManaging
-public typealias CoreStorageManaging = Core_StorageManaging
-public typealias CoreLoggingService = Core_LoggingService
-public typealias CoreThemeManaging = Core_ThemeManaging
-public typealias CoreErrorHandling = Core_ErrorHandling
-public typealias CoreAnalyticsManaging = Core_AnalyticsManaging
-public typealias CorePermissionManaging = Core_PermissionManaging
-public typealias CoreStateManaging = Core_StateManaging
-
-// MARK: - Type Aliases for Core Types
-public typealias CoreLogCategory = Core_LogCategory
-public typealias CoreLogLevel = Core_LogLevel
-public typealias CoreLogEntry = Core_LogEntry
-public typealias CorePermissionType = Core_PermissionType
-public typealias CorePermissionStatus = Core_PermissionStatus
-public typealias AppTheme = Core_Theme
-public typealias CoreDeviceState = Core_DeviceState
-public typealias CoreDevice = Core_Device
-public typealias CoreYeelight = Core_Yeelight
-public typealias CoreScene = Core_Scene
-public typealias CoreSceneUpdate = Core_SceneUpdate
-public typealias CoreEffect = Core_Effect
-public typealias CoreEffectType = Core_EffectType
-public typealias CoreEffectParameters = Core_EffectParameters
-public typealias CoreEffectUpdate = Core_EffectUpdate
-public typealias CoreLocation = Core_Location
-public typealias CoreNetworkError = Core_NetworkError
-public typealias CoreConfigKey = Core_ConfigKey
-public typealias CoreConfigValue = Core_ConfigValue
-public typealias CoreConfiguration = Core_Configuration
-public typealias CoreConfigurationError = Core_ConfigurationError
-public typealias CoreStorageKey = Core_StorageKey
-public typealias CoreStorageDirectory = Core_StorageDirectory
-public typealias CoreStorageError = Core_StorageError
-public typealias CoreSecurityError = Core_SecurityError
-public typealias CoreAnalyticsEvent = Core_AnalyticsEvent
-public typealias CoreAnalyticsEventType = Core_AnalyticsEventType
+// Removing all typealias declarations to resolve redeclaration errors
 
 // MARK: - Core Location Event
 public enum Core_LocationEvent {
@@ -229,7 +183,7 @@ private class DummyConfigurationManager: Core_ConfigurationManaging {
     var configurationUpdates: AnyPublisher<Core_ConfigKey, Never> {
         Empty().eraseToAnyPublisher()
     }
-    func getValue<T>(for key: Core_ConfigKey) throws -> T { throw Core_ConfigurationError.notFound }
+    func getValue<T>(for key: Core_ConfigKey) throws -> T { throw Core_ConfigurationError.valueNotFound(key) }
     func setValue<T>(_ value: T, for key: Core_ConfigKey) throws {}
     func removeValue(for key: Core_ConfigKey) throws {}
 }
@@ -263,14 +217,50 @@ private class DummyErrorHandler: Core_ErrorHandling {
 
 private class DummyLocationManager: Core_LocationManaging {
     var isEnabled: Bool = false
-    var currentLocation: CLLocation? { nil }
-    var locationUpdates: AnyPublisher<CLLocation, Never> {
+    
+    nonisolated var currentLocation: CLLocation? {
+        get async {
+            return nil
+        }
+    }
+    
+    nonisolated var locationUpdates: AnyPublisher<CLLocation, Never> {
         Empty().eraseToAnyPublisher()
     }
-    func startUpdatingLocation() async {}
-    func stopUpdatingLocation() async {}
-    func requestAuthorization() async -> Core_PermissionStatus { .notDetermined }
-    func getAuthorizationStatus() async -> Core_PermissionStatus { .notDetermined }
+    
+    nonisolated var authorizationStatus: CLAuthorizationStatus {
+        get async {
+            return .notDetermined
+        }
+    }
+    
+    nonisolated var isMonitoringAvailable: Bool {
+        return false
+    }
+    
+    nonisolated var monitoredRegions: Set<CLRegion> {
+        return []
+    }
+    
+    nonisolated func requestAuthorization() {
+        // No-op implementation
+    }
+    
+    nonisolated func startUpdatingLocation() {
+        // No-op implementation
+    }
+    
+    nonisolated func stopUpdatingLocation() {
+        // No-op implementation
+    }
+    
+    nonisolated func startMonitoring(for region: CLRegion) {
+        // No-op implementation
+    }
+    
+    nonisolated func stopMonitoring(for region: CLRegion) {
+        // No-op implementation
+    }
 }
 
 private class DummyLogManager: Core_LoggingService {
@@ -315,16 +305,42 @@ private class DummyPermissionManager: Core_PermissionManaging {
 }
 
 private class DummySceneManager: Core_SceneManaging {
-    var isEnabled: Bool = false
     var scenes: [Core_Scene] { [] }
-    var sceneUpdates: AnyPublisher<[Core_Scene], Never> {
+    var sceneUpdates: AnyPublisher<Core_Scene, Never> {
         Empty().eraseToAnyPublisher()
     }
-    func activateScene(_ scene: Core_Scene) async throws {}
-    func deactivateScene(_ scene: Core_Scene) async throws {}
-    func createScene(_ scene: Core_Scene) async throws {}
-    func updateScene(_ scene: Core_Scene) async throws {}
-    func deleteScene(_ scene: Core_Scene) async throws {}
+    
+    func getScene(withId id: String) async -> Core_Scene? {
+        return nil
+    }
+    
+    func getAllScenes() async -> [Core_Scene] {
+        return []
+    }
+    
+    func createScene(name: String, deviceIds: [String], effect: Core_Effect?) async -> Core_Scene {
+        fatalError("Not implemented")
+    }
+    
+    func updateScene(_ scene: Core_Scene) async -> Core_Scene {
+        return scene
+    }
+    
+    func deleteScene(_ scene: Core_Scene) async {
+        // No-op implementation
+    }
+    
+    func activateScene(_ scene: Core_Scene) async {
+        // No-op implementation
+    }
+    
+    func deactivateScene(_ scene: Core_Scene) async {
+        // No-op implementation
+    }
+    
+    func scheduleScene(_ scene: Core_Scene, schedule: Core_SceneSchedule) async -> Core_Scene {
+        return scene
+    }
 }
 
 private class DummySecurityManager: Core_SecurityManaging {
@@ -350,15 +366,18 @@ private class DummyStateManager: Core_StateManaging {
 }
 
 private class DummyStorageManager: Core_StorageManaging {
-    var isEnabled: Bool = false
-    func save<T: Encodable>(_ object: T, withId id: String, inCollection collection: String) async throws {}
-    func get<T: Decodable>(withId id: String, fromCollection collection: String) async throws -> T {
-        throw Core_StorageError.notFound
+    var serviceIdentifier: String { "dummy.storage" }
+    var isEnabled: Bool { false }
+    
+    nonisolated func save<T: Codable>(_ value: T, forKey key: String) async throws {}
+    
+    nonisolated func load<T: Codable>(_ type: T.Type, forKey key: String) async throws -> T? {
+        return nil
     }
-    func getAll<T: Decodable>(fromCollection collection: String) async throws -> [T] { [] }
-    func delete(withId id: String, fromCollection collection: String) async throws {}
-    func deleteCollection(_ collection: String) async throws {}
-    func exists(withId id: String, inCollection collection: String) async -> Bool { false }
+    
+    nonisolated func remove(forKey key: String) async throws {}
+    
+    nonisolated func clear() async throws {}
 }
 
 private class DummyThemeManager: Core_ThemeManaging {
@@ -375,17 +394,46 @@ private class DummyThemeManager: Core_ThemeManaging {
 
 private class DummyYeelightManager: Core_YeelightManaging {
     var isEnabled: Bool = false
-    var devices: [Core_Yeelight] { [] }
-    var deviceUpdates: AnyPublisher<[Core_Yeelight], Never> {
+    
+    nonisolated var devices: [YeelightDevice] {
+        return []
+    }
+    
+    nonisolated var deviceUpdates: AnyPublisher<YeelightDeviceUpdate, Never> {
         Empty().eraseToAnyPublisher()
     }
-    func discoverDevices() async throws {}
-    func connectToDevice(_ device: Core_Yeelight) async throws {}
-    func disconnectFromDevice(_ device: Core_Yeelight) async throws {}
-    func turnOn(_ device: Core_Yeelight) async throws {}
-    func turnOff(_ device: Core_Yeelight) async throws {}
-    func setBrightness(_ brightness: Int, for device: Core_Yeelight) async throws {}
-    func setColor(_ color: Core_Color, for device: Core_Yeelight) async throws {}
+    
+    func connect(to device: YeelightDevice) async throws {
+        // No-op implementation
+    }
+    
+    func disconnect(from device: YeelightDevice) async {
+        // No-op implementation
+    }
+    
+    func send(_ command: YeelightCommand, to device: YeelightDevice) async throws {
+        // No-op implementation
+    }
+    
+    func discover() async throws -> [YeelightDevice] {
+        return []
+    }
+    
+    nonisolated func getConnectedDevices() -> [YeelightDevice] {
+        return []
+    }
+    
+    nonisolated func getDevice(withId id: String) -> YeelightDevice? {
+        return nil
+    }
+    
+    func updateDevice(_ device: YeelightDevice) async throws {
+        // No-op implementation
+    }
+    
+    func clearDevices() async {
+        // No-op implementation
+    }
 }
 
 // MARK: - Default Theme Implementations

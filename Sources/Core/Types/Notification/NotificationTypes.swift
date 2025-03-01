@@ -3,117 +3,122 @@ import Foundation
 import UserNotifications
 import Combine
 
-public typealias InternalNotificationCategory = AppNotificationCategory
-public typealias InternalNotificationTrigger = AppNotificationTrigger
+// MARK: - Notification Types for App
+// Removing duplicate typealias declarations and standardizing on Core_ prefixed versions
+// public typealias InternalNotificationCategory = AppNotificationCategory
+// public typealias InternalNotificationTrigger = AppNotificationTrigger
 
-public struct NotificationRequest: Identifiable, Codable {
-    public let id: String
-    public let title: String
-    public let body: String
-    public let category: AppNotificationCategory
-    public let trigger: AppNotificationTrigger
-    public let userInfo: [String: String]
-    
-    public init(
-        id: String = UUID().uuidString,
-        title: String,
-        body: String,
-        category: AppNotificationCategory,
-        trigger: AppNotificationTrigger,
-        userInfo: [String: String] = [:]
-    ) {
-        self.id = id
-        self.title = title
-        self.body = body
-        self.category = category
-        self.trigger = trigger
-        self.userInfo = userInfo
-    }
-}
+// Removing duplicate struct in favor of Core_NotificationRequest below
+// public struct NotificationRequest: Identifiable, Codable {
+//     public let id: String
+//     public let title: String
+//     public let body: String
+//     public let category: AppNotificationCategory
+//     public let trigger: AppNotificationTrigger
+//     public let userInfo: [String: String]
+//     
+//     public init(
+//         id: String = UUID().uuidString,
+//         title: String,
+//         body: String,
+//         category: AppNotificationCategory,
+//         trigger: AppNotificationTrigger,
+//         userInfo: [String: String] = [:]
+//     ) {
+//         self.id = id
+//         self.title = title
+//         self.body = body
+//         self.category = category
+//         self.trigger = trigger
+//         self.userInfo = userInfo
+//     }
+// }
 
-public enum AppNotificationCategory: String, Codable {
-    case device
-    case scene
-    case automation
-    case security
-    case system
-}
+// Removing duplicate enum in favor of Core_AppNotificationCategory below
+// public enum AppNotificationCategory: String, Codable {
+//     case device
+//     case scene
+//     case automation
+//     case security
+//     case system
+// }
 
-public enum AppNotificationTrigger: Codable {
-    case immediate
-    case timeInterval(TimeInterval)
-    case dateComponents(DateComponents)
-    case location(latitude: Double, longitude: Double, radius: Double)
-    
-    private enum CodingKeys: String, CodingKey {
-        case type
-        case timeInterval
-        case dateComponents
-        case latitude
-        case longitude
-        case radius
-    }
-    
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
-        
-        switch type {
-        case "immediate":
-            self = .immediate
-        case "timeInterval":
-            let interval = try container.decode(TimeInterval.self, forKey: .timeInterval)
-            self = .timeInterval(interval)
-        case "dateComponents":
-            let components = try container.decode(DateComponents.self, forKey: .dateComponents)
-            self = .dateComponents(components)
-        case "location":
-            let latitude = try container.decode(Double.self, forKey: .latitude)
-            let longitude = try container.decode(Double.self, forKey: .longitude)
-            let radius = try container.decode(Double.self, forKey: .radius)
-            self = .location(latitude: latitude, longitude: longitude, radius: radius)
-        default:
-            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Invalid notification trigger type")
-        }
-    }
-    
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
-        switch self {
-        case .immediate:
-            try container.encode("immediate", forKey: .type)
-        case .timeInterval(let interval):
-            try container.encode("timeInterval", forKey: .type)
-            try container.encode(interval, forKey: .timeInterval)
-        case .dateComponents(let components):
-            try container.encode("dateComponents", forKey: .type)
-            try container.encode(components, forKey: .dateComponents)
-        case .location(let latitude, let longitude, let radius):
-            try container.encode("location", forKey: .type)
-            try container.encode(latitude, forKey: .latitude)
-            try container.encode(longitude, forKey: .longitude)
-            try container.encode(radius, forKey: .radius)
-        }
-    }
-    
-    public var unNotificationTrigger: UNNotificationTrigger? {
-        switch self {
-        case .immediate:
-            return nil
-        case .timeInterval(let interval):
-            return UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
-        case .dateComponents(let components):
-            return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        case .location(let latitude, let longitude, let radius):
-            let center = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-            let region = CLCircularRegion(center: center, radius: radius, identifier: UUID().uuidString)
-            region.notifyOnEntry = true
-            region.notifyOnExit = false
-            return UNLocationNotificationTrigger(region: region, repeats: false)
-        }
-    }
-}
+// Removing duplicate enum in favor of Core_AppNotificationTrigger below
+// public enum AppNotificationTrigger: Codable {
+//     case immediate
+//     case timeInterval(TimeInterval)
+//     case dateComponents(DateComponents)
+//     case location(latitude: Double, longitude: Double, radius: Double)
+//     
+//     private enum CodingKeys: String, CodingKey {
+//         case type
+//         case timeInterval
+//         case dateComponents
+//         case latitude
+//         case longitude
+//         case radius
+//     }
+//     
+//     public init(from decoder: Decoder) throws {
+//         let container = try decoder.container(keyedBy: CodingKeys.self)
+//         let type = try container.decode(String.self, forKey: .type)
+//         
+//         switch type {
+//         case "immediate":
+//             self = .immediate
+//         case "timeInterval":
+//             let interval = try container.decode(TimeInterval.self, forKey: .timeInterval)
+//             self = .timeInterval(interval)
+//         case "dateComponents":
+//             let components = try container.decode(DateComponents.self, forKey: .dateComponents)
+//             self = .dateComponents(components)
+//         case "location":
+//             let latitude = try container.decode(Double.self, forKey: .latitude)
+//             let longitude = try container.decode(Double.self, forKey: .longitude)
+//             let radius = try container.decode(Double.self, forKey: .radius)
+//             self = .location(latitude: latitude, longitude: longitude, radius: radius)
+//         default:
+//             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Invalid notification trigger type")
+//         }
+//     }
+//     
+//     public func encode(to encoder: Encoder) throws {
+//         var container = encoder.container(keyedBy: CodingKeys.self)
+//         
+//         switch self {
+//         case .immediate:
+//             try container.encode("immediate", forKey: .type)
+//         case .timeInterval(let interval):
+//             try container.encode("timeInterval", forKey: .type)
+//             try container.encode(interval, forKey: .timeInterval)
+//         case .dateComponents(let components):
+//             try container.encode("dateComponents", forKey: .type)
+//             try container.encode(components, forKey: .dateComponents)
+//         case .location(let latitude, let longitude, let radius):
+//             try container.encode("location", forKey: .type)
+//             try container.encode(latitude, forKey: .latitude)
+//             try container.encode(longitude, forKey: .longitude)
+//             try container.encode(radius, forKey: .radius)
+//         }
+//     }
+//     
+//     public var unNotificationTrigger: UNNotificationTrigger? {
+//         switch self {
+//         case .immediate:
+//             return nil
+//         case .timeInterval(let interval):
+//             return UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+//         case .dateComponents(let components):
+//             return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+//         case .location(let latitude, let longitude, let radius):
+//             let center = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+//             let region = CLCircularRegion(center: center, radius: radius, identifier: UUID().uuidString)
+//             region.notifyOnEntry = true
+//             region.notifyOnExit = false
+//             return UNLocationNotificationTrigger(region: region, repeats: false)
+//         }
+//     }
+// }
 
 // MARK: - Notification Protocols
 @preconcurrency public protocol Core_NotificationManaging: Core_BaseService {
@@ -150,7 +155,7 @@ public enum Core_NotificationEvent: Equatable {
     case denied
 }
 
-// MARK: - Notification Category
+// MARK: - Core Notification Category
 public enum Core_AppNotificationCategory: String, Codable, Hashable {
     case device
     case scene
@@ -159,7 +164,7 @@ public enum Core_AppNotificationCategory: String, Codable, Hashable {
     case system
 }
 
-// MARK: - Notification Trigger
+// MARK: - Core Notification Trigger
 public enum Core_AppNotificationTrigger: Codable, Hashable {
     case immediate
     case timeInterval(TimeInterval)
@@ -250,27 +255,62 @@ public enum Core_AppNotificationTrigger: Codable, Hashable {
             return false
         }
     }
+    
+    public var unNotificationTrigger: UNNotificationTrigger? {
+        switch self {
+        case .immediate:
+            return nil
+        case .timeInterval(let interval):
+            return UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+        case .dateComponents(let components):
+            return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        case .location(let latitude, let longitude, let radius):
+            let center = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            let region = CLCircularRegion(center: center, radius: radius, identifier: UUID().uuidString)
+            region.notifyOnEntry = true
+            region.notifyOnExit = false
+            return UNLocationNotificationTrigger(region: region, repeats: false)
+        }
+    }
 }
 
-// MARK: - Notification Request
+// MARK: - Core Notification Request
 public struct Core_NotificationRequest: Identifiable, Codable, Hashable {
     public let id: String
     public let title: String
     public let body: String
     public let category: Core_AppNotificationCategory
     public let trigger: Core_AppNotificationTrigger
+    public let userInfo: [String: String]
     
     public init(
         id: String = UUID().uuidString,
         title: String,
         body: String,
         category: Core_AppNotificationCategory,
-        trigger: Core_AppNotificationTrigger
+        trigger: Core_AppNotificationTrigger,
+        userInfo: [String: String] = [:]
     ) {
         self.id = id
         self.title = title
         self.body = body
         self.category = category
         self.trigger = trigger
+        self.userInfo = userInfo
     }
-} 
+    
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    public static func == (lhs: Core_NotificationRequest, rhs: Core_NotificationRequest) -> Bool {
+        return lhs.id == rhs.id
+    }
+}
+
+// Add typealias declarations to help with transition
+public typealias AppNotificationCategory = Core_AppNotificationCategory
+public typealias AppNotificationTrigger = Core_AppNotificationTrigger
+public typealias NotificationRequest = Core_NotificationRequest
+public typealias InternalNotificationCategory = Core_AppNotificationCategory
+public typealias InternalNotificationTrigger = Core_AppNotificationTrigger 

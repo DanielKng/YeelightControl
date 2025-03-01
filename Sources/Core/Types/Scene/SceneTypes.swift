@@ -82,25 +82,5 @@ public struct Core_SceneUpdate: Codable, Hashable {
 }
 
 // MARK: - Scene Protocols
-@preconcurrency public protocol Core_SceneManaging: Core_BaseService {
-    /// The list of scenes
-    var scenes: [Core_Scene] { get }
-    
-    /// Publisher for scene updates
-    nonisolated var sceneUpdates: AnyPublisher<[Core_Scene], Never> { get }
-    
-    /// Activate a scene
-    func activateScene(_ scene: Core_Scene) async throws
-    
-    /// Deactivate a scene
-    func deactivateScene(_ scene: Core_Scene) async throws
-    
-    /// Create a scene
-    func createScene(_ scene: Core_Scene) async throws
-    
-    /// Update a scene
-    func updateScene(_ scene: Core_Scene) async throws
-    
-    /// Delete a scene
-    func deleteScene(_ scene: Core_Scene) async throws
-} 
+// Core_SceneManaging protocol is defined in ServiceProtocols.swift
+// Removing duplicate definition to resolve ambiguity errors 

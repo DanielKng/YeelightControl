@@ -3,7 +3,7 @@ import SwiftUI
 import Combine
 
 // MARK: - Theme Types
-public enum Core_Theme: String, Codable, CaseIterable {
+public enum Core_Theme: String, Codable, CaseIterable, Hashable {
     case light
     case dark
     case system
@@ -13,13 +13,13 @@ public enum Core_Theme: String, Codable, CaseIterable {
 // MARK: - Theme Protocols
 @preconcurrency public protocol Core_ThemeManaging: Core_BaseService {
     /// The current theme
-    var currentTheme: Core_Theme { get }
+    nonisolated var currentTheme: Core_Theme { get }
     
     /// Publisher for theme updates
     nonisolated var themeUpdates: AnyPublisher<Core_Theme, Never> { get }
     
     /// Set the theme
-    func setTheme(_ theme: Core_Theme)
+    nonisolated func setTheme(_ theme: Core_Theme)
     
     /// Get the theme colors
     func getThemeColors() -> ThemeColors

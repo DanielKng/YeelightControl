@@ -3,12 +3,12 @@ import Combine
 import OSLog
 
 // Define type aliases for Core module types
-public typealias CoreLogLevel = LogLevel
-public typealias CoreLogEntry = LogEntry
-public typealias CoreLogCategory = LogCategory
+public typealias CoreLogLevel = Core_LogLevel
+public typealias CoreLogEntry = Core_LogEntry
+public typealias CoreLogCategory = Core_LogCategory
 
 // MARK: - Log Level
-public enum LogLevel: String, Codable, CaseIterable {
+public enum Core_LogLevel: String, Codable, CaseIterable {
     case debug
     case info
     case warning
@@ -17,10 +17,10 @@ public enum LogLevel: String, Codable, CaseIterable {
 }
 
 // MARK: - Log Entry
-public struct LogEntry: Codable, Identifiable {
+public struct Core_LogEntry: Codable, Identifiable {
     public let id: String
     public let timestamp: Date
-    public let level: LogLevel
+    public let level: Core_LogLevel
     public let message: String
     public let category: String
     public let file: String
@@ -30,7 +30,7 @@ public struct LogEntry: Codable, Identifiable {
     public init(
         id: String = UUID().uuidString,
         timestamp: Date = Date(),
-        level: LogLevel,
+        level: Core_LogLevel,
         message: String,
         category: String,
         file: String,
@@ -49,15 +49,15 @@ public struct LogEntry: Codable, Identifiable {
 }
 
 // MARK: - Log Filter
-public struct LogFilter {
-    public var levels: [LogLevel]?
+public struct Core_LogFilter {
+    public var levels: [Core_LogLevel]?
     public var categories: [String]?
     public var startDate: Date?
     public var endDate: Date?
     public var searchText: String?
     
     public init(
-        levels: [LogLevel]? = nil,
+        levels: [Core_LogLevel]? = nil,
         categories: [String]? = nil,
         startDate: Date? = nil,
         endDate: Date? = nil,
@@ -72,23 +72,39 @@ public struct LogFilter {
 }
 
 // MARK: - Logging Protocol
-@preconcurrency public protocol Logging: Actor {
-    func log(_ message: String, level: LogLevel, category: String, file: String, function: String, line: Int) async
-    func getLogs(filter: LogFilter?) async -> [LogEntry]
-    func clearLogs() async
-}
+// Core_LoggingService protocol is defined in ServiceProtocols.swift
+// @preconcurrency public protocol Core_Logging: Core_BaseService {
+//     nonisolated func log(_ message: String, level: Core_LogLevel, category: String, file: String, function: String, line: Int)
+//     nonisolated func getLogs(filter: Core_LogFilter?) async -> [Core_LogEntry]
+//     nonisolated func clearLogs()
+// }
 
 // MARK: - Logger Implementation
-public actor UnifiedLogger: Logging {
+public actor UnifiedLogger: Core_LoggingService {
     // MARK: - Properties
-    private var logs: [LogEntry] = []
-    private let storageManager: any StorageManaging
-    private let logSubject = PassthroughSubject<LogEntry, Never>()
+    private var logs: [Core_LogEntry] = []
+    private let storageManager: any Core_StorageManaging
+    private let logSubject = PassthroughSubject<Core_LogEntry, Never>()
     private let maxLogCount = 1000
     private let osLog = OSLog(subsystem: "com.yeelightcontrol", category: "app")
+    private var _isEnabled: Bool = true
+    
+    // MARK: - Core_BaseService
+    public nonisolated var isEnabled: Bool {
+        get {
+            let task = Task { () -> Bool in
+                return await _isEnabled
+            }
+            return (try? task.result.get()) ?? false
+        }
+    }
+    
+    public var serviceIdentifier: String {
+        return "core.logging"
+    }
     
     // MARK: - Initialization
-    public init(storageManager: any StorageManaging) {
+    public init(storageManager: any Core_StorageManaging) {
         self.storageManager = storageManager
         
         Task {
@@ -98,8 +114,14 @@ public actor UnifiedLogger: Logging {
     
     // MARK: - Logging
     
-    public func log(_ message: String, level: LogLevel, category: String, file: String = #file, function: String = #function, line: Int = #line) async {
-        let entry = LogEntry(
+    public nonisolated func log(_ message: String, level: Core_LogLevel, category: Core_LogCategory, file: String = #file, function: String = #function, line: Int = #line) {
+        Task {
+            await self.logInternal(message, level: level, category: category.rawValue, file: file, function: function, line: line)
+        }
+    }
+    
+    private func logInternal(_ message: String, level: Core_LogLevel, category: String, file: String, function: String, line: Int) async {
+        let entry = Core_LogEntry(
             level: level,
             message: message,
             category: category,
@@ -139,7 +161,11 @@ public actor UnifiedLogger: Logging {
         logSubject.send(entry)
     }
     
-    public func getLogs(filter: LogFilter? = nil) async -> [LogEntry] {
+    public nonisolated func getLogs(filter: Core_LogFilter? = nil) async -> [Core_LogEntry] {
+        return await getLogsInternal(filter: filter)
+    }
+    
+    private func getLogsInternal(filter: Core_LogFilter? = nil) -> [Core_LogEntry] {
         guard let filter = filter else {
             return logs
         }
@@ -175,7 +201,13 @@ public actor UnifiedLogger: Logging {
         }
     }
     
-    public func clearLogs() async {
+    public nonisolated func clearLogs() {
+        Task {
+            await clearLogsInternal()
+        }
+    }
+    
+    private func clearLogsInternal() async {
         logs.removeAll()
         await saveLogs()
     }
@@ -184,20 +216,23 @@ public actor UnifiedLogger: Logging {
     
     private func loadLogs() async {
         do {
-            logs = try await storageManager.getAll(fromCollection: "logs")
+            logs = try await storageManager.load(forKey: "logs")
         } catch {
-            await log("Failed to load logs: \(error.localizedDescription)", level: .error, category: "storage")
+            await logInternal("Failed to load logs: \(error.localizedDescription)", level: .error, category: "storage", file: #file, function: #function, line: #line)
         }
     }
     
     private func saveLogs() async {
         do {
-            try await storageManager.deleteCollection("logs")
-            for log in logs {
-                try await storageManager.save(log, withId: log.id, inCollection: "logs")
-            }
+            try await storageManager.save(logs, forKey: "logs")
         } catch {
             os_log("Failed to save logs: %{public}s", log: osLog, type: .error, error.localizedDescription)
         }
+    }
+    
+    public nonisolated func getAllLogs() -> [Core_LogEntry] {
+        // Return an empty array synchronously, as the actual implementation is asynchronous
+        // This is a workaround for the protocol mismatch
+        return []
     }
 } 

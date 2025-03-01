@@ -5,19 +5,21 @@ import SwiftUI
 import CoreLocation
 
 // MARK: - Notification Managing Protocol
-protocol NotificationManaging {
-    var notificationSettings: NotificationSettings { get }
-    var notificationUpdates: AnyPublisher<NotificationUpdate, Never> { get }
-    
-    func requestAuthorization() async throws
-    func scheduleNotification(_ notification: AppNotification) async throws
-    func cancelNotification(withId id: String) async
-    func cancelAllNotifications() async
-    func handleNotificationResponse(_ response: UNNotificationResponse)
-    func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any]) async
-}
+// Using Core_NotificationManaging protocol instead of duplicate definition
+// protocol NotificationManaging {
+//     var notificationSettings: NotificationSettings { get }
+//     var notificationUpdates: AnyPublisher<NotificationUpdate, Never> { get }
+//     
+//     func requestAuthorization() async throws
+//     func scheduleNotification(_ notification: AppNotification) async throws
+//     func cancelNotification(withId id: String) async
+//     func cancelAllNotifications() async
+//     func handleNotificationResponse(_ response: UNNotificationResponse)
+//     func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any]) async
+// }
 
 // MARK: - Notification Settings
+// Using Core_NotificationSettings instead
 struct NotificationSettings {
     let authorizationStatus: UNAuthorizationStatus
     let alertSetting: Bool
@@ -28,32 +30,34 @@ struct NotificationSettings {
 }
 
 // MARK: - App Notification
-struct AppNotification {
-    let id: String
-    let title: String
-    let body: String
-    let category: InternalNotificationCategory
-    let trigger: InternalNotificationTrigger
-    let userInfo: [String: Any]
-    
-    init(
-        id: String = UUID().uuidString,
-        title: String,
-        body: String,
-        category: InternalNotificationCategory,
-        trigger: InternalNotificationTrigger,
-        userInfo: [String: Any] = [:]
-    ) {
-        self.id = id
-        self.title = title
-        self.body = body
-        self.category = category
-        self.trigger = trigger
-        self.userInfo = userInfo
-    }
-}
+// Using Core_NotificationRequest instead of duplicate AppNotification
+// struct AppNotification {
+//     let id: String
+//     let title: String
+//     let body: String
+//     let category: InternalNotificationCategory
+//     let trigger: InternalNotificationTrigger
+//     let userInfo: [String: Any]
+//     
+//     init(
+//         id: String = UUID().uuidString,
+//         title: String,
+//         body: String,
+//         category: InternalNotificationCategory,
+//         trigger: InternalNotificationTrigger,
+//         userInfo: [String: Any] = [:]
+//     ) {
+//         self.id = id
+//         self.title = title
+//         self.body = body
+//         self.category = category
+//         self.trigger = trigger
+//         self.userInfo = userInfo
+//     }
+// }
 
 // MARK: - Notification Category
+// Using Core_AppNotificationCategory instead of duplicate NotificationCategory
 enum NotificationCategory: String {
     case device = "device_notification"
     case automation = "automation_notification"
@@ -115,6 +119,7 @@ enum NotificationCategory: String {
 }
 
 // MARK: - Notification Trigger
+// Using Core_AppNotificationTrigger instead of duplicate NotificationTrigger
 enum NotificationTrigger {
     case immediate
     case timeInterval(TimeInterval)
@@ -138,17 +143,29 @@ enum NotificationTrigger {
 // MARK: - Notification Update
 enum NotificationUpdate {
     case settingsChanged(NotificationSettings)
-    case notificationReceived(AppNotification)
+    case notificationReceived(Core_NotificationRequest) // Updated to use Core_NotificationRequest
     case notificationResponded(String, String) // id, actionIdentifier
     case authorizationChanged(Bool)
 }
 
 @MainActor
-public final class UnifiedNotificationManager: NSObject, ObservableObject {
+public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_NotificationManaging, Core_BaseService {
     // MARK: - Published Properties
     @Published public private(set) var isNotificationsEnabled = false
     @Published public private(set) var pendingNotifications: [UNNotificationRequest] = []
     @Published public private(set) var deliveredNotifications: [UNNotification] = []
+    
+    // MARK: - Core_BaseService Conformance
+    private var _isEnabled: Bool = true
+    nonisolated public var isEnabled: Bool {
+        _isEnabled
+    }
+    
+    // MARK: - Core_NotificationManaging Protocol Properties
+    public nonisolated var notificationEvents: AnyPublisher<Core_NotificationEvent, Never> {
+        notificationEventsSubject.eraseToAnyPublisher()
+    }
+    private let notificationEventsSubject = PassthroughSubject<Core_NotificationEvent, Never>()
     
     // MARK: - Private Properties
     private let notificationCenter = UNUserNotificationCenter.current()
@@ -185,12 +202,16 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject {
         
         // Request authorization if needed
         Task {
-            await requestAuthorization()
+            do {
+                _ = try await requestAuthorization()
+            } catch {
+                print("Failed to request notification authorization: \(error)")
+            }
         }
     }
     
-    // MARK: - Public Methods
-    public func requestAuthorization() async throws {
+    // MARK: - Core_NotificationManaging Protocol Methods
+    public func requestAuthorization() async throws -> Core_PermissionStatus {
         let options: UNAuthorizationOptions = [.alert, .sound, .badge]
         isNotificationsEnabled = try await notificationCenter.requestAuthorization(options: options)
         
@@ -198,28 +219,180 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject {
             name: "notification_authorization_requested",
             parameters: ["authorized": String(isNotificationsEnabled)]
         ))
+        
+        return isNotificationsEnabled ? .authorized : .denied
     }
     
+    public func getAuthorizationStatus() async -> Core_PermissionStatus {
+        let settings = await notificationCenter.notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return .authorized
+        case .denied:
+            return .denied
+        case .notDetermined:
+            return .notDetermined
+        @unknown default:
+            return .notDetermined
+        }
+    }
+    
+    public func scheduleNotification(_ notification: Core_NotificationRequest) async throws {
+        let content = UNMutableNotificationContent()
+        content.title = notification.title
+        content.body = notification.body
+        content.sound = Constants.defaultSound
+        
+        // Convert dictionary to [String: Any]
+        var userInfo: [String: Any] = [:]
+        for (key, value) in notification.userInfo {
+            userInfo[key] = value
+        }
+        content.userInfo = userInfo
+        
+        // Set category based on notification category
+        switch notification.category {
+        case .device:
+            content.categoryIdentifier = Constants.deviceStateCategory
+        case .automation:
+            content.categoryIdentifier = Constants.automationCategory
+        case .system:
+            content.categoryIdentifier = Constants.errorCategory
+        default:
+            content.categoryIdentifier = notification.category.rawValue
+        }
+        
+        let request = UNNotificationRequest(
+            identifier: notification.id,
+            content: content,
+            trigger: notification.trigger.unTrigger
+        )
+        
+        try await notificationCenter.add(request)
+        await refreshNotificationLists()
+    }
+    
+    public func cancelNotification(withId id: String) async {
+        notificationCenter.removePendingNotificationRequests(withIdentifiers: [id])
+        await refreshNotificationLists()
+    }
+    
+    public func cancelAllNotifications() async {
+        notificationCenter.removeAllPendingNotificationRequests()
+        await refreshNotificationLists()
+    }
+    
+    public func getPendingNotifications() async -> [Core_NotificationRequest] {
+        let pendingRequests = await notificationCenter.pendingNotificationRequests()
+        return pendingRequests.compactMap { request in
+            guard let content = request.content as? UNMutableNotificationContent else { return nil }
+            
+            // Convert userInfo to string dictionary
+            var stringUserInfo: [String: String] = [:]
+            for (key, value) in content.userInfo {
+                if let keyString = key as? String, let valueString = String(describing: value) {
+                    stringUserInfo[keyString] = valueString
+                }
+            }
+            
+            // Determine category
+            let category: Core_AppNotificationCategory
+            switch content.categoryIdentifier {
+            case Constants.deviceStateCategory:
+                category = .device
+            case Constants.automationCategory:
+                category = .automation
+            case Constants.errorCategory:
+                category = .system
+            default:
+                category = .system
+            }
+            
+            // Determine trigger
+            let trigger: Core_AppNotificationTrigger
+            if let unTrigger = request.trigger as? UNTimeIntervalNotificationTrigger {
+                trigger = .timeInterval(unTrigger.timeInterval)
+            } else if let unTrigger = request.trigger as? UNCalendarNotificationTrigger {
+                trigger = .dateComponents(unTrigger.dateComponents)
+            } else if let unTrigger = request.trigger as? UNLocationNotificationTrigger {
+                let region = unTrigger.region
+                if let circularRegion = region as? CLCircularRegion {
+                    trigger = .location(
+                        latitude: circularRegion.center.latitude,
+                        longitude: circularRegion.center.longitude,
+                        radius: circularRegion.radius
+                    )
+                } else {
+                    trigger = .immediate
+                }
+            } else {
+                trigger = .immediate
+            }
+            
+            return Core_NotificationRequest(
+                id: request.identifier,
+                title: content.title,
+                body: content.body,
+                category: category,
+                trigger: trigger,
+                userInfo: stringUserInfo
+            )
+        }
+    }
+    
+    public func getDeliveredNotifications() async -> [Core_NotificationRequest] {
+        let deliveredNotifications = await notificationCenter.deliveredNotifications()
+        return deliveredNotifications.compactMap { notification in
+            let content = notification.request.content
+            
+            // Convert userInfo to string dictionary
+            var stringUserInfo: [String: String] = [:]
+            for (key, value) in content.userInfo {
+                if let keyString = key as? String, let valueString = String(describing: value) {
+                    stringUserInfo[keyString] = valueString
+                }
+            }
+            
+            // Determine category
+            let category: Core_AppNotificationCategory
+            switch content.categoryIdentifier {
+            case Constants.deviceStateCategory:
+                category = .device
+            case Constants.automationCategory:
+                category = .automation
+            case Constants.errorCategory:
+                category = .system
+            default:
+                category = .system
+            }
+            
+            return Core_NotificationRequest(
+                id: notification.request.identifier,
+                title: content.title,
+                body: content.body,
+                category: category,
+                trigger: .immediate, // Delivered notifications don't have triggers
+                userInfo: stringUserInfo
+            )
+        }
+    }
+    
+    // MARK: - Legacy Public Methods
     public func scheduleDeviceStateNotification(
         title: String,
         body: String,
         deviceId: String
     ) async throws {
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = Constants.defaultSound
-        content.categoryIdentifier = Constants.deviceStateCategory
-        content.userInfo = ["device_id": deviceId]
-        
-        let request = UNNotificationRequest(
-            identifier: "device_state_\(deviceId)_\(Date().timeIntervalSince1970)",
-            content: content,
-            trigger: nil
+        // Use the Core_NotificationRequest version
+        let notification = Core_NotificationRequest(
+            id: "device_state_\(deviceId)_\(Date().timeIntervalSince1970)",
+            title: title,
+            body: body,
+            category: .device,
+            trigger: .immediate,
+            userInfo: ["device_id": deviceId]
         )
-        
-        try await notificationCenter.add(request)
-        await refreshNotificationLists()
+        try await scheduleNotification(notification)
     }
     
     public func scheduleAutomationNotification(
@@ -227,68 +400,38 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject {
         body: String,
         automationId: String
     ) async throws {
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = Constants.defaultSound
-        content.categoryIdentifier = Constants.automationCategory
-        content.userInfo = ["automation_id": automationId]
-        
-        let request = UNNotificationRequest(
-            identifier: "automation_\(automationId)_\(Date().timeIntervalSince1970)",
-            content: content,
-            trigger: nil
+        // Use the Core_NotificationRequest version
+        let notification = Core_NotificationRequest(
+            id: "automation_\(automationId)_\(Date().timeIntervalSince1970)",
+            title: title,
+            body: body,
+            category: .automation,
+            trigger: .immediate,
+            userInfo: ["automation_id": automationId]
         )
-        
-        try await notificationCenter.add(request)
-        await refreshNotificationLists()
+        try await scheduleNotification(notification)
     }
     
     public func scheduleErrorNotification(
         title: String,
         error: Error
     ) async throws {
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = error.localizedDescription
-        content.sound = Constants.criticalSound
-        content.categoryIdentifier = Constants.errorCategory
-        
-        let request = UNNotificationRequest(
-            identifier: "error_\(Date().timeIntervalSince1970)",
-            content: content,
-            trigger: nil
+        // Use the Core_NotificationRequest version
+        let notification = Core_NotificationRequest(
+            id: "error_\(Date().timeIntervalSince1970)",
+            title: title,
+            body: error.localizedDescription,
+            category: .system,
+            trigger: .immediate,
+            userInfo: ["error": error.localizedDescription]
         )
-        
-        try await notificationCenter.add(request)
-        await refreshNotificationLists()
-    }
-    
-    public func removeAllPendingNotifications() {
-        notificationCenter.removeAllPendingNotificationRequests()
-        pendingNotifications.removeAll()
-    }
-    
-    public func removeAllDeliveredNotifications() {
-        notificationCenter.removeAllDeliveredNotifications()
-        deliveredNotifications.removeAll()
+        try await scheduleNotification(notification)
     }
     
     // MARK: - Private Methods
-    private func checkNotificationStatus() {
-        Task {
-            let settings = await notificationCenter.notificationSettings()
-            isNotificationsEnabled = settings.authorizationStatus == .authorized
-        }
-    }
-    
     private func refreshNotificationLists() async {
-        async let pending = notificationCenter.pendingNotificationRequests()
-        async let delivered = notificationCenter.deliveredNotifications()
-        
-        let (pendingList, deliveredList) = await (pending, delivered)
-        pendingNotifications = pendingList
-        deliveredNotifications = deliveredList
+        pendingNotifications = await notificationCenter.pendingNotificationRequests()
+        deliveredNotifications = await notificationCenter.deliveredNotifications()
     }
 }
 
@@ -296,40 +439,57 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject {
 extension UnifiedNotificationManager: UNUserNotificationCenterDelegate {
     public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        analytics.trackEvent(AnalyticsEvent(
-            name: "notification_presented",
-            parameters: [
-                "category": notification.request.content.categoryIdentifier,
-                "id": notification.request.identifier
-            ]
-        ))
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Convert to Core_NotificationRequest
+        let content = notification.request.content
+        var stringUserInfo: [String: String] = [:]
+        for (key, value) in content.userInfo {
+            if let keyString = key as? String, let valueString = String(describing: value) {
+                stringUserInfo[keyString] = valueString
+            }
+        }
         
-        await refreshNotificationLists()
-        return [.banner, .sound, .badge]
+        // Determine category
+        let category: Core_AppNotificationCategory
+        switch content.categoryIdentifier {
+        case Constants.deviceStateCategory:
+            category = .device
+        case Constants.automationCategory:
+            category = .automation
+        case Constants.errorCategory:
+            category = .system
+        default:
+            category = .system
+        }
+        
+        let coreNotification = Core_NotificationRequest(
+            id: notification.request.identifier,
+            title: content.title,
+            body: content.body,
+            category: category,
+            trigger: .immediate,
+            userInfo: stringUserInfo
+        )
+        
+        // Emit notification received event
+        notificationEventsSubject.send(.received(notification.request.identifier))
+        
+        // Show the notification
+        completionHandler([.banner, .sound, .badge])
     }
     
     public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        analytics.trackEvent(AnalyticsEvent(
-            name: "notification_response",
-            parameters: [
-                "category": response.notification.request.content.categoryIdentifier,
-                "id": response.notification.request.identifier,
-                "action": response.actionIdentifier
-            ]
-        ))
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        // Emit notification responded event
+        notificationEventsSubject.send(.responded(response.notification.request.identifier, response.actionIdentifier))
         
-        await refreshNotificationLists()
+        completionHandler()
     }
-}
-
-// MARK: - Logger Category Extension
-extension Core_LogCategory {
-    static let notification = LogCategory.notification
 }
 
 // MARK: - Constants

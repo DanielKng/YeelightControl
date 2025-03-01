@@ -1,7 +1,11 @@
 import Foundation
 import Network
 
-public protocol NetworkProtocolManaging: AnyObject {
+// Define a type alias for the Core module's NetworkProtocolManaging protocol
+public typealias CoreNetworkProtocolManaging = Core_NetworkProtocolManaging
+
+/// Protocol defining network protocol management capabilities
+public protocol Core_NetworkProtocolManaging: AnyObject {
     func connect(to endpoint: NWEndpoint)
     func disconnect()
     func send(_ command: String) async throws -> Data
@@ -9,7 +13,7 @@ public protocol NetworkProtocolManaging: AnyObject {
     func stopDiscovery()
 }
 
-public final class UnifiedNetworkProtocolManager: NetworkProtocolManaging {
+public final class UnifiedNetworkProtocolManager: Core_NetworkProtocolManaging {
     private var connection: NWConnection?
     private let queue = DispatchQueue(label: "com.yeelightcontrol.protocol")
     
@@ -32,11 +36,11 @@ public final class UnifiedNetworkProtocolManager: NetworkProtocolManaging {
     
     public func send(_ command: String) async throws -> Data {
         guard let connection = connection else {
-            throw NetworkError.connectionFailed
+            throw Core_NetworkError.connectionFailed
         }
         
         guard let data = command.data(using: .utf8) else {
-            throw NetworkError.invalidCommand
+            throw Core_NetworkError.invalidCommand
         }
         
         return try await withCheckedThrowingContinuation { continuation in

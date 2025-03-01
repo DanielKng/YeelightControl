@@ -3,14 +3,7 @@ import Combine
 import SwiftUI
 
 // MARK: - Error Handling Protocol
-@preconcurrency protocol ErrorHandling: Actor {
-    var lastError: Core_AppError? { get }
-    nonisolated var errorUpdates: AnyPublisher<Core_AppError, Never> { get }
-    
-    func handle(_ error: Error) async
-    func handle(_ appError: Core_AppError) async
-    func clearError() async
-}
+// Core_ErrorHandling protocol is defined in ServiceProtocols.swift
 
 // MARK: - Error Record
 public struct ErrorRecord: Codable, Hashable {
@@ -81,80 +74,61 @@ public enum ErrorSeverity: String, Codable {
 }
 
 // MARK: - AppError Extensions
-extension Core_AppError: Identifiable {
-    public var id: String {
-        switch self {
-        case .network(let error): return "network-\(error)"
-        case .location(let error): return "location-\(error)"
-        case .configuration(let error): return "config-\(error)"
-        case .device(let error): return "device-\(error)"
-        case .security(let error): return "security-\(error)"
-        case .storage(let error): return "storage-\(error)"
-        case .permission(let error): return "permission-\(error)"
-        case .effect(let error): return "effect-\(error)"
-        case .scene(let error): return "scene-\(error)"
-        case .unknown: return "unknown"
-        }
-    }
-    
-    public var errorDescription: String? {
-        switch self {
-        case .network(let error): return "Network error: \(error)"
-        case .location(let error): return "Location error: \(error)"
-        case .configuration(let error): return "Configuration error: \(error)"
-        case .device(let error): return "Device error: \(error)"
-        case .security(let error): return "Security error: \(error)"
-        case .storage(let error): return "Storage error: \(error)"
-        case .permission(let error): return "Permission error: \(error)"
-        case .effect(let error): return "Effect error: \(error)"
-        case .scene(let error): return "Scene error: \(error)"
-        case .unknown: return "Unknown error occurred"
-        }
-    }
-    
-    public var recoverySuggestion: String? {
-        switch self {
-        case .network: return "Check your internet connection and try again."
-        case .location: return "Check location permissions in Settings and try again."
-        case .configuration: return "Try resetting app settings to defaults."
-        case .device: return "Make sure the device is powered on and connected to the network."
-        case .security: return "Try authenticating again."
-        case .storage: return "Check available storage space and try again."
-        case .permission: return "Check app permissions in Settings."
-        case .effect: return "Check effect settings and try again."
-        case .scene: return "Check scene configuration and try again."
-        case .unknown: return "Try restarting the app. If the problem persists, contact support."
-        }
-    }
-    
-    public var severity: ErrorSeverity {
-        switch self {
-        case .network: return .warning
-        case .location: return .warning
-        case .configuration: return .warning
-        case .device: return .warning
-        case .security: return .error
-        case .storage: return .error
-        case .permission: return .warning
-        case .effect: return .warning
-        case .scene: return .warning
-        case .unknown: return .error
-        }
-    }
-}
+// Core_AppError already conforms to Identifiable in ErrorTypes.swift
+// No need to redefine it here
 
 // MARK: - Error Handler Implementation
-public actor UnifiedErrorHandler: ErrorHandling {
-    private let services: BaseServiceContainer
+public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
+    private let services: Core_ServiceContainer
     private let errorSubject = PassthroughSubject<Core_AppError, Never>()
-    private(set) var lastError: Core_AppError?
+    private var _lastError: Core_AppError?
+    private var _isEnabled: Bool = true
     
-    public init(services: BaseServiceContainer = .shared) {
-        self.services = services
+    // MARK: - Core_BaseService
+    public nonisolated var isEnabled: Bool {
+        let value = false // Default value
+        let task = Task {
+            return await _isEnabled
+        }
+        return (try? task.value) ?? value
     }
     
-    public nonisolated var errorUpdates: AnyPublisher<Core_AppError, Never> {
+    public var serviceIdentifier: String {
+        return "core.error"
+    }
+    
+    // MARK: - Core_ErrorHandling
+    
+    nonisolated public var lastError: Core_AppError? {
+        get {
+            let task = Task { () -> Core_AppError? in
+                return await _lastError
+            }
+            return try? task.result.get()
+        }
+    }
+    
+    nonisolated public var errorUpdates: AnyPublisher<Core_AppError, Never> {
         errorSubject.eraseToAnyPublisher()
+    }
+    
+    public func handle(_ appError: Core_AppError) async {
+        _lastError = appError
+        errorSubject.send(appError)
+        
+        // Log the error
+        await services.logger.log(
+            "Error: \(appError.message)",
+            level: .error,
+            category: .error,
+            file: appError.file,
+            function: appError.function,
+            line: appError.line
+        )
+    }
+    
+    public init(services: Core_ServiceContainer) {
+        self.services = services
     }
     
     public func handle(_ error: Error) async {
@@ -163,20 +137,15 @@ public actor UnifiedErrorHandler: ErrorHandling {
         } else {
             // Convert to AppError.unknown
             let appError = Core_AppError.unknown
-            lastError = appError
-            services.logger.error(error.localizedDescription, category: .error)
+            _lastError = appError
+            // TODO: Fix this when logger is updated
+            // await services.logger.error(error.localizedDescription, category: .error)
             errorSubject.send(appError)
         }
     }
     
-    public func handle(_ appError: Core_AppError) async {
-        lastError = appError
-        services.logger.error(appError.errorDescription ?? "Unknown error", category: .error)
-        errorSubject.send(appError)
-    }
-    
     public func clearError() async {
-        lastError = nil
+        _lastError = nil
     }
 }
 
@@ -186,7 +155,7 @@ public extension View {
         alert(item: error) { error in
             Alert(
                 title: Text("Error"),
-                message: Text(error?.errorDescription ?? "Unknown error"),
+                message: Text(error.errorDescription ?? "Unknown error"),
                 dismissButton: .default(Text("OK"))
             )
         }

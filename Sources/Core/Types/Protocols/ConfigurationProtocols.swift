@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-public enum Core_ConfigKey: String, Codable, CaseIterable {
+public enum Core_ConfigKey: String, Codable, CaseIterable, Hashable {
     case appTheme
     case deviceRefreshInterval
     case analyticsEnabled
@@ -13,16 +13,21 @@ public enum Core_ConfigKey: String, Codable, CaseIterable {
     case networkSettings
     case securitySettings
     case debugMode
+    case backgroundRefreshEnabled
+    case sceneSettings
+    case effectSettings
+    case apiEndpoint
+    case apiKey
 }
 
 @preconcurrency public protocol Core_ConfigurationManaging: Core_BaseService {
-    var values: [Core_ConfigKey: Any] { get }
-    var configurationUpdates: AnyPublisher<Core_ConfigKey, Never> { get }
+    nonisolated var values: [Core_ConfigKey: Any] { get }
+    nonisolated var configurationUpdates: AnyPublisher<Core_ConfigKey, Never> { get }
     
-    func getValue<T>(for key: Core_ConfigKey) throws -> T
-    func setValue<T>(_ value: T, for key: Core_ConfigKey) throws
-    func removeValue(for key: Core_ConfigKey) throws
+    nonisolated func getValue<T>(for key: Core_ConfigKey) throws -> T
+    nonisolated func setValue<T>(_ value: T, for key: Core_ConfigKey) throws
+    nonisolated func removeValue(for key: Core_ConfigKey) throws
 }
 
-// Core_ConfigurationError is defined in ErrorTypes.swift
+// Core_ConfigurationError is defined in UnifiedConfigurationManager.swift
 // No need to redefine it here 

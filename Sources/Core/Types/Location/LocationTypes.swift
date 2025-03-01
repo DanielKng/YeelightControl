@@ -45,23 +45,4 @@ public struct Core_Location: Codable, Hashable {
     }
 }
 
-// MARK: - Location Protocols
-@preconcurrency public protocol Core_LocationManaging: Core_BaseService {
-    /// The current location
-    nonisolated var currentLocation: CLLocation? { get }
-    
-    /// Publisher for location updates
-    nonisolated var locationUpdates: AnyPublisher<CLLocation, Never> { get }
-    
-    /// Start updating location
-    func startUpdatingLocation() async
-    
-    /// Stop updating location
-    func stopUpdatingLocation() async
-    
-    /// Request location authorization
-    func requestAuthorization() async -> Core_PermissionStatus
-    
-    /// Get the current authorization status
-    func getAuthorizationStatus() async -> Core_PermissionStatus
-} 
+// Note: Core_LocationManaging is defined in UnifiedLocationManager.swift 

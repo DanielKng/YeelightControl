@@ -51,9 +51,10 @@ public enum Core_DeviceType: String, Codable, CaseIterable {
     case unknown
 }
 
+// MARK: - Device State
 public enum Core_DeviceState: Codable, Hashable {
-    case on(brightness: Int, color: Core_Color)
     case off
+    case on(brightness: Int, color: Core_Color)
     case unknown
     
     public var isOn: Bool {
@@ -84,49 +85,11 @@ public enum Core_DeviceState: Codable, Hashable {
     }
 }
 
-public enum Core_Color: Codable, Hashable {
-    case rgb(red: Int, green: Int, blue: Int)
-    case temperature(kelvin: Int)
-    case white
-    
-    public var rgbValues: (red: Int, green: Int, blue: Int) {
-        switch self {
-        case .rgb(let red, let green, let blue):
-            return (red, green, blue)
-        case .temperature:
-            return (255, 255, 255)
-        case .white:
-            return (255, 255, 255)
-        }
-    }
-    
-    public var temperatureValue: Int {
-        switch self {
-        case .temperature(let kelvin):
-            return kelvin
-        case .rgb, .white:
-            return 4000
-        }
-    }
-}
+// Core_Color is defined in ColorTypes.swift
+// Removing duplicate definition to resolve ambiguity errors
 
 // MARK: - Device Protocols
-@preconcurrency public protocol Core_DeviceManaging: Core_BaseService {
-    /// The list of devices
-    nonisolated var devices: [Core_Device] { get }
-    
-    /// Publisher for device updates
-    nonisolated var deviceUpdates: AnyPublisher<[Core_Device], Never> { get }
-    
-    /// Discover devices
-    func discoverDevices() async throws
-    
-    /// Connect to a device
-    func connectToDevice(_ device: Core_Device) async throws
-    
-    /// Disconnect from a device
-    func disconnectFromDevice(_ device: Core_Device) async throws
-    
-    /// Update a device
-    func updateDevice(_ device: Core_Device) async throws
-} 
+// Core_DeviceManaging protocol is defined in ServiceProtocols.swift
+// Removing duplicate definition to resolve ambiguity errors
+
+// ... existing code ... 

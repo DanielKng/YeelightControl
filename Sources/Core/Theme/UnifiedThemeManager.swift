@@ -108,34 +108,59 @@ public struct ConcreteThemeMetrics: Core_ThemeMetrics {
 }
 
 // MARK: - Theme Managing Protocol
-public protocol Core_ThemeManaging: AnyObject {
-    var currentTheme: Core_Theme { get }
-    var colors: ConcreteThemeColors { get }
-    var fonts: ConcreteThemeFonts { get }
-    var metrics: ConcreteThemeMetrics { get }
-    var themeUpdates: AnyPublisher<Core_Theme, Never> { get }
-    
-    func setTheme(_ theme: Core_Theme)
-}
+// Core_ThemeManaging protocol is defined in ThemeTypes.swift
 
-// MARK: - Theme Enum
-public enum Core_Theme: String, Codable, CaseIterable {
-    case light
-    case dark
-    case system
-    case custom
-}
+// MARK: - Theme
+// Core_Theme enum is defined in ThemeTypes.swift
+// Removing duplicate definition to resolve ambiguity errors
 
 // MARK: - Unified Theme Manager Implementation
-public final class UnifiedThemeManager: ObservableObject, Core_ThemeManaging {
+public final class UnifiedThemeManager: ObservableObject, Core_ThemeManaging, Core_BaseService {
     // MARK: - Properties
-    @Published public private(set) var currentTheme: Core_Theme = .system
+    private var _currentTheme: Core_Theme = .system
+    public private(set) var currentTheme: Core_Theme {
+        get { _currentTheme }
+        set {
+            _currentTheme = newValue
+            objectWillChange.send()
+        }
+    }
     @Published public private(set) var colors: ConcreteThemeColors = ConcreteThemeColors()
     @Published public private(set) var fonts: ConcreteThemeFonts = ConcreteThemeFonts()
     @Published public private(set) var metrics: ConcreteThemeMetrics = ConcreteThemeMetrics()
     
     private let storageManager: any Core_StorageManaging
     private let themeSubject = PassthroughSubject<Core_Theme, Never>()
+    private var _isEnabled: Bool = true
+    
+    // MARK: - Core_BaseService Conformance
+    nonisolated public var isEnabled: Bool {
+        _isEnabled
+    }
+    
+    // MARK: - Core_ThemeManaging Conformance
+    
+    nonisolated public var themeUpdates: AnyPublisher<Core_Theme, Never> {
+        themeSubject.eraseToAnyPublisher()
+    }
+    
+    nonisolated public func setTheme(_ theme: Core_Theme) {
+        Task {
+            await setThemeInternal(theme)
+        }
+    }
+    
+    public func getThemeColors() -> ThemeColors {
+        return colors as ThemeColors
+    }
+    
+    public func getThemeFonts() -> ThemeFonts {
+        return fonts as ThemeFonts
+    }
+    
+    public func getThemeMetrics() -> ThemeMetrics {
+        return metrics as ThemeMetrics
+    }
     
     // MARK: - Initialization
     public init(storageManager: any Core_StorageManaging) {
@@ -143,21 +168,6 @@ public final class UnifiedThemeManager: ObservableObject, Core_ThemeManaging {
         
         Task {
             await loadTheme()
-        }
-    }
-    
-    // MARK: - Public API
-    public var themeUpdates: AnyPublisher<Core_Theme, Never> {
-        themeSubject.eraseToAnyPublisher()
-    }
-    
-    public func setTheme(_ theme: Core_Theme) {
-        currentTheme = theme
-        updateThemeComponents()
-        themeSubject.send(theme)
-        
-        Task {
-            await saveTheme()
         }
     }
     
@@ -218,5 +228,16 @@ public final class UnifiedThemeManager: ObservableObject, Core_ThemeManaging {
             print("Error saving theme: \(error)")
         }
     }
+    
+    private func setThemeInternal(_ theme: Core_Theme) async {
+        currentTheme = theme
+        updateThemeComponents()
+        themeSubject.send(theme)
+        
+        Task {
+            await saveTheme()
+        }
+    }
 } 
+
 
