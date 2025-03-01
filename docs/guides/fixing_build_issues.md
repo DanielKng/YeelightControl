@@ -189,6 +189,12 @@ I've made significant progress in resolving the build issues:
     - Modified the `unknown` case to accept an associated `Error` value
     - Updated `UnifiedErrorHandler` to use the new `sourceLocation` property
 
+33. ✅ Fixed enum stored property issue in `Core_AppError`:
+    - Changed the private stored property to use an associated value in the `unknown` case
+    - Updated the `sourceLocation` property to use a computed property based on the case
+    - Updated the `with(sourceLocation:)` method to create a new enum instance with the source location
+    - Updated the `id` and `errorDescription` methods to handle the updated `unknown` case
+
 ## Current Status
 
 We've made significant progress on fixing the Core module issues, but there are still several critical issues that need to be addressed:
