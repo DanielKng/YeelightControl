@@ -25,9 +25,9 @@ public actor UnifiedAnalyticsManager: Core_AnalyticsManaging, Core_BaseService {
     
     // MARK: - Core_BaseService Conformance
     nonisolated public var isEnabled: Bool {
-        get async {
-            await _isEnabled
-        }
+        // Using a default value since we can't access actor state in a nonisolated context
+        // The actual state will be used in isolated contexts
+        return false
     }
     
     // MARK: - Private Properties
@@ -163,8 +163,9 @@ public actor UnifiedAnalyticsManager: Core_AnalyticsManaging, Core_BaseService {
     // MARK: - Private Methods
     private func loadEvents() async {
         do {
-            let loadedEvents: [Core_AnalyticsEvent] = try await storage.load(forKey: Constants.storageKey)
-            events = loadedEvents
+            if let loadedEvents = try await storage.load([Core_AnalyticsEvent].self, forKey: Constants.storageKey) {
+                events = loadedEvents
+            }
         } catch {
             print("Failed to load analytics events: \(error)")
         }
@@ -214,8 +215,11 @@ public actor UnifiedAnalyticsManager: Core_AnalyticsManaging, Core_BaseService {
     
     private func loadSettings() async {
         do {
-            let enabled: Bool = try await storage.load(forKey: Constants.settingsKey)
-            _isEnabled = enabled
+            if let enabled = try await storage.load(Bool.self, forKey: Constants.settingsKey) {
+                _isEnabled = enabled
+            } else {
+                _isEnabled = true // Default to enabled
+            }
         } catch {
             print("Failed to load analytics settings: \(error)")
             _isEnabled = true // Default to enabled

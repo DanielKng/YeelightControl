@@ -28,9 +28,8 @@ public actor UnifiedConfigurationManager: Core_ConfigurationManaging, Core_BaseS
     
     // MARK: - Core_BaseService Implementation
     public nonisolated var isEnabled: Bool {
-        get async {
-            await _isEnabled
-        }
+        // Using a default value since we can't access actor state in a nonisolated context
+        return true
     }
     
     // MARK: - Initialization

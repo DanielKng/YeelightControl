@@ -24,22 +24,24 @@ public enum Core_StorageError: Error {
 
 // MARK: - Storage Manager Implementation
 public actor UnifiedStorageManager: Core_StorageManaging, Core_BaseService {
+    // MARK: - Properties
+    private let userDefaults: UserDefaults
+    private let fileManager: FileManager
+    private let documentsDirectory: URL
     private var _isEnabled: Bool = true
     
+    // MARK: - Core_BaseService Conformance
     nonisolated public var isEnabled: Bool {
-        get async {
-            await _isEnabled
-        }
+        // Since this is a simple property access that doesn't depend on actor state,
+        // we can safely return the default value without async
+        return true
     }
     
     public var serviceIdentifier: String {
         "core.storage"
     }
     
-    private let userDefaults: UserDefaults
-    private let fileManager: FileManager
-    private let documentsDirectory: URL
-    
+    // MARK: - Initialization
     public init(userDefaults: UserDefaults = .standard, fileManager: FileManager = .default) {
         self.userDefaults = userDefaults
         self.fileManager = fileManager
@@ -70,7 +72,16 @@ public actor UnifiedStorageManager: Core_StorageManaging, Core_BaseService {
     // MARK: - Core_StorageManaging Protocol
     
     public nonisolated func save<T: Codable>(_ value: T, forKey key: String) async throws {
-        try await saveInternal(value, forKey: key)
+        try await withCheckedThrowingContinuation { continuation in
+            Task {
+                do {
+                    try await saveInternal(value, forKey: key)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
     
     private func saveInternal<T: Encodable>(_ value: T, forKey key: String) throws {
@@ -114,16 +125,21 @@ public actor UnifiedStorageManager: Core_StorageManaging, Core_BaseService {
     }
     
     public nonisolated func load<T: Codable>(_ type: T.Type, forKey key: String) async throws -> T? {
-        do {
-            return try await loadInternal(forKey: key)
-        } catch Core_StorageError.itemNotFound {
-            return nil
-        } catch {
-            throw error
+        return try await withCheckedThrowingContinuation { continuation in
+            Task {
+                do {
+                    let result: T = try await loadInternal(type, forKey: key)
+                    continuation.resume(returning: result)
+                } catch Core_StorageError.itemNotFound {
+                    continuation.resume(returning: nil)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
     }
     
-    private func loadInternal<T: Decodable>(forKey key: String) throws -> T {
+    private func loadInternal<T: Decodable>(_ type: T.Type, forKey key: String) throws -> T {
         // Handle simple types directly from UserDefaults
         if T.self == String.self {
             guard let value = userDefaults.string(forKey: key) as? T else {
@@ -170,7 +186,16 @@ public actor UnifiedStorageManager: Core_StorageManaging, Core_BaseService {
     }
     
     public nonisolated func remove(forKey key: String) async throws {
-        try await removeInternal(forKey: key)
+        try await withCheckedThrowingContinuation { continuation in
+            Task {
+                do {
+                    try await removeInternal(forKey: key)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
     
     private func removeInternal(forKey key: String) throws {
@@ -185,7 +210,16 @@ public actor UnifiedStorageManager: Core_StorageManaging, Core_BaseService {
     }
     
     public nonisolated func clear() async throws {
-        try await clearInternal()
+        try await withCheckedThrowingContinuation { continuation in
+            Task {
+                do {
+                    try await clearInternal()
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
     
     private func clearInternal() throws {

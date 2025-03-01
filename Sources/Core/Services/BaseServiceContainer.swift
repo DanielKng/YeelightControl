@@ -125,4 +125,9 @@ open class BaseServiceContainer {
             networkManager: self.networkManager as any Core_NetworkManaging
         )
     }()
-} 
+}
+
+// MARK: - Sendable Extensions
+// Make UserDefaults and FileManager conform to Sendable to fix actor isolation issues
+extension UserDefaults: @unchecked Sendable {}
+extension FileManager: @unchecked Sendable {} 
