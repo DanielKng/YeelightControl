@@ -163,41 +163,49 @@ I've made significant progress in resolving the build issues:
     - Updated `AnalyticsEvent` reference to `Core_AnalyticsEvent` with correct parameters
     - Simplified string conversion logic to only check for the key being a string
 
-28. ✅ Partially fixed actor isolation issues in `UnifiedLogger.swift`:
+28. ✅ Fixed actor isolation issues in `UnifiedLogger.swift`:
     - Updated the `log` method to be nonisolated and properly delegate to an internal method
     - Fixed the `clearLogs` method to be properly async
     - Added missing protocol requirements for `Core_LoggingService`
+    - Updated storage method calls to use correct method names and argument labels
 
-29. ✅ Partially fixed actor isolation issues in `UnifiedEffectManager.swift`:
+29. ✅ Fixed actor isolation issues in `UnifiedEffectManager.swift`:
     - Changed the class to an actor to properly handle isolation
     - Fixed the `isEnabled` property to properly handle async access
     - Updated method signatures to match the protocol requirements
+    - Updated storage method calls to use correct argument labels
+
+30. ✅ Fixed storage method calls in `UnifiedDeviceManager.swift`:
+    - Updated all storage method calls to use correct argument labels (`forKey` instead of `key:value:`)
+    - Fixed the `isEnabled` property to use `task.value` instead of `task.result.get()`
+
+31. ✅ Added missing `getAll` method to `UnifiedStorageManager.swift`:
+    - Implemented `getAll<T: Codable>(withPrefix:)` method to retrieve all items with a specific prefix
+    - Added proper error handling and type conversion
+
+32. ✅ Added `SourceLocation` struct and updated `Core_AppError`:
+    - Added `SourceLocation` struct with file, function, and line properties
+    - Updated `Core_AppError` to include a `sourceLocation` property
+    - Modified the `unknown` case to accept an associated `Error` value
+    - Updated `UnifiedErrorHandler` to use the new `sourceLocation` property
 
 ## Current Status
 
-We've made progress on fixing the Core module issues, but there are still several critical issues that need to be addressed:
+We've made significant progress on fixing the Core module issues, but there are still several critical issues that need to be addressed:
 
 1. **Device Type Issues**:
    - The `Device` struct is missing the `isConnected` property
    - The `DeviceType` enum is missing the `bulb` and `strip` members
    - The `DeviceColor` type has issues with the `red` property
 
-2. **Storage Method Call Issues**:
-   - The `storageManager.save` method is being called with incorrect argument labels (`key:value:` instead of `_:forKey:`)
-   - The `storageManager.get` and `storageManager.getAll` methods are missing or have incorrect signatures
-
-3. **Type Conversion Issues**:
+2. **Type Conversion Issues**:
    - Cannot convert between types like `Device` and `Core_Device`
    - Cannot convert between types like `Effect` and `Core_Effect`
 
-4. **Protocol Conformance Issues**:
+3. **Protocol Conformance Issues**:
    - `UnifiedDeviceManager` does not conform to `Core_DeviceManaging`
    - `UnifiedEffectManager` does not conform to `Core_EffectManaging`
    - `UnifiedLogger` does not conform to `Core_LoggingService`
-
-5. **Error Handling Issues**:
-   - `Core_AppError` does not have a `sourceLocation` property
-   - `Core_AppError.unknown` does not have associated values
 
 ## Remaining Issues to Fix
 
@@ -208,21 +216,13 @@ We've made progress on fixing the Core module issues, but there are still severa
    - Add the missing members to the `DeviceType` enum
    - Fix the `DeviceColor` type issues
 
-2. **Storage Method Call Issues**:
-   - Update all storage method calls to use the correct argument labels
-   - Ensure the `storageManager` interface is consistent across all files
-
-3. **Type Conversion Issues**:
+2. **Type Conversion Issues**:
    - Implement proper type conversion between Core types and implementation types
    - Ensure all types properly conform to their Core counterparts
 
-4. **Protocol Conformance Issues**:
+3. **Protocol Conformance Issues**:
    - Implement all required methods and properties for each protocol
    - Ensure the method signatures match the protocol requirements
-
-5. **Error Handling Issues**:
-   - Update the `Core_AppError` type to include the required properties
-   - Fix the `unknown` case to properly handle associated values
 
 ### UI Module Issues
 

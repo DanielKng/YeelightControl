@@ -38,10 +38,8 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     
     nonisolated public var isEnabled: Bool {
         get {
-            let task = Task { () -> Bool in
-                return await _isEnabled
-            }
-            return (try? task.result.get()) ?? false
+            let task = Task { await _isEnabled }
+            return (try? task.value) ?? false
         }
     }
     
@@ -53,15 +51,13 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     
     nonisolated public var devices: [Core_Device] {
         get {
-            let task = Task { () -> [Core_Device] in
-                return await _devices as [Core_Device]
-            }
+            let task = Task { await _devices.map { $0 as Core_Device } }
             return (try? task.result.get()) ?? []
         }
     }
     
-    nonisolated public var deviceUpdates: AnyPublisher<[Core_Device], Never> {
-        deviceSubject.map { [$0] as [Core_Device] }.eraseToAnyPublisher()
+    nonisolated public var deviceUpdates: AnyPublisher<Core_Device, Never> {
+        deviceSubject.map { $0 as Core_Device }.eraseToAnyPublisher()
     }
     
     public func discoverDevices() async throws {
@@ -110,13 +106,18 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
         await updateDeviceInternal(device)
     }
     
-    public nonisolated func getDevice(byId id: String) async -> Device? {
-        let allDevices = await _devices
-        return allDevices.first { $0.id == id }
+    public nonisolated func getDevice(byId id: String) async -> Core_Device? {
+        let device = await getDeviceInternal(byId: id)
+        return device as Core_Device?
     }
     
-    public nonisolated func getAllDevices() async -> [Device] {
-        return await _devices
+    private func getDeviceInternal(byId id: String) -> Device? {
+        return _devices.first { $0.id == id }
+    }
+    
+    public nonisolated func getAllDevices() async -> [Core_Device] {
+        let allDevices = await _devices
+        return allDevices.map { $0 as Core_Device }
     }
     
     public nonisolated func startDiscovery() async {
@@ -137,7 +138,7 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
                 
                 // Create sample devices if none exist
                 if _devices.isEmpty {
-                    let sampleDevices = Device.sampleDevices
+                    let sampleDevices = createSampleDevices()
                     for device in sampleDevices {
                         _devices.append(device)
                         try? await storageManager.save(device, forKey: "device.\(device.id)")
@@ -189,7 +190,7 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
         // In a real implementation, this would send commands to the physical device
         // For now, we'll just update our local state
         
-        await updateDevice(updatedDevice)
+        await updateDeviceInternal(updatedDevice)
     }
     
     public nonisolated func updateDevice(_ device: Device) async {
@@ -221,7 +222,8 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     private func loadDevices() async {
         do {
             // Load devices from storage
-            var loadedDevices: [Device] = []
+            let deviceDict: [String: Device] = try await storageManager.getAll(withPrefix: "device.")
+            let loadedDevices = Array(deviceDict.values)
             
             // In a real implementation, we would load all devices from storage
             // For now, we'll just create sample devices
@@ -249,49 +251,58 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     private func createSampleDevices() -> [Device] {
         return [
             Device(
-                id: UUID().uuidString,
+                id: "device1",
                 name: "Living Room Light",
                 type: .bulb,
+                manufacturer: "Yeelight",
+                model: "Color Bulb",
+                firmwareVersion: "1.5.2",
                 ipAddress: "192.168.1.100",
-                port: 55443,
-                firmwareVersion: "1.0.0",
-                model: "YLDP13YL",
+                macAddress: "AA:BB:CC:DD:EE:FF",
                 state: DeviceState(
-                    power: true,
+                    isOn: true,
                     brightness: 80,
-                    color: Color.orange,
-                    colorTemperature: 3500
-                )
+                    color: .white,
+                    colorTemperature: 4000,
+                    isOnline: true
+                ),
+                isConnected: true
             ),
             Device(
-                id: UUID().uuidString,
+                id: "device2",
                 name: "Bedroom Light",
                 type: .bulb,
+                manufacturer: "Yeelight",
+                model: "White Bulb",
+                firmwareVersion: "1.4.0",
                 ipAddress: "192.168.1.101",
-                port: 55443,
-                firmwareVersion: "1.0.0",
-                model: "YLDP13YL",
+                macAddress: "AA:BB:CC:DD:EE:00",
                 state: DeviceState(
-                    power: false,
+                    isOn: false,
                     brightness: 50,
-                    color: Color.blue,
-                    colorTemperature: 4000
-                )
+                    color: .white,
+                    colorTemperature: 3000,
+                    isOnline: true
+                ),
+                isConnected: false
             ),
             Device(
-                id: UUID().uuidString,
+                id: "device3",
                 name: "Kitchen Strip",
                 type: .strip,
+                manufacturer: "Yeelight",
+                model: "Light Strip",
+                firmwareVersion: "1.6.1",
                 ipAddress: "192.168.1.102",
-                port: 55443,
-                firmwareVersion: "1.0.0",
-                model: "YLDD01YL",
+                macAddress: "AA:BB:CC:DD:EE:11",
                 state: DeviceState(
-                    power: true,
+                    isOn: true,
                     brightness: 100,
-                    color: Color.green,
-                    colorTemperature: 6500
-                )
+                    color: .red,
+                    colorTemperature: 2700,
+                    isOnline: true
+                ),
+                isConnected: true
             )
         ]
     }

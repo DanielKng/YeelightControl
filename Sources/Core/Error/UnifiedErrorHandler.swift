@@ -86,11 +86,10 @@ public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
     
     // MARK: - Core_BaseService
     public nonisolated var isEnabled: Bool {
-        let value = false // Default value
-        let task = Task {
-            return await _isEnabled
+        get {
+            let task = Task { await _isEnabled }
+            return (try? task.result.get()) ?? false
         }
-        return (try? task.value) ?? value
     }
     
     public var serviceIdentifier: String {
@@ -101,10 +100,8 @@ public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
     
     nonisolated public var lastError: Core_AppError? {
         get {
-            let task = Task { () -> Core_AppError? in
-                return await _lastError
-            }
-            return try? task.result.get()
+            let task = Task { await _lastError }
+            return (try? task.result.get())
         }
     }
     
@@ -117,13 +114,14 @@ public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
         errorSubject.send(appError)
         
         // Log the error
-        await services.logger.log(
-            "Error: \(appError.message)",
-            level: .error,
-            category: .error,
-            file: appError.file,
-            function: appError.function,
-            line: appError.line
+        let logger = services.logManager
+        await logger.log(
+            message: appError.localizedDescription,
+            level: Core_LogLevel.error.rawValue,
+            category: Core_LogCategory.error.rawValue,
+            file: appError.sourceLocation.file,
+            function: appError.sourceLocation.function,
+            line: appError.sourceLocation.line
         )
     }
     
@@ -136,10 +134,18 @@ public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
             await handle(appError)
         } else {
             // Convert to AppError.unknown
-            let appError = Core_AppError.unknown
+            let sourceLocation = SourceLocation()
+            let appError = Core_AppError.unknown(error).with(sourceLocation: sourceLocation)
             _lastError = appError
-            // TODO: Fix this when logger is updated
-            // await services.logger.error(error.localizedDescription, category: .error)
+            let logger = services.logManager
+            await logger.log(
+                message: error.localizedDescription,
+                level: Core_LogLevel.error.rawValue,
+                category: Core_LogCategory.error.rawValue,
+                file: sourceLocation.file,
+                function: sourceLocation.function,
+                line: sourceLocation.line
+            )
             errorSubject.send(appError)
         }
     }

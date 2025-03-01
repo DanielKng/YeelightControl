@@ -92,9 +92,7 @@ public actor UnifiedLogger: Core_LoggingService {
     // MARK: - Core_BaseService
     public nonisolated var isEnabled: Bool {
         get {
-            let task = Task { () -> Bool in
-                return await _isEnabled
-            }
+            let task = Task { await _isEnabled }
             return (try? task.result.get()) ?? false
         }
     }
@@ -112,12 +110,19 @@ public actor UnifiedLogger: Core_LoggingService {
         }
     }
     
-    // MARK: - Logging
+    // MARK: - Core_LoggingService Protocol Implementation
     
-    public nonisolated func log(_ message: String, level: Core_LogLevel, category: Core_LogCategory, file: String = #file, function: String = #function, line: Int = #line) {
-        Task {
-            await self.logInternal(message, level: level, category: category.rawValue, file: file, function: function, line: line)
+    public nonisolated func log(message: String, level: String, category: String, file: String = #file, function: String = #function, line: Int = #line) async {
+        await logWithStringLevel(message: message, level: level, category: category, file: file, function: function, line: line)
+    }
+    
+    private func logWithStringLevel(message: String, level: String, category: String, file: String, function: String, line: Int) async {
+        guard let logLevel = Core_LogLevel(rawValue: level) else {
+            await logInternal("Invalid log level: \(level)", level: .error, category: "logging", file: file, function: function, line: line)
+            return
         }
+        
+        await logInternal(message, level: logLevel, category: category, file: file, function: function, line: line)
     }
     
     private func logInternal(_ message: String, level: Core_LogLevel, category: String, file: String, function: String, line: Int) async {
@@ -201,10 +206,8 @@ public actor UnifiedLogger: Core_LoggingService {
         }
     }
     
-    public nonisolated func clearLogs() {
-        Task {
-            await clearLogsInternal()
-        }
+    public nonisolated func clearLogs() async {
+        await clearLogsInternal()
     }
     
     private func clearLogsInternal() async {
@@ -216,7 +219,9 @@ public actor UnifiedLogger: Core_LoggingService {
     
     private func loadLogs() async {
         do {
-            logs = try await storageManager.load(forKey: "logs")
+            if let storedLogs: [Core_LogEntry] = try await storageManager.load(Core_LogEntry.self, forKey: "logs") {
+                logs = storedLogs
+            }
         } catch {
             await logInternal("Failed to load logs: \(error.localizedDescription)", level: .error, category: "storage", file: #file, function: #function, line: #line)
         }
@@ -230,9 +235,13 @@ public actor UnifiedLogger: Core_LoggingService {
         }
     }
     
-    public nonisolated func getAllLogs() -> [Core_LogEntry] {
-        // Return an empty array synchronously, as the actual implementation is asynchronous
-        // This is a workaround for the protocol mismatch
-        return []
+    // Required by Core_LoggingService protocol
+    public nonisolated func getAllLogs() async -> [Core_LogEntry] {
+        return await getLogsInternal(filter: nil)
+    }
+    
+    // Required by Core_LoggingService protocol
+    public nonisolated var logUpdates: AnyPublisher<Core_LogEntry, Never> {
+        return logSubject.eraseToAnyPublisher()
     }
 } 

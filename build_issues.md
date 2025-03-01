@@ -100,6 +100,22 @@
     - Changed the class to an actor to properly handle isolation
     - Fixed the `isEnabled` property to properly handle async access
     - Updated method signatures to match the protocol requirements
+46. ✅ Fixed storage method calls in `UnifiedLogger.swift`:
+    - Updated `loadLogs` method to use `storageManager.load` instead of `get`
+    - Updated `saveLogs` method to use correct argument labels (`forKey` instead of `key:value:`)
+47. ✅ Fixed storage method calls in `UnifiedDeviceManager.swift`:
+    - Updated all storage method calls to use correct argument labels (`forKey` instead of `key:value:`)
+    - Fixed the `isEnabled` property to use `task.value` instead of `task.result.get()`
+48. ✅ Fixed storage method calls in `UnifiedEffectManager.swift`:
+    - Updated all storage method calls to use correct argument labels (`forKey` instead of `key:value:`)
+49. ✅ Added missing `getAll` method to `UnifiedStorageManager.swift`:
+    - Implemented `getAll<T: Codable>(withPrefix:)` method to retrieve all items with a specific prefix
+    - Added proper error handling and type conversion
+50. ✅ Added `SourceLocation` struct and updated `Core_AppError`:
+    - Added `SourceLocation` struct with file, function, and line properties
+    - Updated `Core_AppError` to include a `sourceLocation` property
+    - Modified the `unknown` case to accept an associated `Error` value
+    - Updated `UnifiedErrorHandler` to use the new `sourceLocation` property
 
 ## Remaining Issues
 
@@ -110,22 +126,14 @@ Based on the build output, we still have several issues to fix:
    - The `DeviceType` enum is missing the `bulb` and `strip` members
    - The `DeviceColor` type has issues with the `red` property
 
-2. **Storage Method Call Issues**:
-   - The `storageManager.save` method is being called with incorrect argument labels (`key:value:` instead of `_:forKey:`)
-   - The `storageManager.get` and `storageManager.getAll` methods are missing or have incorrect signatures
-
-3. **Type Conversion Issues**:
+2. **Type Conversion Issues**:
    - Cannot convert between types like `Device` and `Core_Device`
    - Cannot convert between types like `Effect` and `Core_Effect`
 
-4. **Protocol Conformance Issues**:
+3. **Protocol Conformance Issues**:
    - `UnifiedDeviceManager` does not conform to `Core_DeviceManaging`
    - `UnifiedEffectManager` does not conform to `Core_EffectManaging`
    - `UnifiedLogger` does not conform to `Core_LoggingService`
-
-5. **Error Handling Issues**:
-   - `Core_AppError` does not have a `sourceLocation` property
-   - `Core_AppError.unknown` does not have associated values
 
 ## Updated Approach
 

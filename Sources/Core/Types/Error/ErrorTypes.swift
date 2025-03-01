@@ -110,6 +110,19 @@ public enum Core_SceneError: LocalizedError, Hashable {
     }
 }
 
+// Add SourceLocation struct
+public struct SourceLocation: Hashable, Codable {
+    public let file: String
+    public let function: String
+    public let line: Int
+    
+    public init(file: String = #file, function: String = #function, line: Int = #line) {
+        self.file = file
+        self.function = function
+        self.line = line
+    }
+}
+
 public enum Core_AppError: LocalizedError, Hashable, Identifiable {
     case configuration(Core_ConfigurationError)
     case storage(Core_StorageError)
@@ -122,7 +135,19 @@ public enum Core_AppError: LocalizedError, Hashable, Identifiable {
     case permission(Core_PermissionError)
     case effect(Core_EffectError)
     case scene(Core_SceneError)
-    case unknown
+    case unknown(Error? = nil)
+    
+    private var _sourceLocation: SourceLocation?
+    
+    public var sourceLocation: SourceLocation {
+        return _sourceLocation ?? SourceLocation()
+    }
+    
+    public func with(sourceLocation: SourceLocation) -> Core_AppError {
+        var result = self
+        result._sourceLocation = sourceLocation
+        return result
+    }
     
     public var id: String {
         switch self {
@@ -177,8 +202,8 @@ public enum Core_AppError: LocalizedError, Hashable, Identifiable {
             return "Effect error: \(error)"
         case .scene(let error):
             return "Scene error: \(error)"
-        case .unknown:
-            return "Unknown error occurred"
+        case .unknown(let error):
+            return error?.localizedDescription ?? "Unknown error occurred"
         }
     }
     

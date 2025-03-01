@@ -248,4 +248,59 @@ public actor UnifiedStorageManager: Core_StorageManaging, Core_BaseService {
         let sanitizedKey = key.replacingOccurrences(of: "/", with: "_")
         return documentsDirectory.appendingPathComponent("Storage/\(sanitizedKey).json")
     }
+    
+    // MARK: - Additional Methods
+    
+    public nonisolated func getAll<T: Codable>(withPrefix prefix: String) async throws -> [String: T] {
+        return try await withCheckedThrowingContinuation { continuation in
+            Task {
+                do {
+                    let result = try await getAllInternal(withPrefix: prefix, as: T.self)
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    private func getAllInternal<T: Decodable>(withPrefix prefix: String, as type: T.Type) throws -> [String: T] {
+        var result: [String: T] = [:]
+        
+        // Get all files in storage directory
+        let storageDirectory = documentsDirectory.appendingPathComponent("Storage", isDirectory: true)
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: storageDirectory, includingPropertiesForKeys: nil)
+            
+            // Filter files by prefix
+            let prefixFiles = contents.filter { url in
+                let fileName = url.lastPathComponent
+                let key = fileName.replacingOccurrences(of: ".json", with: "")
+                return key.hasPrefix(prefix)
+            }
+            
+            // Load each file
+            for url in prefixFiles {
+                let fileName = url.lastPathComponent
+                let key = fileName.replacingOccurrences(of: ".json", with: "")
+                
+                do {
+                    let data = try Data(contentsOf: url)
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    
+                    let value = try decoder.decode(T.self, from: data)
+                    result[key] = value
+                } catch {
+                    print("Error decoding \(fileName): \(error)")
+                    // Continue with other files
+                }
+            }
+            
+            return result
+        } catch {
+            throw Core_StorageError.fileSystemError
+        }
+    }
 } 

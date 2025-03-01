@@ -6,11 +6,11 @@ import SwiftUI
 // The Core_EffectManaging protocol is defined in ServiceProtocols.swift
 
 // MARK: - Effect Manager Implementation
-public final class UnifiedEffectManager: Core_EffectManaging, ObservableObject {
+public actor UnifiedEffectManager: Core_EffectManaging, Core_BaseService {
     // MARK: - Properties
     
-    @Published private(set) var _effects: [Effect] = []
-    public var effects: [Effect] { _effects }
+    private var _effects: [Effect] = []
+    private var _isEnabled: Bool = true
     
     private let storageManager: any Core_StorageManaging
     private let deviceManager: any Core_DeviceManaging
@@ -22,24 +22,36 @@ public final class UnifiedEffectManager: Core_EffectManaging, ObservableObject {
     public init(storageManager: any Core_StorageManaging, deviceManager: any Core_DeviceManaging) {
         self.storageManager = storageManager
         self.deviceManager = deviceManager
-        self._isEnabled = true
         
         Task {
             await loadEffects()
         }
     }
     
-    // MARK: - BaseService
+    // MARK: - Core_BaseService
     
     public nonisolated var isEnabled: Bool {
-        get { _isEnabled }
+        get {
+            let task = Task { await _isEnabled }
+            return (try? task.result.get()) ?? true
+        }
     }
-    private var _isEnabled: Bool
     
-    // MARK: - EffectManaging
+    public var serviceIdentifier: String {
+        return "core.effect"
+    }
     
-    public var effectUpdates: AnyPublisher<Effect, Never> {
-        effectSubject.eraseToAnyPublisher()
+    // MARK: - Core_EffectManaging
+    
+    public nonisolated var effects: [Core_Effect] {
+        get {
+            let task = Task { await _effects.map { $0 as Core_Effect } }
+            return (try? task.result.get()) ?? []
+        }
+    }
+    
+    public nonisolated var effectUpdates: AnyPublisher<Core_Effect, Never> {
+        effectSubject.map { $0 as Core_Effect }.eraseToAnyPublisher()
     }
     
     private func startEffectTimer(_ effect: Effect) {
@@ -57,70 +69,97 @@ public final class UnifiedEffectManager: Core_EffectManaging, ObservableObject {
     
     public func applyEffect(_ effect: Core_Effect, to device: Core_Device) async throws {
         // Convert Core_Effect to Effect and apply it
-        if let localEffect = effects.first(where: { $0.id == effect.id }) {
-            await applyEffect(localEffect, to: [device.id])
+        guard let localEffect = await getEffect(withId: effect.id) else {
+            throw NSError(domain: "EffectError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Effect not found"])
         }
+        
+        await applyEffect(localEffect, to: [device.id])
     }
     
-    public func getAvailableEffects() -> [Core_Effect] {
-        // Convert local effects to Core_Effect
-        return effects
+    public nonisolated func getAvailableEffects() async -> [Core_Effect] {
+        let allEffects = await _effects
+        return allEffects.map { $0 as Core_Effect }
     }
     
-    public func createEffect(name: String, type: EffectType, parameters: EffectParameters) async -> Effect {
-        let effect = Effect(name: name, type: type, parameters: parameters)
+    public func createEffect(name: String, type: Core_EffectType, parameters: Core_EffectParameters) async throws -> Core_Effect {
+        guard let effectType = type as? EffectType,
+              let effectParams = parameters as? EffectParameters else {
+            throw NSError(domain: "EffectError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid effect type or parameters"])
+        }
+        
+        let effect = Effect(name: name, type: effectType, parameters: effectParams)
         _effects.append(effect)
         
-        try? await storageManager.save(effect, withId: effect.id, inCollection: "effects")
+        try await storageManager.save(effect, forKey: "effects.\(effect.id)")
         effectSubject.send(effect)
         
-        return effect
+        return effect as Core_Effect
     }
     
-    public func getEffect(withId id: String) async -> Effect? {
-        return _effects.first { $0.id == id }
+    public nonisolated func getEffect(withId id: String) async -> Effect? {
+        let allEffects = await _effects
+        return allEffects.first { $0.id == id }
     }
     
-    public func getAllEffects() async -> [Effect] {
-        return _effects
+    public nonisolated func getAllEffects() async -> [Core_Effect] {
+        let allEffects = await _effects
+        return allEffects.map { $0 as Core_Effect }
     }
     
-    public func updateEffect(_ effect: Effect) async -> Effect {
-        if let index = _effects.firstIndex(where: { $0.id == effect.id }) {
-            _effects[index] = effect
-            
-            try? await storageManager.save(effect, withId: effect.id, inCollection: "effects")
-            effectSubject.send(effect)
-            
-            return effect
+    public func updateEffect(_ effect: Core_Effect) async throws -> Core_Effect {
+        guard let localEffect = effect as? Effect else {
+            throw NSError(domain: "EffectError", code: 3, userInfo: [NSLocalizedDescriptionKey: "Invalid effect type"])
         }
         
-        return effect
+        if let index = _effects.firstIndex(where: { $0.id == localEffect.id }) {
+            _effects[index] = localEffect
+            
+            try await storageManager.save(localEffect, forKey: "effects.\(localEffect.id)")
+            effectSubject.send(localEffect)
+            
+            return localEffect as Core_Effect
+        }
+        
+        throw NSError(domain: "EffectError", code: 4, userInfo: [NSLocalizedDescriptionKey: "Effect not found"])
     }
     
-    public func deleteEffect(_ effect: Effect) async {
-        if let index = _effects.firstIndex(where: { $0.id == effect.id }) {
+    public func deleteEffect(_ effect: Core_Effect) async throws {
+        guard let localEffect = effect as? Effect else {
+            throw NSError(domain: "EffectError", code: 5, userInfo: [NSLocalizedDescriptionKey: "Invalid effect type"])
+        }
+        
+        if let index = _effects.firstIndex(where: { $0.id == localEffect.id }) {
             _effects.remove(at: index)
             
-            try? await storageManager.delete(withId: effect.id, fromCollection: "effects")
-            effectSubject.send(effect)
+            try await storageManager.remove(forKey: "effects.\(localEffect.id)")
+            effectSubject.send(localEffect)
+        } else {
+            throw NSError(domain: "EffectError", code: 6, userInfo: [NSLocalizedDescriptionKey: "Effect not found"])
         }
     }
     
-    public func startEffect(_ effect: Effect) async {
-        var updatedEffect = effect
+    public func startEffect(_ effect: Core_Effect) async throws {
+        guard let localEffect = effect as? Effect else {
+            throw NSError(domain: "EffectError", code: 7, userInfo: [NSLocalizedDescriptionKey: "Invalid effect type"])
+        }
+        
+        var updatedEffect = localEffect
         updatedEffect.isActive = true
         
-        await updateEffect(updatedEffect)
+        _ = try await updateEffect(updatedEffect as Core_Effect)
         await applyEffect(updatedEffect, to: [])
         startEffectTimer(updatedEffect)
     }
     
-    public func stopEffect(_ effect: Effect) async {
-        var updatedEffect = effect
+    public func stopEffect(_ effect: Core_Effect) async throws {
+        guard let localEffect = effect as? Effect else {
+            throw NSError(domain: "EffectError", code: 8, userInfo: [NSLocalizedDescriptionKey: "Invalid effect type"])
+        }
+        
+        var updatedEffect = localEffect
         updatedEffect.isActive = false
         
-        await updateEffect(updatedEffect)
+        _ = try await updateEffect(updatedEffect as Core_Effect)
         stopEffectTimer(updatedEffect)
     }
     
@@ -135,7 +174,8 @@ public final class UnifiedEffectManager: Core_EffectManaging, ObservableObject {
     
     private func loadEffects() async {
         do {
-            _effects = try await storageManager.getAll(fromCollection: "effects")
+            let effectsDict: [String: Effect] = try await storageManager.getAll(withPrefix: "effects.")
+            _effects = Array(effectsDict.values)
         } catch {
             print("Failed to load effects: \(error.localizedDescription)")
         }
@@ -159,3 +199,4 @@ extension DispatchQueue {
         }
     }
 }
+
