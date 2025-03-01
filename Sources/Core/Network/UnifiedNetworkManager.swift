@@ -5,6 +5,9 @@ import Combine
 // Define a type alias for the Core module's NetworkManaging protocol
 typealias CoreNetworkManaging = NetworkManaging
 
+// Use Core_NetworkError instead of NetworkError
+public typealias NetworkError = Core_NetworkError
+
 /// Protocol for network message handling
 public protocol UnifiedNetworkMessageHandler: AnyObject {
     func didReceiveMessage(_ message: Data)
@@ -82,7 +85,7 @@ public final class UnifiedNetworkManager: NetworkManaging {
     
     public func send(_ data: Data) throws {
         guard isReachable else {
-            throw NetworkError.connectionFailed
+            throw Core_NetworkError.connectionFailed
         }
         // Implementation for sending data
     }
@@ -116,11 +119,3 @@ public final class UnifiedNetworkManager: NetworkManaging {
         }
     }
 }
-
-// Define NetworkError enum if not already defined elsewhere
-public enum NetworkError: Error {
-    case connectionFailed
-    case invalidResponse
-    case dataError
-    case timeout
-} 

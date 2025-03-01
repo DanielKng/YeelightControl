@@ -15,14 +15,7 @@ public enum Core_AppPermissionType: String, CaseIterable, Codable {
     case photoLibrary
 }
 
-public enum Core_PermissionStatus: String, Codable {
-    case notDetermined
-    case denied
-    case restricted
-    case authorized
-    case provisional // For notifications
-    case limited     // For photo library
-}
+// Use the Core_PermissionStatus from PermissionTypes.swift
 
 // MARK: - Permission Update Type
 public struct Core_PermissionUpdate: Codable {
@@ -54,34 +47,32 @@ public struct Core_PermissionUpdate: Codable {
     }
 }
 
-// MARK: - Permission Managing Protocol
-public protocol Core_PermissionManaging: AnyObject {
-    var permissionUpdates: AnyPublisher<Core_PermissionUpdate, Never> { get }
-    
-    func requestPermission(for type: Core_AppPermissionType) async -> Core_PermissionStatus
-    func checkPermissionStatus(for type: Core_AppPermissionType) async -> Core_PermissionStatus
-}
-
 // MARK: - Unified Permission Manager Implementation
-public final class UnifiedPermissionManager: ObservableObject, Core_PermissionManaging {
+public final class UnifiedPermissionManager: Core_PermissionManaging {
     // MARK: - Properties
     private let locationManager = CLLocationManager()
-    private let permissionSubject = PassthroughSubject<Core_PermissionUpdate, Never>()
+    private let permissionSubject = PassthroughSubject<(Core_PermissionType, Core_PermissionStatus), Never>()
+    private var _isEnabled: Bool = true
+    
+    // MARK: - Core_BaseService Implementation
+    public nonisolated var isEnabled: Bool {
+        return _isEnabled
+    }
     
     // MARK: - Initialization
     public init() {
         locationManager.delegate = nil // We'll use one-time requests
     }
     
-    // MARK: - Public API
-    public var permissionUpdates: AnyPublisher<Core_PermissionUpdate, Never> {
-        permissionSubject.eraseToAnyPublisher()
+    // MARK: - Core_PermissionManaging Implementation
+    public nonisolated var permissionUpdates: AnyPublisher<(Core_PermissionType, Core_PermissionStatus), Never> {
+        return permissionSubject.eraseToAnyPublisher()
     }
     
-    public func requestPermission(for type: Core_AppPermissionType) async -> Core_PermissionStatus {
+    public func requestPermission(_ permission: Core_PermissionType) async -> Core_PermissionStatus {
         let status: Core_PermissionStatus
         
-        switch type {
+        switch permission {
         case .location:
             status = await requestLocationPermission()
         case .notification:
@@ -92,32 +83,38 @@ public final class UnifiedPermissionManager: ObservableObject, Core_PermissionMa
             status = await requestMicrophonePermission()
         case .photoLibrary:
             status = await requestPhotoLibraryPermission()
+        case .bluetooth:
+            // Implement bluetooth permission request if needed
+            status = .notDetermined
         }
         
         // Publish the update
-        let update = Core_PermissionUpdate(type: type, status: status)
-        permissionSubject.send(update)
+        permissionSubject.send((permission, status))
         
         return status
     }
     
-    public func checkPermissionStatus(for type: Core_AppPermissionType) async -> Core_PermissionStatus {
-        let status: Core_PermissionStatus
-        
-        switch type {
+    public func getPermissionStatus(_ permission: Core_PermissionType) async -> Core_PermissionStatus {
+        switch permission {
         case .location:
-            status = checkLocationPermissionStatus()
+            return checkLocationPermissionStatus()
         case .notification:
-            status = await checkNotificationPermissionStatus()
+            return await checkNotificationPermissionStatus()
         case .camera:
-            status = checkCameraPermissionStatus()
+            return checkCameraPermissionStatus()
         case .microphone:
-            status = checkMicrophonePermissionStatus()
+            return checkMicrophonePermissionStatus()
         case .photoLibrary:
-            status = await checkPhotoLibraryPermissionStatus()
+            return await checkPhotoLibraryPermissionStatus()
+        case .bluetooth:
+            // Implement bluetooth permission check if needed
+            return .notDetermined
         }
-        
-        return status
+    }
+    
+    public func isPermissionGranted(_ permission: Core_PermissionType) async -> Bool {
+        let status = await getPermissionStatus(permission)
+        return status == .authorized
     }
     
     // MARK: - Permission Request Methods

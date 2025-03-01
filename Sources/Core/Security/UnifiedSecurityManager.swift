@@ -232,5 +232,5 @@ public final class UnifiedSecurityManager: ObservableObject {
 
 // MARK: - Constants
 extension UnifiedSecurityManager {
-    static let logCategory = LogCategory.security
+    static let logCategory = Core_LogCategory.security
 } 

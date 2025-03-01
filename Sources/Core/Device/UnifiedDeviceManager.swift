@@ -9,7 +9,7 @@ import SwiftUI
 
 // MARK: - Device Manager Implementation
 
-public actor UnifiedDeviceManager: DeviceManaging, ObservableObject {
+public actor UnifiedDeviceManager: Core_DeviceManaging, ObservableObject {
     // MARK: - Properties
     
     @MainActor @Published private(set) var devices: [Device] = []

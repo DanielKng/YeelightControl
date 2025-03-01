@@ -10,6 +10,16 @@ public enum Core_HTTPMethod: String {
     case patch = "PATCH"
 }
 
+// MARK: - Network Error
+
+public enum Core_NetworkError: Error {
+    case connectionFailed
+    case invalidCommand
+    case invalidResponse
+    case timeout
+    case deviceOffline
+}
+
 // MARK: - Network Managing Protocol
 
 public protocol Core_NetworkAPIManaging {

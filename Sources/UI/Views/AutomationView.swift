@@ -1,140 +1,197 @@
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
+import SwiftUI
 
-s; truct AutomationView: View {
-// MARK: - Environment
-
-@; ; EnvironmentObject private; ; var automationManager: UnifiedAutomationManager
-@; ; EnvironmentObject private; ; var yeelightManager: UnifiedYeelightManager
-
-// MARK: - State
-
-@; ; State private; ; var showingAddAutomation = false
-@; ; State private; ; var selectedAutomation: Automation?
-@; ; State private; ; var showingDeleteAlert = false
-
-// MARK: - Body
-
-v; ar body:; ; some View {
-List {
-Section {
-ForEach(automationManager.automations) {; ; automation in
-AutomationRow(automation: automation) {
-selectedAutomation = automation
-}
-}
-.onDelete {; ; indexSet in
-i; f let index = indexSet.first {
-selectedAutomation = automationManager.automations[index]
-showingDeleteAlert = true
-}
-}
-} header: {
-i; f automationManager.automations.isEmpty {
-Text("; ; No automations; ; created yet")
-.foregroundColor(.secondary)
-}
-}
-}
-.navigationTitle("Automations")
-.toolbar {
-ToolbarItem(placement: .navigationBarTrailing) {
-Button {
-showingAddAutomation = true
-} label: {
-Image(systemName: "plus")
-}
-}
-}
-.sheet(isPresented: $showingAddAutomation) {
-NavigationView {
-CreateAutomationView(devices: yeelightManager.devices)
-}
-}
-.sheet(item: $selectedAutomation) {; ; automation in
-NavigationView {
-AutomationEditor(automation: automation, devices: yeelightManager.devices)
-}
-}
-.alert("; ; Delete Automation", isPresented: $showingDeleteAlert, presenting: selectedAutomation) {; ; automation in
-Button("Delete", role: .destructive) {
-automationManager.deleteAutomation(automation)
-selectedAutomation = nil
-}
-Button("Cancel", role: .cancel) {
-selectedAutomation = nil
-}
-} message: {; ; automation in
-Text("; ; Are you; ; sure you; ; want to delete '\(automation.name)'?")
-}
-}
-}
-
-// MARK: -; ; Supporting Views
-
-s; truct AutomationRow: View {
-l; et automation: Automation
-l; et onEdit: () -> Void
-
-v; ar body:; ; some View {
-Button {
-onEdit()
-} label: {
-HStack {
-VStack(alignment: .leading, spacing: 8) {
-HStack {
-Image(systemName: automation.trigger.icon)
-.foregroundColor(.accentColor)
-
-Text(automation.name)
-.font(.headline)
-
-Spacer()
-
-Toggle("", isOn: .constant(automation.isEnabled))
-.labelsHidden()
+struct AutomationView: View {
+    // MARK: - Properties
+    
+    @EnvironmentObject private var automationManager: UnifiedAutomationManager
+    @EnvironmentObject private var yeelightManager: UnifiedYeelightManager
+    
+    // State variables
+    @State private var searchText = ""
+    @State private var showingAddAutomation = false
+    @State private var selectedAutomation: Automation?
+    @State private var showingDeleteAlert = false
+    
+    // MARK: - Body
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                // Automations list
+                ForEach(filteredAutomations) { automation in
+                    AutomationRow(automation: automation)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedAutomation = automation
+                        }
+                }
+                .onDelete { indexSet in
+                    if let index = indexSet.first {
+                        selectedAutomation = automationManager.automations[index]
+                        showingDeleteAlert = true
+                    }
+                }
+            }
+            .overlay {
+                if automationManager.automations.isEmpty {
+                    ContentUnavailableView(
+                        "No automations created yet",
+                        systemImage: "clock.arrow.2.circlepath",
+                        description: Text("Tap the + button to create your first automation")
+                    )
+                } else if filteredAutomations.isEmpty {
+                    ContentUnavailableView.search
+                }
+            }
+            .navigationTitle("Automations")
+            .searchable(text: $searchText, prompt: "Search automations")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: { showingAddAutomation = true }) {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAddAutomation) {
+                NavigationStack {
+                    AutomationCreationView()
+                }
+                .presentationDetents([.large])
+            }
+            .sheet(item: $selectedAutomation) { automation in
+                NavigationStack {
+                    AutomationDetailView(automation: automation)
+                }
+                .presentationDetents([.large])
+            }
+            .alert("Delete Automation", isPresented: $showingDeleteAlert) {
+                Button("Cancel", role: .cancel) {
+                    selectedAutomation = nil
+                }
+                Button("Delete", role: .destructive) {
+                    if let automation = selectedAutomation {
+                        automationManager.removeAutomation(automation)
+                        selectedAutomation = nil
+                    }
+                }
+            } message: {
+                Text("Are you sure you want to delete this automation? This action cannot be undone.")
+            }
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var filteredAutomations: [Automation] {
+        if searchText.isEmpty {
+            return automationManager.automations
+        } else {
+            return automationManager.automations.filter { automation in
+                automation.name.localizedCaseInsensitiveContains(searchText) ||
+                automation.description.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+    }
 }
 
-Text(automation.trigger.description)
-.font(.caption)
-.foregroundColor(.secondary)
+struct AutomationRow: View {
+    let automation: Automation
+    @EnvironmentObject private var automationManager: UnifiedAutomationManager
+    
+    var body: some View {
+        HStack {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(automation.isEnabled ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.2))
+                    .frame(width: 40, height: 40)
+                
+                Image(systemName: iconForTrigger(automation.trigger))
+                    .foregroundColor(automation.isEnabled ? .accentColor : .gray)
+            }
+            
+            // Details
+            VStack(alignment: .leading, spacing: 4) {
+                Text(automation.name)
+                    .font(.headline)
+                
+                Text(automation.description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                
+                // Device chips
+                if !automation.actions.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(automation.actions) { action in
+                                if case .device(let deviceID, _) = action.type {
+                                    DeviceChip(deviceID: deviceID)
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: 24)
+                }
+            }
+            
+            Spacer()
+            
+            // Toggle
+            Toggle("", isOn: Binding(
+                get: { automation.isEnabled },
+                set: { newValue in
+                    automationManager.toggleAutomation(automation, enabled: newValue)
+                }
+            ))
+            .labelsHidden()
+        }
+        .padding(.vertical, 4)
+    }
+    
+    private func iconForTrigger(_ trigger: AutomationTrigger) -> String {
+        switch trigger.type {
+        case .time:
+            return "clock"
+        case .sunrise, .sunset:
+            return "sun.horizon"
+        case .deviceState:
+            return "lightbulb"
+        case .location:
+            return "location"
+        case .networkEvent:
+            return "wifi"
+        }
+    }
+}
 
-if !automation.devices.isEmpty {
-ScrollView(.horizontal, showsIndicators: false) {
-HStack(spacing: 8) {
-ForEach(automation.devices) {; ; device in
-DeviceChip(device: device)
-}
-}
-}
-}
-}
-}
-.padding(.vertical, 8)
-}
-.buttonStyle(.plain)
-}
-}
-
-s; truct DeviceChip: View {
-l; et device: UnifiedYeelightDevice
-
-v; ar body:; ; some View {
-HStack(spacing: 4) {
-Image(systemName: "lightbulb.fill")
-.imageScale(.small)
-.foregroundColor(device.isOn ? .yellow : .gray)
-
-Text(device.name)
-.font(.caption)
-}
-.padding(.horizontal, 8)
-.padding(.vertical, 4)
-.background(Color(.tertiarySystemFill))
-.cornerRadius(8)
-}
+struct DeviceChip: View {
+    let deviceID: DeviceID
+    @EnvironmentObject private var yeelightManager: UnifiedYeelightManager
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(Color.orange)
+                .frame(width: 8, height: 8)
+            
+            Text(deviceName)
+                .font(.caption2)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color.gray.opacity(0.2))
+        .cornerRadius(12)
+    }
+    
+    private var deviceName: String {
+        if let device = yeelightManager.getDevice(id: deviceID) {
+            return device.name
+        } else {
+            return "Unknown"
+        }
+    }
 }
 
 // MARK: - Preview

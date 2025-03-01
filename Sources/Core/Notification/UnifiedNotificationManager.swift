@@ -164,7 +164,7 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject {
         
         static let defaultSound = UNNotificationSound.default
         static let criticalSound = UNNotificationSound.defaultCritical
-        static let logCategory = LogCategory.notification
+        static let logCategory = Core_LogCategory.notification
     }
     
     // MARK: - Singleton
@@ -328,11 +328,11 @@ extension UnifiedNotificationManager: UNUserNotificationCenterDelegate {
 }
 
 // MARK: - Logger Category Extension
-extension LogCategory {
+extension Core_LogCategory {
     static let notification = LogCategory.notification
 }
 
 // MARK: - Constants
 extension UnifiedNotificationManager {
-    static let logCategory = LogCategory.notification
+    static let logCategory = Core_LogCategory.notification
 } 

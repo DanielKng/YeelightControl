@@ -4,11 +4,11 @@ import SwiftUI
 
 // MARK: - Error Handling Protocol
 @preconcurrency protocol ErrorHandling: Actor {
-    var lastError: AppError? { get }
-    nonisolated var errorUpdates: AnyPublisher<AppError, Never> { get }
+    var lastError: Core_AppError? { get }
+    nonisolated var errorUpdates: AnyPublisher<Core_AppError, Never> { get }
     
     func handle(_ error: Error) async
-    func handle(_ appError: AppError) async
+    func handle(_ appError: Core_AppError) async
     func clearError() async
 }
 
@@ -81,7 +81,7 @@ public enum ErrorSeverity: String, Codable {
 }
 
 // MARK: - AppError Extensions
-extension AppError: Identifiable {
+extension Core_AppError: Identifiable {
     public var id: String {
         switch self {
         case .network(let error): return "network-\(error)"
@@ -146,30 +146,30 @@ extension AppError: Identifiable {
 // MARK: - Error Handler Implementation
 public actor UnifiedErrorHandler: ErrorHandling {
     private let services: BaseServiceContainer
-    private let errorSubject = PassthroughSubject<AppError, Never>()
-    private(set) var lastError: AppError?
+    private let errorSubject = PassthroughSubject<Core_AppError, Never>()
+    private(set) var lastError: Core_AppError?
     
     public init(services: BaseServiceContainer = .shared) {
         self.services = services
     }
     
-    public nonisolated var errorUpdates: AnyPublisher<AppError, Never> {
+    public nonisolated var errorUpdates: AnyPublisher<Core_AppError, Never> {
         errorSubject.eraseToAnyPublisher()
     }
     
     public func handle(_ error: Error) async {
-        if let appError = error as? AppError {
+        if let appError = error as? Core_AppError {
             await handle(appError)
         } else {
             // Convert to AppError.unknown
-            let appError = AppError.unknown
+            let appError = Core_AppError.unknown
             lastError = appError
             services.logger.error(error.localizedDescription, category: .error)
             errorSubject.send(appError)
         }
     }
     
-    public func handle(_ appError: AppError) async {
+    public func handle(_ appError: Core_AppError) async {
         lastError = appError
         services.logger.error(appError.errorDescription ?? "Unknown error", category: .error)
         errorSubject.send(appError)
@@ -182,11 +182,11 @@ public actor UnifiedErrorHandler: ErrorHandling {
 
 // MARK: - View Extension
 public extension View {
-    func handleError(_ error: Binding<AppError?>) -> some View {
+    func handleError(_ error: Binding<Core_AppError?>) -> some View {
         alert(item: error) { error in
             Alert(
                 title: Text("Error"),
-                message: Text(error.errorDescription ?? "Unknown error"),
+                message: Text(error?.errorDescription ?? "Unknown error"),
                 dismissButton: .default(Text("OK"))
             )
         }

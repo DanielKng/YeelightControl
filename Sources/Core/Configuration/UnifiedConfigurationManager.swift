@@ -41,6 +41,12 @@ public actor UnifiedConfigurationManager: Core_ConfigurationManaging {
     private var configValues: [String: Any] = [:]
     private let storageManager: any Core_StorageManaging
     private let configSubject = PassthroughSubject<Core_ConfigKey, Never>()
+    private var _isEnabled: Bool = true
+    
+    // MARK: - Core_BaseService Implementation
+    public nonisolated var isEnabled: Bool {
+        return _isEnabled
+    }
     
     // MARK: - Initialization
     public init(storageManager: any Core_StorageManaging) {

@@ -1,168 +1,263 @@
-i; mport SwiftUI
+import SwiftUI
 
-s; truct DeviceSetupView: View {
-@; ; ObservedObject var manager: YeelightManager
-@; ; ObservedObject var roomManager: RoomManager
-@Environment(\.dismiss); ; private var dismiss
-
-l; et device: YeelightDevice
-@; ; State private; ; var deviceName = ""
-@; ; State private; ; var selectedRoom: UUID?
-@; ; State private; ; var setupStep = SetupStep.naming
-@; ; State private; ; var isTestingConnection = false
-
-e; num SetupStep {
-c; ase naming, room, testing, complete
+struct DeviceSetupView: View {
+    @ObservedObject var manager: YeelightManager
+    @ObservedObject var roomManager: RoomManager
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    
+    @State private var deviceName = ""
+    @State private var selectedRoom: UUID?
+    @State private var setupStep = SetupStep.naming
+    @State private var isTestingConnection = false
+    
+    enum SetupStep {
+        case naming
+        case roomSelection
+        case complete
+    }
+    
+    var body: some View {
+        NavigationStack {
+            VStack {
+                // Progress indicator
+                StepIndicator(currentStep: setupStep)
+                    .padding(.top)
+                
+                // Main content
+                VStack(spacing: 20) {
+                    // Step content
+                    switch setupStep {
+                    case .naming:
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Name Your Device")
+                                .font(.headline)
+                            
+                            TextField("Device Name", text: $deviceName)
+                                .textFieldStyle(.roundedBorder)
+                                .padding(.bottom)
+                            
+                            Text("Choose a descriptive name for your Yeelight device. This will help you identify it in your home.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        
+                    case .roomSelection:
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Select a Room")
+                                .font(.headline)
+                            
+                            ScrollView {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 16) {
+                                    ForEach(roomManager.rooms) { room in
+                                        RoomSelectionCard(
+                                            room: room,
+                                            isSelected: selectedRoom == room.id,
+                                            onSelect: { selectedRoom = room.id }
+                                        )
+                                    }
+                                    
+                                    // Add new room option
+                                    RoomSelectionCard(
+                                        room: Room(name: "Add New", icon: "plus.circle"),
+                                        isSelected: false,
+                                        onSelect: { /* Show room creation UI */ }
+                                    )
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                        .padding()
+                        
+                    case .complete:
+                        VStack(spacing: 24) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(.green)
+                            
+                            Text("Setup Complete!")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            Text("Your device has been added successfully and is ready to use.")
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .frame(maxHeight: .infinity)
+                    }
+                    
+                    Spacer()
+                    
+                    // Connection test indicator
+                    if isTestingConnection {
+                        HStack {
+                            ProgressView()
+                                .padding(.trailing, 8)
+                            Text("Testing connection...")
+                        }
+                        .padding()
+                    }
+                    
+                    // Navigation buttons
+                    HStack {
+                        if setupStep != .naming {
+                            Button("Back") {
+                                moveBack()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        
+                        Spacer()
+                        
+                        if setupStep == .complete {
+                            Button("Done") {
+                                dismiss()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        } else {
+                            Button("Next") {
+                                moveForward()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!canMoveForward)
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Device Setup")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .interactiveDismissDisabled(setupStep != .complete)
+    }
+    
+    private var canMoveForward: Bool {
+        switch setupStep {
+        case .naming:
+            return !deviceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .roomSelection:
+            return true // Optional selection
+        case .complete:
+            return true
+        }
+    }
+    
+    private func moveForward() {
+        switch setupStep {
+        case .naming:
+            setupStep = .roomSelection
+        case .roomSelection:
+            // Test connection and save device
+            isTestingConnection = true
+            
+            // Simulate connection test
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                isTestingConnection = false
+                saveDeviceSetup()
+                setupStep = .complete
+            }
+        case .complete:
+            dismiss()
+        }
+    }
+    
+    private func moveBack() {
+        switch setupStep {
+        case .naming:
+            break // Already at first step
+        case .roomSelection:
+            setupStep = .naming
+        case .complete:
+            setupStep = .roomSelection
+        }
+    }
+    
+    private func saveDeviceSetup() {
+        // In a real app, this would save the device to the manager
+        let device = YeelightDevice(name: deviceName, ipAddress: "192.168.1.100")
+        manager.addDevice(device)
+        
+        if let roomID = selectedRoom {
+            roomManager.addDeviceToRoom(device.id, roomID: roomID)
+        }
+    }
 }
 
-v; ar body:; ; some View {
-NavigationStack {
-UnifiedSettingsView(
-title: "; ; Device Setup",
-sections: [
-SettingsSection(
-header: "; ; Device Information",
-items: [
-SettingsItem(
-title: "; ; Device Name",
-subtitle: "; ; Enter a; ; name for; ; your device",
-icon: "textbox",
-type: .custom(AnyView(
-TextField("; ; Device Name", text: $deviceName)
-.textFieldStyle(.roundedBorder)
-))
-),
-SettingsItem(
-title: "; ; IP Address",
-icon: "network",
-type: .value(device.ip)
-)
-]
-),
-SettingsSection(
-header: "; ; Room Assignment",
-items: roomManager.rooms.map {; ; room in
-SettingsItem(
-title: room.name,
-icon: room.icon,
-type: .toggle(isOn: Binding(
-get: { selectedRoom == room.id },
-set: { if $0 { selectedRoom = room.id } }
-))
-)
-}
-),
-SettingsSection(
-header: "; ; Connection Test",
-items: [
-SettingsItem(
-title: "; ; Test Connection",
-subtitle: "; ; Verify device connectivity",
-icon: "antenna.radiowaves.left.and.right",
-type: .button {
-isTestingConnection = true
-Task {
-try?; ; await manager.testConnection(device)
-isTestingConnection = false
-setupStep = .complete
-}
-}
-)
-]
-)
-],
-footer: "; ; Make sure; ; your device; ; is connected; ; to the; ; same network; ; as your phone."
-)
-.toolbar {
-ToolbarItem(placement: .navigationBarTrailing) {
-i; f setupStep == .complete {
-Button("Done") {
-saveDeviceSetup()
-dismiss()
-}
-.disabled(deviceName.isEmpty)
-}
-}
-}
-.overlay {
-i; f isTestingConnection {
-ProgressView("; ; Testing connection...")
-.frame(maxWidth: .infinity, maxHeight: .infinity)
-.background(.ultraThinMaterial)
-}
-}
-}
+struct StepIndicator: View {
+    let currentStep: DeviceSetupView.SetupStep
+    
+    var body: some View {
+        HStack {
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(stepColor(for: index))
+                    .frame(width: 12, height: 12)
+                
+                if index < 2 {
+                    Rectangle()
+                        .fill(stepColor(for: index, isConnector: true))
+                        .frame(height: 2)
+                }
+            }
+        }
+        .padding(.horizontal, 40)
+    }
+    
+    private func stepColor(for index: Int, isConnector: Bool = false) -> Color {
+        let stepValue = stepValue(for: currentStep)
+        
+        if isConnector {
+            return index < stepValue ? .accentColor : Color.gray.opacity(0.3)
+        } else {
+            return index <= stepValue ? .accentColor : Color.gray.opacity(0.3)
+        }
+    }
+    
+    private func stepValue(for step: DeviceSetupView.SetupStep) -> Int {
+        switch step {
+        case .naming: return 0
+        case .roomSelection: return 1
+        case .complete: return 2
+        }
+    }
 }
 
-p; rivate var canMoveForward: Bool {
-s; witch setupStep {
-case .naming:
-return !deviceName.isEmpty
-case .room:
-r; eturn selectedRoom != nil
-case .testing:
-return !isTestingConnection
-case .complete:
-r; eturn true
-}
-}
-
-p; rivate func moveForward() {
-s; witch setupStep {
-case .naming:
-setupStep = .room
-case .room:
-setupStep = .testing
-case .testing:
-setupStep = .complete
-case .complete:
-break
-}
-}
-
-p; rivate func moveBack() {
-s; witch setupStep {
-case .naming:
-break
-case .room:
-setupStep = .naming
-case .testing:
-setupStep = .room
-case .complete:
-setupStep = .testing
-}
-}
-
-p; rivate func saveDeviceSetup() {
-device.name = deviceName
-i; f let roomID = selectedRoom {
-roomManager.addDevice(device.ip, toRoom: roomID)
-}
-manager.saveDeviceState(device, inRoom: selectedRoom?.uuidString ?? "")
-}
-}
-
-s; truct StepIndicator: View {
-l; et currentStep: DeviceSetupView.SetupStep
-
-v; ar body:; ; some View {
-HStack(spacing: 40) {
-ForEach(0..<4) {; ; index in
-Circle()
-.fill(index <= stepIndex ? .orange : .gray.opacity(0.3))
-.frame(width: 12, height: 12)
-}
-}
-}
-
-p; rivate var stepIndex: Int {
-s; witch currentStep {
-case .naming: return 0
-case .room: return 1
-case .testing: return 2
-case .complete: return 3
-}
-}
-}
-
-//; ; Add the; ; step views (NamingStep, RoomSelectionStep, etc.) here... 
+struct RoomSelectionCard: View {
+    let room: Room
+    let isSelected: Bool
+    let onSelect: () -> Void
+    
+    var body: some View {
+        VStack {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.1))
+                    .frame(height: 80)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+                    )
+                
+                Image(systemName: room.icon)
+                    .font(.system(size: 30))
+                    .foregroundColor(isSelected ? .accentColor : .primary)
+            }
+            
+            Text(room.name)
+                .font(.caption)
+                .foregroundColor(isSelected ? .accentColor : .primary)
+        }
+        .onTapGesture {
+            onSelect()
+        }
+    }
+} 

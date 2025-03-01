@@ -1,296 +1,301 @@
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
-// DetailContentView.swift
-//; ; Renamed from ContentView.; ; swift in UI/; ; Views directory
-//; ; This file; ; contains the; ; detailed content; ; view for; ; the Yeelight; ; Control app
+import SwiftUI
 
-i; mport SwiftUI
+// This file contains the detailed content view for the Yeelight Control app
 
-s; truct DetailContentView: View {
-@; ; StateObject private; ; var yeelightManager = YeelightManager()
-@; ; State private; ; var isDiscovering = false
-@; ; State private; ; var showingHelp = false
-@; ; State private; ; var showingError: Error?
-
-v; ar body:; ; some View {
-NavigationStack {
-UnifiedDetailView(
-title: "; ; My Lights",
-mainContent: {
-ZStack {
-i; f yeelightManager.devices.isEmpty {
-EmptyStateView(isDiscovering: $isDiscovering) {
-startDiscovery()
-}
-} else {
-VStack(spacing: 16) {
-UnifiedListView(
-title: "; ; Connected Devices",
-items: yeelightManager.devices,
-emptyStateMessage: "; ; No devices found",
-footer: "; ; Tap a; ; device to; ; access detailed controls"
-) {; ; device in
-DeviceRow(device: device, manager: yeelightManager)
-}
-
-Button(action: startDiscovery) {
-HStack {
-Text("; ; Search for; ; More Devices")
-Spacer()
-i; f isDiscovering {
-ProgressView()
-}
-}
-}
-.buttonStyle(.bordered)
-.disabled(isDiscovering)
-.padding(.horizontal)
-}
-}
-
-i; f isDiscovering {
-ProgressView("; ; Discovering devices...")
-.progressViewStyle(.circular)
-.frame(maxWidth: .infinity, maxHeight: .infinity)
-.background(.ultraThinMaterial)
-}
-}
-}
-)
-.toolbar {
-ToolbarItem(placement: .primaryAction) {
-Menu {
-Button(action: startDiscovery) {
-Label("; ; Discover Devices", systemImage: "antenna.radiowaves.left.and.right")
-}
-.disabled(isDiscovering)
-
-Button(action: { showingHelp = true }) {
-Label("Help", systemImage: "questionmark.circle")
-}
-
-if !yeelightManager.devices.isEmpty {
-Button(role: .destructive, action: clearDevices) {
-Label("; ; Clear All Devices", systemImage: "trash")
-}
-}
-} label: {
-Image(systemName: "ellipsis.circle")
-}
-}
-}
-.sheet(isPresented: $showingHelp) {
-HelpView()
-}
-.alert("Error", isPresented: .constant(showingError != nil)) {
-Button("OK") { showingError = nil }
-} message: {
-Text(showingError?.localizedDescription ?? "")
-}
-}
-.environmentObject(yeelightManager)
-}
-
-p; rivate func startDiscovery() {
-isDiscovering = true
-yeelightManager.startDiscovery()
-
-DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-isDiscovering = false
-}
+struct DetailContentView: View {
+    @StateObject private var yeelightManager = YeelightManager()
+    @State private var isDiscovering = false
+    @State private var showingHelp = false
+    @State private var showingError: Error?
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                if yeelightManager.devices.isEmpty {
+                    EmptyStateView(isDiscovering: $isDiscovering)
+                        .environmentObject(yeelightManager)
+                } else {
+                    List {
+                        Section {
+                            ForEach(yeelightManager.devices) { device in
+                                DeviceRow(device: device)
+                            }
+                        } header: {
+                            HStack {
+                                Text("Devices")
+                                Spacer()
+                                if isDiscovering {
+                                    ProgressView()
+                                        .padding(.trailing, 8)
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                    .refreshable {
+                        await startDiscovery()
+                    }
+                }
+            }
+            .navigationTitle("Yeelight Control")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showingHelp = true }) {
+                        Image(systemName: "questionmark.circle")
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack {
+                        if isDiscovering {
+                            ProgressView()
+                                .padding(.trailing, 8)
+                        }
+                        
+                        Menu {
+                            Button(action: { Task { await startDiscovery() } }) {
+                                Label("Discover Devices", systemImage: "magnifyingglass")
+                            }
+                            
+                            Button(action: { clearDevices() }) {
+                                Label("Clear All Devices", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingHelp) {
+                HelpView()
+            }
+            .alert("Error", isPresented: .constant(showingError != nil), presenting: showingError) { _ in
+                Button("OK") { showingError = nil }
+            } message: { error in
+                Text(error.localizedDescription)
+            }
+        }
+        .task {
+            await startDiscovery()
+        }
+    }
+    
+    private func startDiscovery() async {
+        isDiscovering = true
+        do {
+            try await yeelightManager.discoverDevices()
+        } catch {
+            showingError = error
+        }
+        isDiscovering = false
+    }
+    
+    private func clearDevices() {
+        yeelightManager.clearDevices()
+    }
 }
 
-p; rivate func clearDevices() {
-yeelightManager.clearDevices()
-}
-}
-
-s; truct DetailContentView_Previews: PreviewProvider {
-s; tatic var previews:; ; some View {
-DetailContentView()
-}
+struct DetailContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        DetailContentView()
+    }
 }
 
-s; truct EmptyStateView: View {
-@; ; Binding var isDiscovering: Bool
-l; et onDiscover: () -> Void
-
-v; ar body:; ; some View {
-VStack(spacing: 20) {
-Image(systemName: "lightbulb")
-.font(.system(size: 60))
-.foregroundStyle(.secondary)
-
-Text("; ; No Lights Found")
-.font(.title2)
-.bold()
-
-Text("; ; Tap discover; ; to find; ; your Yeelight; ; devices on; ; the network")
-.font(.subheadline)
-.foregroundStyle(.secondary)
-.multilineTextAlignment(.center)
-.padding(.horizontal)
-
-Button(action: onDiscover) {
-Text("; ; Discover Devices")
-.bold()
-}
-.buttonStyle(.borderedProminent)
-.disabled(isDiscovering)
-}
-}
-}
-
-s; truct DeviceRow: View {
-@; ; ObservedObject var device: YeelightDevice
-l; et manager: YeelightManager
-@; ; State private; ; var showingDetail = false
-
-v; ar body:; ; some View {
-Button(action: { showingDetail = true }) {
-VStack(alignment: .leading, spacing: 12) {
-HStack {
-Image(systemName: device.isOn ? "lightbulb.fill" : "lightbulb")
-.font(.title2)
-.foregroundStyle(device.isOn ? .yellow : .secondary)
-
-Spacer()
-
-Toggle("", isOn: Binding(
-get: { device.isOn },
-set: {; ; newValue in
-device.isOn = newValue
-manager.sendCommand(
-to: device,
-method: "set_power",
-params: [newValue ? "on" : "off", "smooth", 500]
-)
-}
-))
-.labelsHidden()
+struct EmptyStateView: View {
+    @Binding var isDiscovering: Bool
+    @EnvironmentObject var yeelightManager: YeelightManager
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            
+            Image(systemName: "lightbulb.slash")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            
+            Text("No Devices Found")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text("Make sure your Yeelight devices are on the same network and have LAN Control enabled.")
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 40)
+            
+            Button(action: {
+                Task {
+                    await yeelightManager.discoverDevices()
+                }
+            }) {
+                HStack {
+                    Text("Discover Devices")
+                    if isDiscovering {
+                        ProgressView()
+                    }
+                }
+                .frame(minWidth: 200)
+                .padding()
+                .background(Color.accentColor)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+            .disabled(isDiscovering)
+            
+            Spacer()
+        }
+    }
 }
 
-VStack(alignment: .leading, spacing: 4) {
-Text("Light")
-.font(.headline)
-Text(device.ip)
-.font(.caption)
-.foregroundStyle(.secondary)
-}
-}
-.padding()
-.background(Color(UIColor.secondarySystemGroupedBackground))
-.cornerRadius(16)
-}
-.buttonStyle(.plain)
-.sheet(isPresented: $showingDetail) {
-DeviceDetailView(device: device, manager: manager)
-}
-}
-}
-
-s; truct DeviceDetailView: View {
-@; ; ObservedObject var device: YeelightDevice
-l; et manager: YeelightManager
-@Environment(\.dismiss); ; private var dismiss
-
-@; ; State private; ; var brightness: Double
-@; ; State private; ; var color = Color.white
-
-init(device: YeelightDevice, manager: YeelightManager) {
-self.device = device
-self.manager = manager
-self._brightness = State(initialValue: Double(device.brightness))
-}
-
-v; ar body:; ; some View {
-NavigationStack {
-List {
-Section {
-HStack {
-Label("Power", systemImage: "power")
-Spacer()
-Toggle("", isOn: Binding(
-get: { device.isOn },
-set: {; ; newValue in
-device.isOn = newValue
-manager.sendCommand(
-to: device,
-method: "set_power",
-params: [newValue ? "on" : "off", "smooth", 500]
-)
-}
-))
-.labelsHidden()
-}
-}
-
-Section {
-VStack(alignment: .leading, spacing: 8) {
-HStack {
-Label("Brightness", systemImage: "sun.max")
-Spacer()
-Text("\(Int(brightness))%")
-.foregroundStyle(.secondary)
-}
-
-Slider(value: $brightness, in: 1...100) {; ; changed in
-i; f changed {
-device.brightness = Int(brightness)
-manager.sendCommand(
-to: device,
-method: "set_bright",
-params: [Int(brightness), "smooth", 500]
-)
-}
-}
-}
+struct DeviceRow: View {
+    @ObservedObject var device: YeelightDevice
+    
+    @State private var showingDetail = false
+    
+    var body: some View {
+        Button(action: { showingDetail = true }) {
+            HStack {
+                ZStack {
+                    Circle()
+                        .fill(device.isOn ? device.color.opacity(0.2) : Color.gray.opacity(0.1))
+                        .frame(width: 40, height: 40)
+                    
+                    Image(systemName: device.isOn ? "lightbulb.fill" : "lightbulb")
+                        .foregroundColor(device.isOn ? device.color : .gray)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(device.name)
+                        .fontWeight(.medium)
+                    
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 6, height: 6)
+                        
+                        Text(statusText)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Toggle("", isOn: Binding(
+                    get: { device.isOn },
+                    set: { newValue in
+                        device.setPower(on: newValue)
+                    }
+                ))
+                .labelsHidden()
+            }
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showingDetail) {
+            NavigationStack {
+                DeviceDetailView(device: device)
+            }
+        }
+    }
+    
+    private var statusColor: Color {
+        switch device.connectionState {
+        case .connected: return .green
+        case .connecting: return .yellow
+        case .disconnected: return .red
+        }
+    }
+    
+    private var statusText: String {
+        switch device.connectionState {
+        case .connected: return "Connected"
+        case .connecting: return "Connecting..."
+        case .disconnected: return "Disconnected"
+        }
+    }
 }
 
-Section {
-ColorPicker("Color", selection: $color)
-.onChange(of: color) {; ; newValue in
-l; et components = UIColor(newValue).cgColor.components ?? [1, 1, 1, 1]
-l; et rgb = YeelightDevice.RGB(
-red: Int(components[0] * 255),
-green: Int(components[1] * 255),
-blue: Int(components[2] * 255)
-)
-device.color = rgb
-manager.sendCommand(
-to: device,
-method: "set_rgb",
-params: [rgb.rgbValue, "smooth", 500]
-)
-}
-}
-
-Section {
-HStack {
-Text("; ; IP Address")
-Spacer()
-Text(device.ip)
-.foregroundStyle(.secondary)
-}
-
-HStack {
-Text("Port")
-Spacer()
-Text("\(device.port)")
-.foregroundStyle(.secondary)
-}
-}
-}
-.navigationTitle("; ; Light Settings")
-.navigationBarTitleDisplayMode(.inline)
-.toolbar {
-ToolbarItem(placement: .cancellationAction) {
-Button("Done") {
-dismiss()
-}
-}
-}
-}
-}
+struct DeviceDetailView: View {
+    @ObservedObject var device: YeelightDevice
+    
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    
+    @State private var brightness: Double
+    @State private var color = Color.white
+    
+    init(device: YeelightDevice) {
+        self.device = device
+        _brightness = State(initialValue: Double(device.brightness))
+        _color = State(initialValue: device.color)
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 30) {
+                // Device icon
+                ZStack {
+                    Circle()
+                        .fill(colorScheme == .dark ? Color.black : Color.white)
+                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                        .frame(width: 120, height: 120)
+                    
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(device.isOn ? color : .gray)
+                }
+                .padding(.top, 20)
+                
+                // Power toggle
+                Button(action: {
+                    device.setPower(on: !device.isOn)
+                }) {
+                    HStack {
+                        Image(systemName: "power")
+                        Text(device.isOn ? "Turn Off" : "Turn On")
+                    }
+                    .frame(minWidth: 200)
+                    .padding()
+                    .background(device.isOn ? Color.red : Color.green)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                
+                // Brightness slider
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Brightness: \(Int(brightness))%")
+                        .font(.headline)
+                    
+                    Slider(value: $brightness, in: 1...100) { changed in
+                        if changed {
+                            device.setBrightness(Int(brightness))
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                
+                // Color picker
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Color")
+                        .font(.headline)
+                    
+                    ColorPicker("Select Color", selection: $color)
+                        .labelsHidden()
+                        .onChange(of: color) { newColor in
+                            device.setColor(newColor)
+                        }
+                }
+                .padding(.horizontal)
+            }
+            .padding()
+        }
+        .navigationTitle(device.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+    }
 } 

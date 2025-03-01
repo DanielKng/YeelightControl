@@ -1,11 +1,11 @@
-i; ; ; ; mport SwiftUI
-i; ; ; ; mport Core
+import SwiftUI
+import Core
 
 @main
-s; ; ; ; truct YeelightControlApp: App {
-    @; ; ; ; StateObject private ; ; ; ; var services = ServiceContainer.shared
+struct YeelightControlApp: App {
+    @StateObject private var services = ServiceContainer.shared
     
- ; ; ; ; var body:; ; ; ; some Scene {
+    var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(services)

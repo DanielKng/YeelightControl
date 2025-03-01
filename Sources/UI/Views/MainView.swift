@@ -1,127 +1,125 @@
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport Combine
-i; mport Network
+import SwiftUI
+import Combine
+import Network
 
-///; ; Main tab-; ; based navigation; ; view for; ; the application
-///; ; Provides access; ; to all; ; major features; ; through a; ; tab interface
-s; truct MainView: View {
-// MARK: -; ; Environment Objects
+/// Main tab-based navigation view for the application
+/// Provides access to all major features through a tab interface
+struct MainView: View {
+// MARK: - Environment Objects
 
-//; ; Core Device Management
-@; ; EnvironmentObject private; ; var yeelightManager: UnifiedYeelightManager
-@; ; EnvironmentObject private; ; var deviceManager: UnifiedDeviceManager
+// Core Device Management
+@EnvironmentObject private var yeelightManager: UnifiedYeelightManager
+@EnvironmentObject private var deviceManager: UnifiedDeviceManager
 
-//; ; Feature Management
-@; ; EnvironmentObject private; ; var effectManager: UnifiedEffectManager
-@; ; EnvironmentObject private; ; var sceneManager: UnifiedSceneManager
-@; ; EnvironmentObject private; ; var automationManager: UnifiedAutomationManager
-@; ; EnvironmentObject private; ; var roomManager: UnifiedRoomManager
+// Feature Management
+@EnvironmentObject private var effectManager: UnifiedEffectManager
+@EnvironmentObject private var sceneManager: UnifiedSceneManager
+@EnvironmentObject private var automationManager: UnifiedAutomationManager
+@EnvironmentObject private var roomManager: UnifiedRoomManager
 
-//; ; Core Services
-@; ; EnvironmentObject private; ; var networkManager: UnifiedNetworkManager
-@; ; EnvironmentObject private; ; var storageManager: UnifiedStorageManager
-@; ; EnvironmentObject private; ; var backgroundManager: UnifiedBackgroundManager
-@; ; EnvironmentObject private; ; var notificationManager: UnifiedNotificationManager
-@; ; EnvironmentObject private; ; var locationManager: UnifiedLocationManager
-@; ; EnvironmentObject private; ; var permissionManager: UnifiedPermissionManager
-@; ; EnvironmentObject private; ; var analyticsManager: UnifiedAnalyticsManager
-@; ; EnvironmentObject private; ; var configurationManager: UnifiedConfigurationManager
-@; ; EnvironmentObject private; ; var stateManager: UnifiedStateManager
-@; ; EnvironmentObject private; ; var securityManager: UnifiedSecurityManager
-@; ; EnvironmentObject private; ; var errorManager: UnifiedErrorManager
-@; ; EnvironmentObject private; ; var themeManager: UnifiedThemeManager
-@; ; EnvironmentObject private; ; var connectionManager: UnifiedConnectionManager
-@; ; EnvironmentObject private; ; var logger: UnifiedLogger
+// Core Services
+@EnvironmentObject private var networkManager: UnifiedNetworkManager
+@EnvironmentObject private var storageManager: UnifiedStorageManager
+@EnvironmentObject private var backgroundManager: UnifiedBackgroundManager
+@EnvironmentObject private var notificationManager: UnifiedNotificationManager
+@EnvironmentObject private var locationManager: UnifiedLocationManager
+@EnvironmentObject private var permissionManager: UnifiedPermissionManager
+@EnvironmentObject private var analyticsManager: UnifiedAnalyticsManager
+@EnvironmentObject private var configurationManager: UnifiedConfigurationManager
+@EnvironmentObject private var stateManager: UnifiedStateManager
+@EnvironmentObject private var securityManager: UnifiedSecurityManager
+@EnvironmentObject private var errorManager: UnifiedErrorManager
+@EnvironmentObject private var themeManager: UnifiedThemeManager
+@EnvironmentObject private var connectionManager: UnifiedConnectionManager
+@EnvironmentObject private var logger: UnifiedLogger
 
 // MARK: - State
 
-@AppStorage("selectedTab"); ; private var selectedTab = Tab.lights
-@; ; State private; ; var showingPermissionAlert = false
-@; ; State private; ; var showingErrorAlert = false
-@; ; State private; ; var showingSecurityAlert = false
-@; ; State private; ; var showingRetryAlert = false
-@; ; State private; ; var alertMessage: String?
-@; ; State private; ; var isInitializing = true
-@; ; State private; ; var isOffline = false
-@; ; State private; ; var initializationProgress: Double = 0
+@AppStorage("selectedTab") private var selectedTab = Tab.lights
+@State private var showingPermissionAlert = false
+@State private var showingErrorAlert = false
+@State private var showingSecurityAlert = false
+@State private var showingRetryAlert = false
+@State private var alertMessage: String?
+@State private var isInitializing = true
+@State private var isOffline = false
+@State private var initializationProgress: Double = 0
 
-// MARK: -; ; Navigation State
-@; ; State private; ; var showingDeviceSetup = false
-@; ; State private; ; var showingNetworkDiagnostics = false
-@; ; State private; ; var showingAdvancedSettings = false
-@; ; State private; ; var showingHelp = false
-@; ; State private; ; var selectedDevice: UnifiedYeelightDevice?
-@; ; State private; ; var selectedScene: Scene?
-@; ; State private; ; var selectedEffect: Effect?
+// MARK: - Navigation State
+@State private var showingDeviceSetup = false
+@State private var showingNetworkDiagnostics = false
+@State private var showingAdvancedSettings = false
+@State private var showingHelp = false
+@State private var selectedDevice: UnifiedYeelightDevice?
+@State private var selectedScene: Scene?
+@State private var selectedEffect: Effect?
 
-p; rivate var cancellables = Set<AnyCancellable>()
+private var cancellables = Set<AnyCancellable>()
 
 // MARK: - Types
 
-e; num Tab {
-c; ase lights, scenes, automation, effects, settings
+enum Tab {
+case lights
+case scenes
+case rooms
+case automations
 
-v; ar title: String {
-s; witch self {
+var title: String {
+switch self {
 case .lights: return "Lights"
 case .scenes: return "Scenes"
-case .automation: return "Automation"
-case .effects: return "Effects"
-case .settings: return "Settings"
+case .rooms: return "Rooms"
+case .automations: return "Automations"
 }
 }
 
-v; ar icon: String {
-s; witch self {
+var icon: String {
+switch self {
 case .lights: return "lightbulb.fill"
 case .scenes: return "theatermasks.fill"
-case .automation: return "timer"
-case .effects: return "waveform.path.ecg"
-case .settings: return "gear"
+case .rooms: return "house.fill"
+case .automations: return "clock.fill"
 }
 }
 }
 
 // MARK: - Body
 
-v; ar body:; ; some View {
+var body: some View {
 Group {
-i; f isInitializing {
+if isInitializing {
 splashScreen
 } else {
 mainContent
 }
 }
-.onChange(of: errorManager.currentError) {; ; error in
-i; f let error = error {
+.onChange(of: errorManager.currentError) { error in
+if let error = error {
 alertMessage = error.localizedDescription
 showingErrorAlert = true
 }
 }
-.onChange(of: securityManager.securityAlert) {; ; alert in
-i; f let alert = alert {
+.onChange(of: securityManager.securityAlert) { alert in
+if let alert = alert {
 alertMessage = alert
 showingSecurityAlert = true
 }
 }
-.onChange(of: networkManager.isConnected) {; ; isConnected in
+.onChange(of: networkManager.isConnected) { isConnected in
 isOffline = !isConnected
 }
-.alert("; ; Network Unavailable", isPresented: .constant(isOffline)) {
+.alert("Network Unavailable", isPresented: .constant(isOffline)) {
 Button("OK", role: .cancel) { }
 } message: {
-Text("; ; Please check; ; your network connection.")
+Text("Please check your network connection.")
 }
-.alert("; ; Initialization Failed", isPresented: $showingRetryAlert) {
+.alert("Initialization Failed", isPresented: $showingRetryAlert) {
 Button("Retry", role: .none) {
 initializeApp()
 }
 Button("Cancel", role: .cancel) { }
 } message: {
-Text(alertMessage ?? "; ; Failed to; ; initialize the app.; ; Would you; ; like to retry?")
+Text(alertMessage ?? "Failed to initialize the app. Would you like to retry?")
 }
 .task {
 setupNetworkMonitoring()
@@ -149,13 +147,13 @@ HelpView()
 }
 }
 
-p; rivate var splashScreen:; ; some View {
+private var splashScreen: some View {
 VStack(spacing: 20) {
 Image(systemName: "lightbulb.fill")
 .font(.system(size: 60))
 .foregroundColor(.accentColor)
-i; f isOffline {
-Text("; ; Waiting for; ; network connection...")
+if isOffline {
+Text("Waiting for network connection...")
 .foregroundColor(.secondary)
 }
 VStack(spacing: 8) {
@@ -171,10 +169,10 @@ initializeApp()
 }
 }
 
-p; rivate var mainContent:; ; some View {
+private var mainContent: some View {
 TabView(selection: $selectedTab) {
 NavigationStack {
-LightsView()
+LightsView(deviceManager: deviceManager)
 .environmentObject(yeelightManager)
 .environmentObject(deviceManager)
 .environmentObject(roomManager)
@@ -194,13 +192,13 @@ Label(Tab.lights.title, systemImage: Tab.lights.icon)
 .tag(Tab.lights)
 
 NavigationStack {
-SceneListView()
+SceneListView(sceneManager: sceneManager)
 .environmentObject(sceneManager)
 .environmentObject(yeelightManager)
 .environmentObject(deviceManager)
 .environmentObject(roomManager)
 .environmentObject(stateManager)
-.sheet(item: $selectedScene) {; ; scene in
+.sheet(item: $selectedScene) { scene in
 ScenePreview(scene: scene)
 .environmentObject(sceneManager)
 .environmentObject(yeelightManager)
@@ -212,7 +210,16 @@ Label(Tab.scenes.title, systemImage: Tab.scenes.icon)
 .tag(Tab.scenes)
 
 NavigationStack {
-AutomationView()
+RoomListView(roomManager: roomManager)
+.environmentObject(roomManager)
+}
+.tabItem {
+Label(Tab.rooms.title, systemImage: Tab.rooms.icon)
+}
+.tag(Tab.rooms)
+
+NavigationStack {
+AutomationListView(automationManager: automationManager)
 .environmentObject(automationManager)
 .environmentObject(yeelightManager)
 .environmentObject(sceneManager)
@@ -224,142 +231,84 @@ LocationPicker()
 }
 }
 .tabItem {
-Label(Tab.automation.title, systemImage: Tab.automation.icon)
+Label(Tab.automations.title, systemImage: Tab.automations.icon)
 }
-.tag(Tab.automation)
-
-NavigationStack {
-EffectsListView()
-.environmentObject(effectManager)
-.environmentObject(yeelightManager)
-.environmentObject(deviceManager)
-.environmentObject(stateManager)
-.sheet(item: $selectedEffect) {; ; effect in
-FlowEffectEditor(effect: effect)
-.environmentObject(effectManager)
-.environmentObject(yeelightManager)
+.tag(Tab.automations)
 }
-}
-.tabItem {
-Label(Tab.effects.title, systemImage: Tab.effects.icon)
-}
-.tag(Tab.effects)
-
-NavigationStack {
-SettingsView()
-.environmentObject(yeelightManager)
-.environmentObject(deviceManager)
-.environmentObject(roomManager)
-.environmentObject(networkManager)
-.environmentObject(storageManager)
-.environmentObject(backgroundManager)
-.environmentObject(notificationManager)
-.environmentObject(locationManager)
-.environmentObject(permissionManager)
-.environmentObject(analyticsManager)
-.environmentObject(configurationManager)
-.environmentObject(stateManager)
-.environmentObject(securityManager)
-.environmentObject(themeManager)
-.environmentObject(connectionManager)
-.environmentObject(logger)
-.toolbar {
-ToolbarItem(placement: .navigationBarTrailing) {
-Menu {
-Button(action: { showingAdvancedSettings = true }) {
-Label("; ; Advanced Settings", systemImage: "gear")
-}
-Button(action: { showingNetworkDiagnostics = true }) {
-Label("; ; Network Diagnostics", systemImage: "network")
-}
-Button(action: { showingHelp = true }) {
-Label("Help", systemImage: "questionmark.circle")
-}
-} label: {
-Image(systemName: "ellipsis.circle")
-}
-}
-}
-}
-.tabItem {
-Label(Tab.settings.title, systemImage: Tab.settings.icon)
-}
-.tag(Tab.settings)
-}
-.alert("; ; Permission Required", isPresented: $showingPermissionAlert) {
+.alert("Permission Required", isPresented: $showingPermissionAlert) {
 Button("Settings", role: .none) {
 permissionManager.openSettings()
 }
 Button("Cancel", role: .cancel) { }
 } message: {
-Text(alertMessage ?? "; ; Please grant; ; the required; ; permissions to; ; use this app.")
+Text(alertMessage ?? "Please grant the required permissions to use this app.")
 }
 .alert("Error", isPresented: $showingErrorAlert) {
 Button("OK", role: .cancel) {
 errorManager.clearError()
 }
 } message: {
-Text(alertMessage ?? "; ; An unknown; ; error occurred.")
+Text(alertMessage ?? "An unknown error occurred.")
 }
-.alert("; ; Security Alert", isPresented: $showingSecurityAlert) {
+.alert("Security Alert", isPresented: $showingSecurityAlert) {
 Button("Settings", role: .none) {
 securityManager.openSecuritySettings()
 }
 Button("Cancel", role: .cancel) { }
 } message: {
-Text(alertMessage ?? "; ; Please review; ; your security settings.")
+Text(alertMessage ?? "Please review your security settings.")
 }
 }
 
-// MARK: -; ; Private Methods
+// MARK: - Private Methods
 
-p; rivate func initializeApp() {
+private func initializeApp() {
 Task {
 do {
-//; ; Initialize logger first
+// Initialize logger first
 logger.startLogging()
 updateProgress(0.1)
 
-//; ; Initialize security
-t; ry await securityManager.initialize()
+// Initialize security
+try await securityManager.initialize()
 updateProgress(0.2)
 
-//; ; Check and; ; request permissions
-t; ry await permissionManager.checkAndRequestPermissions()
+// Check and request permissions
+try await permissionManager.checkAndRequestPermissions()
 updateProgress(0.3)
 
-//; ; Initialize state management
-t; ry await stateManager.initialize()
+// Initialize state management
+try await stateManager.initialize()
 updateProgress(0.4)
 
-//; ; Initialize core services
-t; ry await networkManager.initialize()
-t; ry await connectionManager.initialize()
+// Initialize core services
+try await networkManager.initialize()
+try await connectionManager.initialize()
 updateProgress(0.5)
 
-//; ; Initialize location; ; and notifications
-t; ry await locationManager.startMonitoring()
-t; ry await notificationManager.registerForNotifications()
+// Initialize location and notifications
+try await locationManager.startMonitoring()
+try await notificationManager.registerForNotifications()
 updateProgress(0.6)
 
-//; ; Initialize analytics; ; and theme
-t; ry await analyticsManager.startSession()
+// Initialize analytics and theme
+try await analyticsManager.startSession()
 themeManager.applyTheme()
 updateProgress(0.7)
 
-//; ; Start device discovery
-t; ry await yeelightManager.startDiscovery()
+// Start device discovery
+try await yeelightManager.startDiscovery()
 updateProgress(0.8)
 
-//; ; Initialize background tasks
-t; ry await backgroundManager.startBackgroundTasks()
+// Initialize background tasks
+try await backgroundManager.startBackgroundTasks()
 updateProgress(0.9)
 
-//; ; Load saved data
-t; ry await storageManager.loadSavedState()
+// Load saved data
+try await storageManager.loadSavedState()
 updateProgress(1.0)
 
-//; ; Update UI state
+// Update UI state
 withAnimation {
 isInitializing = false
 }
@@ -371,18 +320,18 @@ showingRetryAlert = true
 }
 }
 
-p; rivate func updateProgress(_ value: Double) {
+private func updateProgress(_ value: Double) {
 withAnimation {
 initializationProgress = value
 }
 }
 
-p; rivate func setupNetworkMonitoring() {
+private func setupNetworkMonitoring() {
 networkManager.connectionPublisher
 .receive(on: DispatchQueue.main)
-.sink {; ; isConnected in
+.sink { isConnected in
 isOffline = !isConnected
-i; f isConnected && isInitializing {
+if isConnected && isInitializing {
 initializeApp()
 }
 }
@@ -394,17 +343,17 @@ initializeApp()
 
 #Preview {
 MainView()
-//; ; Core Device Management
+// Core Device Management
 .environmentObject(ServiceContainer.shared.yeelightManager)
 .environmentObject(ServiceContainer.shared.deviceManager)
 
-//; ; Feature Management
+// Feature Management
 .environmentObject(ServiceContainer.shared.effectManager)
 .environmentObject(ServiceContainer.shared.sceneManager)
 .environmentObject(ServiceContainer.shared.automationManager)
 .environmentObject(ServiceContainer.shared.roomManager)
 
-//; ; Core Services
+// Core Services
 .environmentObject(ServiceContainer.shared.networkManager)
 .environmentObject(ServiceContainer.shared.storageManager)
 .environmentObject(ServiceContainer.shared.backgroundManager)

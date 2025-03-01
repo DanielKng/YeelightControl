@@ -1,45 +1,44 @@
-i; ; ; ; mport WidgetKit
-i; ; ; ; mport SwiftUI
+import WidgetKit
+import SwiftUI
 
-s; ; ; ; truct Provider: TimelineProvider {
- ; ; ; ; func placeholder(; ; ; ; in context: Context) -> SimpleEntry {
+struct Provider: TimelineProvider {
+    func placeholder(in context: Context) -> SimpleEntry {
         SimpleEntry(date: Date())
     }
 
- ; ; ; ; func getSnapshot(; ; ; ; in context: Context, completion: @escaping (SimpleEntry) -> ()) {
- ; ; ; ; let entry = SimpleEntry(date: Date())
+    func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
+        let entry = SimpleEntry(date: Date())
         completion(entry)
     }
 
- ; ; ; ; func getTimeline(; ; ; ; in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
- ; ; ; ; let entries = [SimpleEntry(date: Date())]
- ; ; ; ; let timeline = Timeline(entries: entries, policy: .atEnd)
+    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+        let entries = [SimpleEntry(date: Date())]
+        let timeline = Timeline(entries: entries, policy: .atEnd)
         completion(timeline)
     }
 }
 
-s; ; ; ; truct SimpleEntry: TimelineEntry {
- ; ; ; ; let date: Date
+struct SimpleEntry: TimelineEntry {
+    let date: Date
 }
 
-s; ; ; ; truct YeelightWidgetEntryView : View {
- ; ; ; ; var entry: Provider.Entry
+struct YeelightWidgetEntryView : View {
+    var entry: Provider.Entry
 
- ; ; ; ; var body:; ; ; ; some View {
-        Text("; ; ; ; YeelightControl Widget")
+    var body: some View {
+        Text("YeelightControl Widget")
     }
 }
 
-@main
-s; ; ; ; truct YeelightWidget: Widget {
- ; ; ; ; let kind: String = "YeelightWidget"
+struct YeelightWidget: Widget {
+    let kind: String = "YeelightWidget"
 
- ; ; ; ; var body:; ; ; ; some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: Provider()) { ; ; ; ; entry in
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: Provider()) { entry in
             YeelightWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("; ; ; ; Yeelight Control")
-        .description("; ; ; ; Control your ; ; ; ; Yeelight devices")
+        .configurationDisplayName("Yeelight Control")
+        .description("Control your Yeelight devices")
         .supportedFamilies([.systemSmall])
     }
 }

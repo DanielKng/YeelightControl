@@ -1,44 +1,44 @@
-i; ; ; ; mport XCTest
-@; ; ; ; testable import YeelightControl
+import XCTest
+@testable import YeelightControl
 
-f; ; ; ; inal class NetworkDiscoveryTests: XCTestCase {
- ; ; ; ; var discovery: NetworkDiscovery!
+final class NetworkDiscoveryTests: XCTestCase {
+    var discovery: NetworkDiscovery!
     
- ; ; ; ; override func setUp() {
+    override func setUp() {
         super.setUp()
-        discovery = NetworkDiscovery.shared
+        discovery = NetworkDiscovery()
     }
     
- ; ; ; ; func testDiscoveryWithRetry() {
-        // Given
- ; ; ; ; let expectation = XCTestExpectation(description: "; ; ; ; Device discovery")
- ; ; ; ; var discoveredDevices: Set<String> = []
+    func testDiscoveryWithRetry() {
+        // Create expectation
+        let expectation = XCTestExpectation(description: "Device discovery")
+        var discoveredDevices: Set<String> = []
         
-        discovery.onDeviceFound = { ip,; ; ; ; port in
+        discovery.onDeviceFound = { ip, port in
             discoveredDevices.insert(ip)
- ; ; ; ; if discoveredDevices.count >= 1 {
+            if discoveredDevices.count >= 1 {
                 expectation.fulfill()
             }
         }
         
-        // When
-        discovery.startDiscovery { ; ; ; ; result in
- ; ; ; ; switch result {
+        // Start discovery
+        discovery.startDiscovery { result in
+            switch result {
             case .success:
-                print("; ; ; ; Discovery started successfully")
-            case .failure(; ; ; ; let error):
-                XCTFail("; ; ; ; Discovery failed: \(error)")
+                print("Discovery started successfully")
+            case .failure(let error):
+                XCTFail("Discovery failed: \(error)")
             }
         }
         
-        // Then
+        // Wait for discovery
         wait(for: [expectation], timeout: 10.0)
-        XCTAssertFalse(discoveredDevices.isEmpty, "; ; ; ; Should discover ; ; ; ; at least ; ; ; ; one device")
+        XCTAssertFalse(discoveredDevices.isEmpty, "Should discover at least one device")
     }
     
- ; ; ; ; func testDiscoveryTimeout() {
+    func testDiscoveryTimeout() {
         // Given
- ; ; ; ; let expectation = XCTestExpectation(description: "; ; ; ; Discovery timeout")
+        let expectation = XCTestExpectation(description: "Discovery timeout")
         
         // When
         DispatchQueue.global().asyncAfter(deadline: .now() + 6) {
@@ -51,12 +51,12 @@ f; ; ; ; inal class NetworkDiscoveryTests: XCTestCase {
         wait(for: [expectation], timeout: 7.0)
     }
     
- ; ; ; ; func testBonjourDiscovery() {
+    func testBonjourDiscovery() {
         // Given
- ; ; ; ; let expectation = XCTestExpectation(description: "; ; ; ; Bonjour discovery")
- ; ; ; ; var discoveredDevices: Set<String> = []
+        let expectation = XCTestExpectation(description: "Bonjour discovery")
+        var discoveredDevices: Set<String> = []
         
-        discovery.onDeviceFound = { ip,; ; ; ; port in
+        discovery.onDeviceFound = { ip, port in
             discoveredDevices.insert(ip)
             expectation.fulfill()
         }
@@ -68,20 +68,20 @@ f; ; ; ; inal class NetworkDiscoveryTests: XCTestCase {
         wait(for: [expectation], timeout: 5.0)
     }
     
- ; ; ; ; func testDiscoveryErrorHandling() {
+    func testDiscoveryErrorHandling() {
         // Given
- ; ; ; ; let expectation = XCTestExpectation(description: "; ; ; ; Error handling")
+        let expectation = XCTestExpectation(description: "Error handling")
         
         // When
         NetworkMonitor.shared.isConnected = false
         
-        discovery.startDiscovery { ; ; ; ; result in
- ; ; ; ; switch result {
+        discovery.startDiscovery { result in
+            switch result {
             case .success:
-                XCTFail("; ; ; ; Discovery should ; ; ; ; fail when ; ; ; ; network is unavailable")
-            case .failure(; ; ; ; let error):
+                XCTFail("Discovery should fail when network is unavailable")
+            case .failure(let error):
                 // Then
-                XCTAssertEqual(; ; ; ; error as? NetworkDiscovery.DiscoveryError, .networkUnavailable)
+                XCTAssertEqual(error as? NetworkDiscovery.DiscoveryError, .networkUnavailable)
                 expectation.fulfill()
             }
         }
@@ -89,17 +89,17 @@ f; ; ; ; inal class NetworkDiscoveryTests: XCTestCase {
         wait(for: [expectation], timeout: 5.0)
     }
     
- ; ; ; ; func testParseDiscoveryResponse() {
+    func testParseDiscoveryResponse() {
         // Given
- ; ; ; ; let response = """
+        let response = """
         HTTP/1.1 200 OK
         Cache-Control: max-age=3600
         Location: yeelight://192.168.1.100:55443
-        Server:; ; ; ; POSIX UPnP/1.0 YGLC/1
+        Server: POSIX UPnP/1.0 YGLC/1
         id: 0x000000000015243f
         model: color
         fw_ver: 18
-        support: get_; ; ; ; prop set_; ; ; ; default set_; ; ; ; power toggle set_; ; ; ; bright start_; ; ; ; cf stop_cf
+        support: get prop set default set power toggle set bright start cf stop_cf
         power: on
         bright: 100
         color_mode: 2
@@ -107,15 +107,15 @@ f; ; ; ; inal class NetworkDiscoveryTests: XCTestCase {
         rgb: 16711680
         hue: 359
         sat: 100
-        name:; ; ; ; Living Room
+        name: Living Room
         """
         
         // When
- ; ; ; ; let expectation = XCTestExpectation(description: "; ; ; ; Parse response")
- ; ; ; ; var discoveredIP: String?
- ; ; ; ; var discoveredPort: Int?
+        let expectation = XCTestExpectation(description: "Parse response")
+        var discoveredIP: String?
+        var discoveredPort: Int?
         
-        discovery.onDeviceFound = { ip,; ; ; ; port in
+        discovery.onDeviceFound = { ip, port in
             discoveredIP = ip
             discoveredPort = port
             expectation.fulfill()

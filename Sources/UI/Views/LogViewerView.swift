@@ -1,124 +1,124 @@
-i; mport SwiftUI
+import SwiftUI
 
-s; truct LogViewerView: View {
-@; ; StateObject private; ; var logger = Logger.shared
-@Environment(\.dismiss); ; private var dismiss
-@; ; State private; ; var selectedCategory: LogEntry.Category?
-@; ; State private; ; var selectedLevel: LogEntry.Level?
-@; ; State private; ; var searchText = ""
+struct LogViewerView: View {
+    @StateObject private var logger = Logger.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedCategory: LogEntry.Category?
+    @State private var selectedLevel: LogEntry.Level?
+    @State private var searchText = ""
 
-v; ar body:; ; some View {
-NavigationStack {
-VStack(spacing: 0) {
-// Filters
-ScrollView(.horizontal, showsIndicators: false) {
-HStack(spacing: 8) {
-FilterChip(
-title: "; ; All Levels",
-isSelected: selectedLevel == nil,
-action: { selectedLevel = nil }
-)
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Filters
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        FilterChip(
+                            title: "All Levels",
+                            isSelected: selectedLevel == nil,
+                            action: { selectedLevel = nil }
+                        )
 
-ForEach(LogEntry.Level.allCases, id: \.self) {; ; level in
-FilterChip(
-title: level.rawValue.capitalized,
-isSelected: selectedLevel == level,
-color: level.color,
-action: { selectedLevel = level }
-)
-}
-}
-.padding(.horizontal)
-}
-.padding(.vertical, 8)
-.background(.bar)
+                        ForEach(LogEntry.Level.allCases, id: \.self) { level in
+                            FilterChip(
+                                title: level.rawValue.capitalized,
+                                isSelected: selectedLevel == level,
+                                color: level.color,
+                                action: { selectedLevel = level }
+                            )
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .padding(.vertical, 8)
+                .background(.bar)
 
-List {
-ForEach(filteredLogs) {; ; log in
-LogEntryRow(entry: log)
-}
-}
-}
-.searchable(text: $searchText, prompt: "; ; Search logs")
-.navigationTitle("; ; Debug Logs")
-.navigationBarTitleDisplayMode(.inline)
-.toolbar {
-ToolbarItem(placement: .navigationBarTrailing) {
-Menu {
-Button(role: .destructive, action: { logger.clearLogs() }) {
-Label("; ; Clear Logs", systemImage: "trash")
-}
+                List {
+                    ForEach(filteredLogs) { log in
+                        LogEntryRow(entry: log)
+                    }
+                }
+            }
+            .searchable(text: $searchText, prompt: "Search logs")
+            .navigationTitle("Debug Logs")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button(role: .destructive, action: { logger.clearLogs() }) {
+                            Label("Clear Logs", systemImage: "trash")
+                        }
 
-Button(action: exportLogs) {
-Label("; ; Export Logs", systemImage: "square.and.arrow.up")
-}
+                        Button(action: exportLogs) {
+                            Label("Export Logs", systemImage: "square.and.arrow.up")
+                        }
 
-Menu("; ; Filter Category") {
-Button("; ; All Categories") {
-selectedCategory = nil
-}
+                        Menu("Filter Category") {
+                            Button("All Categories") {
+                                selectedCategory = nil
+                            }
 
-Divider()
+                            Divider()
 
-ForEach(LogEntry.Category.allCases, id: \.self) {; ; category in
-Button(category.rawValue.capitalized) {
-selectedCategory = category
-}
-}
-}
-} label: {
-Image(systemName: "ellipsis.circle")
-}
-}
+                            ForEach(LogEntry.Category.allCases, id: \.self) { category in
+                                Button(category.rawValue.capitalized) {
+                                    selectedCategory = category
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
 
-ToolbarItem(placement: .navigationBarLeading) {
-Button("Done") { dismiss() }
-}
-}
-}
-}
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
 
-p; rivate var filteredLogs: [LogEntry] {
-v; ar logs = logger.logs
+    private var filteredLogs: [LogEntry] {
+        var logs = logger.logs
 
-i; f let level = selectedLevel {
-logs = logs.filter { $0.level == level }
-}
+        if let level = selectedLevel {
+            logs = logs.filter { $0.level == level }
+        }
 
-i; f let category = selectedCategory {
-logs = logs.filter { $0.category == category }
-}
+        if let category = selectedCategory {
+            logs = logs.filter { $0.category == category }
+        }
 
-if !searchText.isEmpty {
-logs = logs.filter { $0.message.localizedCaseInsensitiveContains(searchText) }
-}
+        if !searchText.isEmpty {
+            logs = logs.filter { $0.message.localizedCaseInsensitiveContains(searchText) }
+        }
 
-r; eturn logs
-}
-}
-
-s; truct LogEntryRow: View {
-l; et entry: LogEntry
-
-v; ar body:; ; some View {
-VStack(alignment: .leading, spacing: 4) {
-HStack {
-Image(systemName: entry.category.icon)
-.foregroundStyle(entry.level.color)
-
-Text(entry.message)
-.font(.system(.body, design: .monospaced))
+        return logs
+    }
 }
 
-HStack {
-Text(entry.timestamp, style: .time)
-Text("[\(entry.level.rawValue.uppercased())]")
-.foregroundStyle(entry.level.color)
-Text("[\(entry.category.rawValue)]")
-}
-.font(.caption2)
-.foregroundStyle(.secondary)
-}
-.padding(.vertical, 4)
-}
+struct LogEntryRow: View {
+    let entry: LogEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: entry.category.icon)
+                    .foregroundStyle(entry.level.color)
+
+                Text(entry.message)
+                    .font(.system(.body, design: .monospaced))
+            }
+
+            HStack {
+                Text(entry.timestamp, style: .time)
+                Text("[\(entry.level.rawValue.uppercased())]")
+                    .foregroundStyle(entry.level.color)
+                Text("[\(entry.category.rawValue)]")
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
 } 

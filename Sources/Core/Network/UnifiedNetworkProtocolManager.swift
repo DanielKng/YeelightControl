@@ -130,10 +130,5 @@ public final class UnifiedNetworkProtocolManager: NetworkProtocolManaging {
     }
 }
 
-// Define NetworkError enum if not already defined elsewhere
-public enum NetworkError: Error {
-    case connectionFailed
-    case invalidCommand
-    case invalidResponse
-    case timeout
-} 
+// Use Core_NetworkError instead of defining a duplicate NetworkError
+public typealias NetworkError = Core_NetworkError 

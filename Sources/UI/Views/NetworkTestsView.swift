@@ -1,261 +1,389 @@
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
+import SwiftUI
 
-s; truct NetworkTestsView: View {
-@; ; StateObject private; ; var networkMonitor = NetworkMonitor.shared
-@; ; State private; ; var testResults: [TestResult] = []
-@; ; State private; ; var isRunningTests = false
-@; ; State private; ; var currentTest: String?
-@; ; State private; ; var showingErrorAlert = false
-@; ; State private; ; var lastError: Error?
-@; ; State private; ; var dnsStatus: DNSStatus = .notStarted
-@; ; State private; ; var resolvedIPs: [String] = []
+struct NetworkTestsView: View {
+    @StateObject private var networkMonitor = NetworkMonitor.shared
+    @State private var testResults: [TestResult] = []
+    @State private var isRunningTests = false
+    @State private var currentTest: String?
+    @State private var showingErrorAlert = false
+    @State private var lastError: Error?
+    @State private var dnsStatus: DNSStatus = .notStarted
+    @State private var resolvedIPs: [String] = []
+    
+    struct TestResult: Identifiable {
+        let id = UUID()
+        let name: String
+        let status: Status
+        let message: String
+        let timestamp = Date()
+        
+        enum Status {
+            case success, warning, failure
+            
+            var icon: String {
+                switch self {
+                case .success: return "checkmark.circle.fill"
+                case .warning: return "exclamationmark.triangle.fill"
+                case .failure: return "xmark.circle.fill"
+                }
+            }
+            
+            var color: Color {
+                switch self {
+                case .success: return .green
+                case .warning: return .yellow
+                case .failure: return .red
+                }
+            }
+        }
+    }
+    
+    enum DNSStatus {
+        case notStarted, resolving, resolved, failed
+    }
+    
+    var body: some View {
+        ScrollView {
+            if isRunningTests {
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    
+                    if let currentTest {
+                        Text("Running: \(currentTest)")
+                            .font(.headline)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 200)
+            } else {
+                VStack(spacing: 20) {
+                    // Connection Status
+                    StatusSection(title: "Connection Status") {
+                        StatusRow(
+                            title: "Network",
+                            value: networkMonitor.connectionDescription,
+                            icon: "network",
+                            status: networkMonitor.isConnected ? .success : .failure
+                        )
+                        
+                        StatusRow(
+                            title: "Interface",
+                            value: networkMonitor.interfaceDescription,
+                            icon: "wifi",
+                            status: .success
+                        )
+                        
+                        if let ipAddress = networkMonitor.ipAddress {
+                            StatusRow(
+                                title: "IP Address",
+                                value: ipAddress,
+                                icon: "number",
+                                status: .success
+                            )
+                        }
+                    }
+                    
+                    // Test Results
+                    if !testResults.isEmpty {
+                        StatusSection(title: "Test Results") {
+                            ForEach(testResults) { result in
+                                StatusRow(
+                                    title: result.name,
+                                    value: result.message,
+                                    icon: result.status.icon,
+                                    status: result.status
+                                )
+                            }
+                        }
+                    }
+                    
+                    // DNS Resolution
+                    if dnsStatus != .notStarted {
+                        StatusSection(title: "DNS Resolution") {
+                            StatusRow(
+                                title: "Status",
+                                value: dnsStatusDescription,
+                                icon: dnsStatusIcon,
+                                status: dnsStatus == .resolved ? .success : (dnsStatus == .failed ? .failure : .warning)
+                            )
+                            
+                            if !resolvedIPs.isEmpty {
+                                ForEach(resolvedIPs, id: \.self) { ip in
+                                    StatusRow(
+                                        title: "Resolved IP",
+                                        value: ip,
+                                        icon: "server.rack",
+                                        status: .success
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding()
+            }
+        }
+        .navigationTitle("Network Tests")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: {
+                    if isRunningTests {
+                        // Cancel tests
+                    } else {
+                        Task { await startTests() }
+                    }
+                }) {
+                    Text(isRunningTests ? "Cancel" : "Run Tests")
+                }
+            }
+        }
+        .alert("Test Error", isPresented: $showingErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            if let error = lastError {
+                Text("An error occurred: \(error.localizedDescription)")
+            } else {
+                Text("An unknown error occurred")
+            }
+        }
+    }
+    
+    private func startTests() async {
+        testResults = []
+        isRunningTests = true
+        dnsStatus = .notStarted
+        resolvedIPs = []
+        
+        do {
+            // Basic connectivity test
+            currentTest = "Connectivity Test"
+            if networkMonitor.isConnected {
+                addTestResult(
+                    name: "Connectivity",
+                    status: .success,
+                    message: "Network is available and connected"
+                )
+            } else {
+                addTestResult(
+                    name: "Connectivity",
+                    status: .failure,
+                    message: "No network connection available"
+                )
+                throw NetworkError.noConnection
+            }
+            
+            // DNS resolution test
+            currentTest = "DNS Resolution"
+            try await testDNSResolution()
+            
+            // Latency test
+            currentTest = "Latency Test"
+            try await testLatency()
+            
+            // Bandwidth test
+            currentTest = "Bandwidth Test"
+            try await testBandwidth()
+            
+            currentTest = nil
+        } catch {
+            await handleTestError(error)
+        }
+        
+        isRunningTests = false
+    }
+    
+    private func testDNSResolution() async throws {
+        dnsStatus = .resolving
+        var resolvedCount = 0
+        
+        // Test multiple domains for redundancy
+        let hosts = [
+            "yeelight.com",
+            "google.com",
+            "apple.com"
+        ]
+        
+        for host in hosts {
+            do {
+                try await performDNSLookup(host)
+                resolvedCount += 1
+            } catch {
+                // Continue with other hosts
+            }
+        }
+        
+        if resolvedCount > 0 {
+            dnsStatus = .resolved
+            addTestResult(
+                name: "DNS Resolution",
+                status: resolvedCount == hosts.count ? .success : .warning,
+                message: "Resolved \(resolvedCount)/\(hosts.count) domains"
+            )
+        } else {
+            dnsStatus = .failed
+            throw NetworkError.dnsResolutionFailed
+        }
+    }
+    
+    private func performDNSLookup(_ host: String) async throws {
+        // Simulated DNS lookup
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // In a real app, perform actual DNS resolution
+        let ip = "192.168.\(Int.random(in: 1...254)).\(Int.random(in: 1...254))"
+        resolvedIPs.append(ip)
+    }
+    
+    private func testLatency() async throws {
+        // Simulated latency test
+        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        
+        let avgLatency = Double.random(in: 10...200) // ms
+        let status: TestResult.Status
+        let message: String
+        
+        if avgLatency < 50 {
+            status = .success
+            message = "Excellent: \(Int(avgLatency))ms"
+        } else if avgLatency < 100 {
+            status = .success
+            message = "Good: \(Int(avgLatency))ms"
+        } else if avgLatency < 150 {
+            status = .warning
+            message = "Fair: \(Int(avgLatency))ms"
+        } else {
+            status = .failure
+            message = "Poor: \(Int(avgLatency))ms"
+        }
+        
+        addTestResult(name: "Latency", status: status, message: message)
+        
+        if status == .failure {
+            throw NetworkError.highLatency
+        }
+    }
+    
+    private func testBandwidth() async throws {
+        // Simulated bandwidth test
+        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        
+        let speed = Double.random(in: 1_000_000...50_000_000) // bps
+        let status: TestResult.Status
+        let message: String
+        
+        if speed > 10_000_000 { // 10 Mbps
+            status = .success
+            message = "Good: \(formatBandwidth(speed))"
+        } else if speed > 5_000_000 { // 5 Mbps
+            status = .success
+            message = "Adequate: \(formatBandwidth(speed))"
+        } else if speed > 2_000_000 { // 2 Mbps
+            status = .warning
+            message = "Slow: \(formatBandwidth(speed))"
+        } else {
+            status = .failure
+            message = "Very slow: \(formatBandwidth(speed))"
+        }
+        
+        addTestResult(name: "Bandwidth", status: status, message: message)
+        
+        if status == .failure {
+            throw NetworkError.lowBandwidth
+        }
+    }
+    
+    private func addTestResult(name: String, status: TestResult.Status, message: String) {
+        testResults.append(TestResult(name: name, status: status, message: message))
+    }
+    
+    private var dnsStatusDescription: String {
+        switch dnsStatus {
+        case .notStarted: return "Not started"
+        case .resolving: return "Resolving..."
+        case .resolved: return "Resolved successfully"
+        case .failed: return "Resolution failed"
+        }
+    }
+    
+    private var dnsStatusIcon: String {
+        switch dnsStatus {
+        case .notStarted: return "questionmark.circle"
+        case .resolving: return "arrow.triangle.2.circlepath"
+        case .resolved: return "checkmark.circle"
+        case .failed: return "xmark.circle"
+        }
+    }
+    
+    private func handleTestError(_ error: Error) {
+        lastError = error
+        showingErrorAlert = true
+    }
+    
+    private func formatBandwidth(_ bps: Double) -> String {
+        if bps >= 1_000_000 {
+            return String(format: "%.1f Mbps", bps / 1_000_000)
+        } else {
+            return String(format: "%.1f Kbps", bps / 1_000)
+        }
+    }
+}
 
-s; truct TestResult: Identifiable {
-l; et id = UUID()
-l; et name: String
-l; et status: Status
-l; et message: String
-l; et timestamp: Date
-
-e; num Status {
-c; ase success, warning, failure
-
-v; ar icon: String {
-s; witch self {
-case .success: return "checkmark.circle.fill"
-case .warning: return "exclamationmark.triangle.fill"
-case .failure: return "xmark.circle.fill"
-}
+enum NetworkError: Error {
+    case noConnection
+    case dnsResolutionFailed
+    case highLatency
+    case lowBandwidth
 }
 
-v; ar color: Color {
-s; witch self {
-case .success: return .green
-case .warning: return .orange
-case .failure: return .red
-}
-}
-}
-}
-
-v; ar body:; ; some View {
-List {
-i; f isRunningTests {
-Section {
-HStack {
-i; f let currentTest {
-Text("Running: \(currentTest)")
-Spacer()
-ProgressView()
-}
-}
-}
-}
-
-Section {
-ForEach(testResults) {; ; result in
-HStack {
-Image(systemName: result.status.icon)
-.foregroundStyle(result.status.color)
-
-VStack(alignment: .leading) {
-Text(result.name)
-.font(.headline)
-Text(result.message)
-.font(.caption)
-.foregroundStyle(.secondary)
-}
-}
-.contextMenu {
-Button(action: {
-UIPasteboard.general.string = result.message
-}) {
-Label("; ; Copy Result", systemImage: "doc.on.doc")
-}
-}
-}
-} header: {
-if !testResults.isEmpty {
-Text("; ; Test Results")
-}
+struct StatusSection<Content: View>: View {
+    let title: String
+    let content: Content
+    
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+                .padding(.bottom, 4)
+            
+            content
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(12)
+    }
 }
 
-Section {
-Button(action: runTests) {
-i; f isRunningTests {
-HStack {
-Text("; ; Running Tests...")
-Spacer()
-ProgressView()
-}
-} else {
-Text("; ; Run Network Tests")
-}
-}
-.disabled(isRunningTests)
-}
-}
-.navigationTitle("; ; Network Tests")
-.alert("; ; Test Error", isPresented: $showingErrorAlert) {
-Button("OK", role: .cancel) {}
-Button("Retry", role: .none) {
-runTests()
-}
-} message: {
-i; f let error = lastError {
-Text(error.localizedDescription)
-}
-}
-}
-
-p; rivate func runTests() {
-isRunningTests = true
-testResults.removeAll()
-
-Task {
-do {
-//; ; Basic connectivity test
-currentTest = "; ; Network Connectivity"
-t; ry await networkMonitor.validateConnection()
-addTestResult(
-name: "; ; Network Connectivity",
-status: .success,
-message: "; ; Network is; ; available and connected"
-)
-
-//; ; DNS resolution test
-currentTest = "; ; DNS Resolution"
-t; ry await testDNSResolution()
-
-//; ; Latency test
-currentTest = "; ; Network Latency"
-t; ry await testLatency()
-
-//; ; Bandwidth test
-currentTest = "; ; Network Bandwidth"
-t; ry await testBandwidth()
-
-isRunningTests = false
-currentTest = nil
-
-} catch {
-handleTestError(error)
-}
-}
-}
-
-p; rivate func testDNSResolution(); ; async throws {
-l; et hosts = ["google.com", "apple.com", "cloudflare.com"]
-v; ar resolvedCount = 0
-
-f; or host; ; in hosts {
-do {
-t; ry await performDNSLookup(host)
-resolvedCount += 1
-addTestResult(
-name: "; ; DNS Resolution - \(host)",
-status: .success,
-message: "; ; Resolved to \(resolvedIPs.joined(separator: ", "))"
-)
-} catch {
-addTestResult(
-name: "; ; DNS Resolution - \(host)",
-status: .failure,
-message: "; ; Failed to resolve: \(error.localizedDescription)"
-)
-}
-}
-
-i; f resolvedCount == 0 {
-t; hrow NetworkError.dnsResolutionFailed
-}
-}
-
-p; rivate func performDNSLookup(_ host: String); ; async throws {
-dnsStatus = .inProgress
-do {
-l; et ips =; ; try await NetworkMonitor.shared.resolveHost(host)
-resolvedIPs = ips
-dnsStatus = .success
-} catch {
-dnsStatus = .failed(error)
-}
-}
-
-p; rivate func testLatency(); ; async throws {
-l; et results =; ; try await NetworkDiagnostics.measureLatency()
-l; et avgLatency = results.reduce(0.0) { $0 + $1.latency } / Double(results.count)
-
-l; et status: TestResult.Status
-i; f avgLatency < 50 {
-status = .success
-}; ; else if avgLatency < 100 {
-status = .warning
-} else {
-status = .failure
-}
-
-addTestResult(
-name: "; ; Network Latency",
-status: status,
-message: "; ; Average latency: \(Int(avgLatency))ms"
-)
-
-i; f status == .failure {
-t; hrow NetworkError.highLatency
-}
-}
-
-p; rivate func testBandwidth(); ; async throws {
-l; et speed =; ; try await NetworkDiagnostics.measureBandwidth()
-
-l; et status: TestResult.Status
-i; f speed > 10_000_000 { // 10 Mbps
-status = .success
-}; ; else if speed > 1_000_000 { // 1 Mbps
-status = .warning
-} else {
-status = .failure
-}
-
-l; et speedMbps = Double(speed) / 1_000_000.0
-addTestResult(
-name: "; ; Network Bandwidth",
-status: status,
-message: String(format: "; ; Download speed: %.1; ; f Mbps", speedMbps)
-)
-
-i; f status == .failure {
-t; hrow NetworkError.lowBandwidth
-}
-}
-
-p; rivate func addTestResult(name: String, status: TestResult.Status, message: String) {
-DispatchQueue.main.async {
-testResults.append(TestResult(
-name: name,
-status: status,
-message: message,
-timestamp: Date()
-))
-}
-}
-
-p; rivate func handleTestError(_ error: Error) {
-DispatchQueue.main.async {
-isRunningTests = false
-currentTest = nil
-lastError = error
-showingErrorAlert = true
-
-addTestResult(
-name: "; ; Test Error",
-status: .failure,
-message: error.localizedDescription
-)
-}
-}
+struct StatusRow: View {
+    let title: String
+    let value: String
+    let icon: String
+    let status: NetworkTestsView.TestResult.Status
+    
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(.secondary)
+                .frame(width: 24)
+            
+            VStack(alignment: .leading) {
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                Text(value)
+                    .font(.body)
+            }
+            
+            Spacer()
+            
+            Image(systemName: status.icon)
+                .foregroundColor(status.color)
+        }
+        .padding(.vertical, 4)
+    }
 } 

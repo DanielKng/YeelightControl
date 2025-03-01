@@ -27,13 +27,13 @@ public final class UnifiedEffectManager: EffectManaging, ObservableObject {
     public var effects: [Effect] { _effects }
     
     private let storageManager: any StorageManaging
-    private let deviceManager: any DeviceManaging
+    private let deviceManager: any Core_DeviceManaging
     private let effectSubject = PassthroughSubject<Effect, Never>()
     private var effectTimers: [String: Timer] = [:]
     
     // MARK: - Initialization
     
-    public init(storageManager: any StorageManaging, deviceManager: any DeviceManaging) {
+    public init(storageManager: any StorageManaging, deviceManager: any Core_DeviceManaging) {
         self.storageManager = storageManager
         self.deviceManager = deviceManager
         self.isEnabled = true

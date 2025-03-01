@@ -1,153 +1,149 @@
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
+import SwiftUI
 
-s; truct LightsView: View {
-// MARK: - Environment
-
-@; ; EnvironmentObject private; ; var yeelightManager: UnifiedYeelightManager
-@; ; EnvironmentObject private; ; var roomManager: UnifiedRoomManager
-
-// MARK: - State
-
-@; ; State private; ; var selectedRoom: UUID?
-@; ; State private; ; var showingDeviceSetup = false
-@; ; State private; ; var selectedDevice: UnifiedYeelightDevice?
-@; ; State private; ; var showingRoomEditor = false
-@; ; State private; ; var searchText = ""
-
-// MARK: -; ; Computed Properties
-
-p; rivate var filteredDevices: [UnifiedYeelightDevice] {
-l; et devices = selectedRoom.map {; ; roomId in
-yeelightManager.devices.filter { $0.roomId == roomId }
-} ?? yeelightManager.devices
-
-guard !searchText.; ; isEmpty else {; ; return devices }
-
-r; eturn devices.filter {; ; device in
-device.name.localizedCaseInsensitiveContains(searchText) ||
-device.ipAddress.localizedCaseInsensitiveContains(searchText)
-}
-}
-
-// MARK: - Body
-
-v; ar body:; ; some View {
-List {
-Section {
-ForEach(filteredDevices) {; ; device in
-DeviceRow(device: device) {
-selectedDevice = device
-}
-}
-} header: {
-i; f yeelightManager.devices.isEmpty {
-Text("; ; No devices found")
-.foregroundColor(.secondary)
-}
-}
-}
-.searchable(text: $searchText, prompt: "; ; Search devices")
-.navigationTitle("; ; My Lights")
-.toolbar {
-ToolbarItem(placement: .navigationBarTrailing) {
-Menu {
-Button {
-showingDeviceSetup = true
-} label: {
-Label("; ; Add Device", systemImage: "plus")
-}
-
-Button {
-showingRoomEditor = true
-} label: {
-Label("; ; Manage Rooms", systemImage: "folder")
-}
-
-Button {
-yeelightManager.startDiscovery()
-} label: {
-Label("; ; Discover Devices", systemImage: "magnifyingglass")
-}
-} label: {
-Image(systemName: "ellipsis.circle")
-}
-}
-}
-.sheet(isPresented: $showingDeviceSetup) {
-NavigationView {
-DeviceSetupView()
-}
-}
-.sheet(item: $selectedDevice) {; ; device in
-NavigationView {
-DeviceDetailView(device: device)
-}
-}
-.sheet(isPresented: $showingRoomEditor) {
-NavigationView {
-RoomManagementView()
-}
-}
-.onAppear {
-yeelightManager.startDiscovery()
-}
-}
+struct LightsView: View {
+    @ObservedObject var deviceManager: DeviceManager
+    @State private var searchText = ""
+    @State private var showingAddDevice = false
+    @State private var selectedDevice: YeelightDevice?
+    @State private var isRefreshing = false
+    
+    var body: some View {
+        List {
+            if deviceManager.isDiscovering {
+                HStack {
+                    ProgressView()
+                        .padding(.trailing, 8)
+                    Text("Searching for devices...")
+                }
+            }
+            
+            ForEach(filteredDevices) { device in
+                DeviceRow(device: device)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedDevice = device
+                    }
+            }
+        }
+        .navigationTitle("Lights")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showingAddDevice = true
+                }) {
+                    Image(systemName: "plus")
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: refreshDevices) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(deviceManager.isDiscovering)
+            }
+        }
+        .searchable(text: $searchText, prompt: "Search devices")
+        .refreshable {
+            await refreshDevicesAsync()
+        }
+        .sheet(isPresented: $showingAddDevice) {
+            AddDeviceView(deviceManager: deviceManager)
+        }
+        .sheet(item: $selectedDevice) { device in
+            DeviceDetailView(device: device)
+        }
+        .overlay {
+            if deviceManager.devices.isEmpty && !deviceManager.isDiscovering {
+                ContentUnavailableView(
+                    "No Devices Found",
+                    systemImage: "lightbulb.slash",
+                    description: Text("Add a device using the + button or pull down to refresh")
+                )
+            }
+        }
+    }
+    
+    private var filteredDevices: [YeelightDevice] {
+        if searchText.isEmpty {
+            return deviceManager.devices
+        } else {
+            return deviceManager.devices.filter { device in
+                device.name.localizedCaseInsensitiveContains(searchText) ||
+                device.id.localizedCaseInsensitiveContains(searchText) ||
+                device.ipAddress.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+    }
+    
+    private func refreshDevices() {
+        deviceManager.startDiscovery()
+    }
+    
+    private func refreshDevicesAsync() async {
+        isRefreshing = true
+        deviceManager.startDiscovery()
+        // Wait for discovery to complete or timeout
+        try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+        isRefreshing = false
+    }
 }
 
-// MARK: -; ; Supporting Views
-
-p; rivate struct DeviceRow: View {
-l; et device: UnifiedYeelightDevice
-l; et onTap: () -> Void
-
-v; ar body:; ; some View {
-Button {
-onTap()
-} label: {
-HStack {
-Image(systemName: device.isOn ? "lightbulb.fill" : "lightbulb")
-.font(.title2)
-.foregroundStyle(device.isOn ? .yellow : .gray)
-.frame(width: 44, height: 44)
-.background(Color(.tertiarySystemFill))
-.cornerRadius(8)
-
-VStack(alignment: .leading, spacing: 4) {
-Text(device.name)
-.font(.headline)
-
-Text(device.model)
-.font(.subheadline)
-.foregroundColor(.secondary)
-}
-
-Spacer()
-
-VStack(alignment: .trailing, spacing: 4) {
-Text(device.isOn ? "On" : "Off")
-.font(.subheadline)
-.foregroundColor(device.isOn ? .primary : .secondary)
-
-Text("\(device.brightness)%")
-.font(.caption)
-.foregroundColor(.secondary)
-}
-}
-.padding(.vertical, 8)
-}
-.buttonStyle(.plain)
-}
+struct DeviceRow: View {
+    @ObservedObject var device: YeelightDevice
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "lightbulb.fill")
+                .font(.title2)
+                .foregroundColor(device.isOn ? .yellow : .gray)
+                .frame(width: 40, height: 40)
+                .background(
+                    Circle()
+                        .fill(Color.gray.opacity(0.2))
+                )
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(device.name)
+                    .font(.headline)
+                
+                Text(device.model)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(device.isConnected ? "Connected" : "Disconnected")
+                    .font(.caption)
+                    .foregroundColor(device.isConnected ? .green : .red)
+                
+                Text(device.ipAddress)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            
+            Button(action: {
+                device.togglePower()
+            }) {
+                Image(systemName: device.isOn ? "power" : "power")
+                    .foregroundColor(device.isOn ? .green : .gray)
+                    .padding(8)
+                    .background(
+                        Circle()
+                            .fill(Color.gray.opacity(0.2))
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 4)
+    }
 }
 
 // MARK: - Preview
 
 #Preview {
 NavigationView {
-LightsView()
-.environmentObject(ServiceContainer.shared.yeelightManager)
-.environmentObject(ServiceContainer.shared.roomManager)
+LightsView(deviceManager: ServiceContainer.shared.deviceManager)
 }
 } 

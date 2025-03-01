@@ -1,237 +1,290 @@
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
+import SwiftUI
 
-s; truct SceneCreator: View {
-@Environment(\.dismiss); ; private var dismiss
-@; ; State private; ; var selectedTab = Tab.basic
-@; ; State private; ; var showingPreview = false
-
-e; num Tab {
-c; ase basic, preset, custom, multiDevice
-
-v; ar name: String {
-s; witch self {
-case .basic: return "Basic"
-case .preset: return "Presets"
-case .custom: return "Custom"
-case .multiDevice: return "Multi-Device"
-}
-}
-
-v; ar icon: String {
-s; witch self {
-case .basic: return "lightbulb"
-case .preset: return "theatermasks"
-case .custom: return "wand.and.stars"
-case .multiDevice: return "lightbulb.2"
-}
-}
-}
-
-v; ar body:; ; some View {
-NavigationStack {
-VStack(spacing: 0) {
-//; ; Tab selector
-UnifiedTabSelector(
-selection: $selectedTab,
-tabs: [
-.init("Basic", icon: "lightbulb", tag: Tab.basic),
-.init("Presets", icon: "theatermasks", tag: Tab.preset),
-.init("Custom", icon: "wand.and.stars", tag: Tab.custom),
-.init("Multi-Device", icon: "lightbulb.2", tag: Tab.multiDevice)
-],
-style: .pills
-)
-.padding(.vertical, 8)
-.background(.bar)
-
-// Content
-TabView(selection: $selectedTab) {
-CreateSceneView()
-.tag(Tab.basic)
-
-PresetSceneView()
-.tag(Tab.preset)
-
-CustomSceneView()
-.tag(Tab.custom)
-
-MultiDeviceSceneView()
-.tag(Tab.multiDevice)
-}
-.tabViewStyle(.page(indexDisplayMode: .never))
-}
-.navigationTitle("; ; Create Scene")
-.navigationBarTitleDisplayMode(.inline)
-.toolbar {
-ToolbarItem(placement: .cancellationAction) {
-Button("Cancel") { dismiss() }
-}
-ToolbarItem(placement: .primaryAction) {
-Button("Preview") {
-showingPreview = true
-}
-}
-}
-}
-}
-}
-
-s; truct PresetSceneView: View {
-@; ; EnvironmentObject private; ; var yeelightManager: YeelightManager
-@; ; State private; ; var selectedPreset: ScenePreset?
-@; ; State private; ; var selectedDevices: Set<Device> = []
-
-v; ar body:; ; some View {
-VStack(spacing: 16) {
-//; ; Device selection
-UnifiedListView(
-title: "; ; Select Devices",
-items: Array(yeelightManager.devices),
-emptyStateMessage: "; ; No devices found"
-) {; ; device in
-DeviceSelectionRow(
-device: device,
-isSelected: selectedDevices.contains(device)
-)
-.contentShape(Rectangle())
-.onTapGesture {
-i; f selectedDevices.contains(device) {
-selectedDevices.remove(device)
-} else {
-selectedDevices.insert(device)
-}
-}
+struct SceneCreator: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var selectedTab = Tab.basic
+    @State private var showingPreview = false
+    
+    enum Tab {
+        case basic, custom, multiDevice
+        
+        var name: String {
+            switch self {
+            case .basic:
+                return "Preset"
+            case .custom:
+                return "Custom"
+            case .multiDevice:
+                return "Multi-Device"
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .basic:
+                return "theatermasks"
+            case .custom:
+                return "slider.horizontal.3"
+            case .multiDevice:
+                return "lightbulb.2"
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Tab selector
+                HStack(spacing: 0) {
+                    ForEach([Tab.basic, .custom, .multiDevice], id: \.name) { tab in
+                        Button(action: { selectedTab = tab }) {
+                            VStack(spacing: 4) {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 20))
+                                
+                                Text(tab.name)
+                                    .font(.caption)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(selectedTab == tab ? Color.accentColor.opacity(0.1) : Color.clear)
+                            .foregroundColor(selectedTab == tab ? .accentColor : .primary)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        if tab != .multiDevice {
+                            Divider()
+                                .frame(height: 30)
+                        }
+                    }
+                }
+                .background(Color(.secondarySystemBackground))
+                
+                Divider()
+                
+                // Content based on selected tab
+                TabView(selection: $selectedTab) {
+                    PresetSceneView()
+                        .tag(Tab.basic)
+                    
+                    CustomSceneView()
+                        .tag(Tab.custom)
+                    
+                    MultiDeviceSceneView()
+                        .tag(Tab.multiDevice)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .animation(.easeInOut, value: selectedTab)
+            }
+            .navigationTitle("Create Scene")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Preview") { showingPreview = true }
+                }
+            }
+            .sheet(isPresented: $showingPreview) {
+                ScenePreview()
+            }
+        }
+    }
 }
 
-//; ; Preset grid
-UnifiedGridView(
-title: "; ; Select Preset",
-items: ScenePreset.presets,
-columns: [GridItem(.adaptive(minimum: 150), spacing: 16)],
-spacing: 16,
-emptyStateMessage: "; ; No presets available"
-) {; ; preset in
-PresetCard(
-preset: preset,
-isSelected: selectedPreset?.id == preset.id,
-action: { selectedPreset = preset }
-)
-}
-.padding(.horizontal)
-}
-.padding(.vertical)
-}
-}
-
-s; truct PresetCard: View {
-l; et preset: ScenePreset
-l; et isSelected: Bool
-l; et action: () -> Void
-
-v; ar body:; ; some View {
-Button(action: action) {
-VStack(spacing: 12) {
-Image(systemName: preset.icon)
-.font(.title)
-.foregroundStyle(preset.previewColor)
-
-Text(preset.name)
-.font(.headline)
-
-Text(preset.description)
-.font(.caption)
-.foregroundStyle(.secondary)
-.lineLimit(2)
-}
-.frame(maxWidth: .infinity)
-.padding()
-.background(Color(.secondarySystemGroupedBackground))
-.cornerRadius(12)
-.overlay {
-RoundedRectangle(cornerRadius: 12)
-.stroke(isSelected ? .orange : .clear, lineWidth: 2)
-}
-}
-.buttonStyle(.plain)
-}
-}
-
-s; truct CustomSceneView: View {
-@; ; EnvironmentObject private; ; var yeelightManager: YeelightManager
-@; ; State private; ; var selectedDevices: Set<Device> = []
-@; ; State private; ; var flowParams = YeelightDevice.FlowParams()
-
-v; ar body:; ; some View {
-VStack(spacing: 16) {
-//; ; Device selection
-UnifiedListView(
-title: "; ; Select Devices",
-items: Array(yeelightManager.devices),
-emptyStateMessage: "; ; No devices found"
-) {; ; device in
-DeviceSelectionRow(
-device: device,
-isSelected: selectedDevices.contains(device)
-)
-.contentShape(Rectangle())
-.onTapGesture {
-i; f selectedDevices.contains(device) {
-selectedDevices.remove(device)
-} else {
-selectedDevices.insert(device)
-}
-}
+struct PresetSceneView: View {
+    @EnvironmentObject private var yeelightManager: YeelightManager
+    @State private var selectedPreset: ScenePreset?
+    @State private var selectedDevices: Set<Device> = []
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Device selection
+                Section(header: Text("Select Devices").font(.headline)) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(yeelightManager.devices) { device in
+                                Button(action: {
+                                    if selectedDevices.contains(device) {
+                                        selectedDevices.remove(device)
+                                    } else {
+                                        selectedDevices.insert(device)
+                                    }
+                                }) {
+                                    VStack(spacing: 8) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color.secondary.opacity(0.2))
+                                                .frame(width: 60, height: 60)
+                                            
+                                            Image(systemName: "lightbulb.fill")
+                                                .font(.system(size: 24))
+                                                .foregroundColor(device.isOn ? .yellow : .gray)
+                                            
+                                            if selectedDevices.contains(device) {
+                                                Circle()
+                                                    .fill(Color.accentColor)
+                                                    .frame(width: 24, height: 24)
+                                                    .overlay(
+                                                        Image(systemName: "checkmark")
+                                                            .font(.system(size: 12, weight: .bold))
+                                                            .foregroundColor(.white)
+                                                    )
+                                                    .position(x: 50, y: 10)
+                                            }
+                                        }
+                                        
+                                        Text(device.name)
+                                            .font(.caption)
+                                            .lineLimit(1)
+                                    }
+                                    .frame(width: 80)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                
+                // Preset selection
+                Section(header: Text("Select Preset").font(.headline)) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 16) {
+                        ForEach(ScenePreset.presets) { preset in
+                            PresetCard(preset: preset, isSelected: selectedPreset == preset)
+                                .onTapGesture {
+                                    selectedPreset = preset
+                                }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.vertical)
+        }
+    }
 }
 
-//; ; Flow effect editor
-FlowEffectEditor(params: $flowParams)
-.padding(.horizontal)
-}
-.padding(.vertical)
-}
+struct PresetCard: View {
+    let preset: ScenePreset
+    let isSelected: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Color preview
+            RoundedRectangle(cornerRadius: 12)
+                .fill(preset.color)
+                .frame(height: 100)
+                .overlay(
+                    Image(systemName: preset.icon)
+                        .font(.system(size: 30))
+                        .foregroundColor(.white)
+                )
+            
+            // Title
+            Text(preset.name)
+                .font(.headline)
+            
+            // Description
+            Text(preset.description)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+        )
+    }
 }
 
-s; truct MultiDeviceSceneView: View {
-@; ; EnvironmentObject private; ; var yeelightManager: YeelightManager
-@; ; State private; ; var selectedDevices: Set<Device> = []
+struct CustomSceneView: View {
+    @EnvironmentObject private var yeelightManager: YeelightManager
+    @State private var selectedDevices: Set<Device> = []
+    @State private var flowParams = YeelightDevice.FlowParams()
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Device selection
+                Section(header: Text("Select Devices").font(.headline)) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(yeelightManager.devices) { device in
+                                Button(action: {
+                                    if selectedDevices.contains(device) {
+                                        selectedDevices.remove(device)
+                                    } else {
+                                        selectedDevices.insert(device)
+                                    }
+                                }) {
+                                    // Device chip (same as in PresetSceneView)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                
+                // Flow effect editor
+                FlowEffectEditor(params: $flowParams)
+            }
+            .padding(.vertical)
+        }
+    }
+}
 
-v; ar body:; ; some View {
-VStack(spacing: 16) {
-//; ; Device selection
-UnifiedListView(
-title: "; ; Select Devices",
-items: Array(yeelightManager.devices),
-emptyStateMessage: "; ; No devices found"
-) {; ; device in
-DeviceSelectionRow(
-device: device,
-isSelected: selectedDevices.contains(device)
-)
-.contentShape(Rectangle())
-.onTapGesture {
-i; f selectedDevices.contains(device) {
-selectedDevices.remove(device)
-} else {
-selectedDevices.insert(device)
-}
-}
-}
-
-i; f selectedDevices.count >= 2 {
-// Multi-; ; device effect editor
-MultiDeviceEffectEditor(devices: Array(selectedDevices))
-.padding(.horizontal)
-} else {
-ContentUnavailableView(
-"; ; Select Multiple Devices",
-systemImage: "lightbulb.2",
-description: Text("; ; Select at least 2; ; devices to; ; create a multi-; ; device scene")
-)
-}
-}
-.padding(.vertical)
-}
+struct MultiDeviceSceneView: View {
+    @EnvironmentObject private var yeelightManager: YeelightManager
+    @State private var selectedDevices: Set<Device> = []
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Device selection
+                Section(header: Text("Select Devices").font(.headline)) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(yeelightManager.devices) { device in
+                                Button(action: {
+                                    if selectedDevices.contains(device) {
+                                        selectedDevices.remove(device)
+                                    } else {
+                                        selectedDevices.insert(device)
+                                    }
+                                }) {
+                                    // Device chip (same as in PresetSceneView)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                
+                if selectedDevices.count >= 2 {
+                    // Multi-device configuration options
+                    Text("Configure multi-device scene")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    // Additional configuration options would go here
+                } else {
+                    Text("Select at least 2 devices to create a multi-device scene")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                }
+            }
+            .padding(.vertical)
+        }
+    }
 } 

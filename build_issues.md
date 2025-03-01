@@ -23,3 +23,5 @@
 - NotificationTypes.swift: Fix Core_NotificationRequest conformance
 - YeelightTypes.swift and CoreYeelightTypes.swift: Ensure clear separation
 - UnifiedManagers: Update to conform to their respective protocols
+
+More about potential fixing, [HERE](docs/guides/fixing_build_issues.md)

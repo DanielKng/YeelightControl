@@ -1,30 +1,34 @@
-i; ; ; ; mport SwiftUI
-i; ; ; ; mport Core
-i; ; ; ; mport UI
+import SwiftUI
+import Core
+import UI
 
-s; ; ; ; truct ContentView: View {
-    @; ; ; ; EnvironmentObject var serviceContainer: BaseServiceContainer
+struct ContentView: View {
+    @EnvironmentObject var serviceContainer: BaseServiceContainer
     
- ; ; ; ; var body:; ; ; ; some View {
-        MainView()
-            .environmentObject(serviceContainer.deviceManager)
-            .environmentObject(serviceContainer.sceneManager)
-            .environmentObject(serviceContainer.effectManager)
-            .environmentObject(serviceContainer.networkManager)
-            .environmentObject(serviceContainer.storageManager)
-            .environmentObject(serviceContainer.configManager)
-            .environmentObject(serviceContainer.notificationManager)
-            .environmentObject(serviceContainer.permissionManager)
-            .environmentObject(serviceContainer.analyticsManager)
-            .environmentObject(serviceContainer.securityManager)
-            .environmentObject(serviceContainer.errorManager)
-            .environmentObject(serviceContainer.logger)
+    var body: some View {
+        TabView {
+            DeviceListView()
+                .tabItem {
+                    Label("Lights", systemImage: "lightbulb.fill")
+                }
+            
+            SceneGalleryView()
+                .tabItem {
+                    Label("Scenes", systemImage: "theatermasks.fill")
+                }
+            
+            AutomationListView()
+                .tabItem {
+                    Label("Automation", systemImage: "timer")
+                }
+        }
+        .environmentObject(serviceContainer)
     }
 }
 
-s; ; ; ; truct ContentView_Previews: PreviewProvider {
- ; ; ; ; static var previews:; ; ; ; some View {
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
         ContentView()
-            .environmentObject(ServiceContainer.shared)
+            .environmentObject(BaseServiceContainer())
     }
 }

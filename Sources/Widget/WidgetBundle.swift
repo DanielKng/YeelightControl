@@ -1,10 +1,10 @@
-i; ; ; ; mport SwiftUI
-i; ; ; ; mport WidgetKit
+import SwiftUI
+import WidgetKit
 
 @main
-s; ; ; ; truct YeelightWidgets: WidgetBundle {
- ; ; ; ; var body:; ; ; ; some Widget {
-        DeviceControlWidget()
-        //; ; ; ; Add more ; ; ; ; widgets here ; ; ; ; as needed
+struct YeelightWidgets: WidgetBundle {
+    var body: some Widget {
+        YeelightWidget()
+        // Add more widgets here as needed
     }
 } 

@@ -19,6 +19,8 @@ public enum Core_PermissionStatus: String, Codable {
     case authorized
     case denied
     case restricted
+    case provisional
+    case limited
 }
 
 // MARK: - Permission Event
@@ -37,18 +39,6 @@ public struct Core_PermissionEvent: Codable {
 
 // MARK: - Permission Managing Protocol
 
-public protocol Core_PermissionManaging {
-    /// Publisher for permission events
-    var permissionPublisher: AnyPublisher<Core_PermissionEvent, Never> { get }
-    
-    /// Requests permission for the specified type
-    func requestPermission(_ permission: Core_PermissionType) async -> Core_PermissionStatus
-    
-    /// Checks the current status of the specified permission
-    func checkPermissionStatus(_ permission: Core_PermissionType) async -> Core_PermissionStatus
-}
-
-// MARK: - Permission Protocols
 @preconcurrency public protocol Core_PermissionManaging: Core_BaseService {
     /// Get the status of a permission
     func getPermissionStatus(_ permission: Core_PermissionType) async -> Core_PermissionStatus

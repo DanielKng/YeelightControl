@@ -1,206 +1,171 @@
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
-i; mport SwiftUI
+import SwiftUI
 
-s; truct ColorFlowView: View {
-@; ; ObservedObject var device: YeelightDevice
-l; et manager: YeelightManager
-@; ; State private; ; var selectedPreset: FlowPreset = .candlelight
-@; ; State private; ; var duration: Double = 1000
-@; ; State private; ; var isCustomizing = false
-
-v; ar body:; ; some View {
-UnifiedDetailView(
-title: "; ; Color Flow",
-subtitle: device.name,
-mainContent: {
-VStack(spacing: 16) {
-//; ; Preset Effects
-UnifiedListView(
-title: "; ; Preset Effects",
-items: FlowPreset.allCases,
-emptyStateMessage: ""
-) {; ; preset in
-HStack {
-VStack(alignment: .leading) {
-Text(preset.rawValue)
-.font(.headline)
-Text(preset.description)
-.font(.caption)
-.foregroundColor(.secondary)
-}
-
-Spacer()
-
-i; f preset == selectedPreset {
-Image(systemName: "checkmark")
-.foregroundColor(.accentColor)
-}
-}
-.contentShape(Rectangle())
-.onTapGesture {
-selectedPreset = preset
-}
-}
-
-// Duration
-VStack(alignment: .leading, spacing: 8) {
-HStack {
-Text("Duration")
-Spacer()
-Text("\(Int(duration))ms")
-}
-Slider(value: $duration, in: 500...5000, step: 100)
-}
-.padding()
-.background(Color(.secondarySystemGroupedBackground))
-.cornerRadius(12)
-
-// Controls
-VStack(spacing: 12) {
-i; f selectedPreset != .custom {
-Button(device.flowing ? "; ; Stop Effect" : "; ; Start Effect") {
-toggleEffect()
-}
-.buttonStyle(.borderedProminent)
-} else {
-Button("; ; Customize Transitions") {
-isCustomizing = true
-}
-.buttonStyle(.bordered)
-}
-}
-.padding()
-}
-}
-)
-.sheet(isPresented: $isCustomizing) {
-CustomFlowEditor(device: device, manager: manager)
-}
-}
-
-p; rivate func toggleEffect() {
-i; f device.flowing {
-manager.stopColorFlow(device)
-} else {
-l; et params = YeelightDevice.FlowParams(
-count: 0,
-action: .recover,
-transitions: selectedPreset.transitions
-)
-manager.startColorFlow(device, params: params)
-}
-}
+struct ColorFlowView: View {
+    enum FlowPreset: String, CaseIterable, Identifiable {
+        case candlelight, sunrise, party, pulse, strobe, custom
+        var id: String { rawValue }
+    }
+    
+    @ObservedObject var device: YeelightDevice
+    
+    @State private var selectedPreset: FlowPreset = .candlelight
+    @State private var duration: Double = 1000
+    @State private var isCustomizing = false
+    
+    var body: some View {
+        VStack {
+            NavigationView {
+                Form {
+                    Section(
+                        header: Text("Preset Effects"),
+                        footer: Text(selectedPreset.description)
+                    ) {
+                        Picker("Effect Type", selection: $selectedPreset) { preset in
+                            ForEach(FlowPreset.allCases) { preset in
+                                Text(preset.rawValue.capitalized)
+                                    .tag(preset)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        if selectedPreset != .custom {
+                            HStack {
+                                Text("Duration")
+                                Spacer()
+                                Text("\(Int(duration))s")
+                            }
+                            
+                            Slider(
+                                value: $duration,
+                                in: 30...3600,
+                                step: 30
+                            ) {
+                                Text("Duration")
+                            } minimumValueLabel: {
+                                Text("30s")
+                            } maximumValueLabel: {
+                                Text("1h")
+                            }
+                        }
+                    }
+                    
+                    Section {
+                        Button(device.flowing ? "Stop Effect" : "Start Effect") {
+                            toggleEffect()
+                        }
+                        
+                        Button("Customize Transitions") {
+                            isCustomizing = true
+                        }
+                    }
+                }
+                .navigationTitle("Color Flow")
+                .sheet(isPresented: $isCustomizing) {
+                    FlowCustomizationView(device: device)
+                }
+            }
+        }
+    }
+    
+    private func toggleEffect() {
+        if device.flowing {
+            device.stopColorFlow()
+            return
+        }
+        
+        switch selectedPreset {
+        case .candlelight:
+            device.startCandlelightEffect(duration: duration)
+        case .sunrise:
+            device.startSunriseEffect(duration: duration)
+        case .party:
+            device.startPartyEffect(duration: duration)
+        case .pulse:
+            device.startPulseEffect(duration: duration)
+        case .strobe:
+            device.startStrobeEffect(duration: duration)
+        case .custom:
+            // Use custom transitions
+            break
+        }
+    }
 }
 
-s; truct CustomFlowEditor: View {
-@; ; ObservedObject var device: YeelightDevice
-l; et manager: YeelightManager
-@Environment(\.dismiss); ; private var dismiss
-
-@; ; State private; ; var transitions: [YeelightDevice.FlowParams.FlowTransition] = []
-
-v; ar body:; ; some View {
-NavigationStack {
-UnifiedListView(
-title: "Transitions",
-items: transitions.indices,
-emptyStateMessage: "; ; No transitions added"
-) {; ; index in
-TransitionRow(transition: $transitions[index])
-}
-.toolbar {
-ToolbarItem(placement: .navigationBarLeading) {
-Button("Cancel") {
-dismiss()
-}
+extension ColorFlowView.FlowPreset {
+    var description: String {
+        switch self {
+        case .candlelight:
+            return "Warm flickering light effect"
+        case .sunrise:
+            return "Gradually brightening warm to cool light"
+        case .party:
+            return "Colorful party lighting effect"
+        case .pulse:
+            return "Smooth pulsing light effect"
+        case .strobe:
+            return "Quick flashing light effect"
+        case .custom:
+            return "Create your own custom effect"
+        }
+    }
 }
 
-ToolbarItem(placement: .navigationBarTrailing) {
-Button("Save") {
-saveFlow()
-dismiss()
-}
-}
-
-ToolbarItem(placement: .bottomBar) {
-Button(action: addTransition) {
-Label("; ; Add Transition", systemImage: "plus")
-}
-}
-}
-}
-}
-
-p; rivate func addTransition() {
-transitions.append(.init(
-duration: 1000,
-mode: 1,
-value: 0xFF0000,
-brightness: 100
-))
-}
-
-p; rivate func saveFlow() {
-l; et params = YeelightDevice.FlowParams(
-count: 0,
-action: .recover,
-transitions: transitions
-)
-manager.startColorFlow(device, params: params)
-}
-}
-
-e; xtension FlowPreset {
-v; ar description: String {
-s; witch self {
-case .candlelight:
-return "; ; Warm flickering; ; light effect"
-case .sunrise:
-return "; ; Gradually brightening; ; warm to; ; cool light"
-case .disco:
-return "; ; Colorful party; ; lighting effect"
-case .pulse:
-return "; ; Smooth pulsing; ; light effect"
-case .strobe:
-return "; ; Quick flashing; ; light effect"
-case .custom:
-return "; ; Create your; ; own custom effect"
-}
-}
-
-v; ar transitions: [YeelightDevice.FlowParams.FlowTransition] {
-s; witch self {
-case .candlelight:
-return [
-.init(duration: 800, mode: .color(red: 255, green: 147, blue: 41)),
-.init(duration: 800, mode: .color(red: 255, green: 137, blue: 31))
-]
-case .sunrise:
-return [
-.init(duration: 3000, mode: .temperature(temp: 1700, brightness: 1)),
-.init(duration: 3000, mode: .temperature(temp: 2500, brightness: 50)),
-.init(duration: 3000, mode: .temperature(temp: 5000, brightness: 100))
-]
-case .disco:
-return [
-.init(duration: 500, mode: .color(red: 255, green: 0, blue: 0)),
-.init(duration: 500, mode: .color(red: 0, green: 255, blue: 0)),
-.init(duration: 500, mode: .color(red: 0, green: 0, blue: 255))
-]
-case .pulse:
-return [
-.init(duration: 1000, mode: .brightness(level: 100)),
-.init(duration: 1000, mode: .brightness(level: 1))
-]
-case .strobe:
-return [
-.init(duration: 100, mode: .brightness(level: 100)),
-.init(duration: 100, mode: .brightness(level: 0))
-]
-case .custom:
-return []
-}
-}
+struct FlowCustomizationView: View {
+    @ObservedObject var device: YeelightDevice
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var transitions: [YeelightDevice.FlowParams.FlowTransition] = []
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    List {
+                        ForEach(transitions.indices, id: \.self) { index in
+                            TransitionRow(transition: transitions[index])
+                        }
+                        .onDelete { indexSet in
+                            transitions.remove(atOffsets: indexSet)
+                        }
+                    }
+                    .listStyle(.plain)
+                    
+                    Button {
+                        // Add new transition
+                        let newTransition = YeelightDevice.FlowParams.FlowTransition(
+                            duration: 1000,
+                            mode: .color,
+                            value: 0xFF0000,
+                            brightness: 100
+                        )
+                        transitions.append(newTransition)
+                    } label: {
+                        Label("Add Transition", systemImage: "plus")
+                    }
+                }
+                
+                Section {
+                    Button("Apply Custom Flow") {
+                        applyCustomFlow()
+                        dismiss()
+                    }
+                    .disabled(transitions.isEmpty)
+                }
+            }
+            .navigationTitle("Custom Flow")
+            .navigationBarItems(
+                leading: Button("Cancel") { dismiss() }
+            )
+        }
+    }
+    
+    private func applyCustomFlow() {
+        // Apply custom flow with transitions
+        device.startColorFlow(
+            count: 0, // Infinite
+            action: .stay,
+            transitions: transitions
+        )
+    }
 } 
