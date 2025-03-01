@@ -126,7 +126,7 @@ enum NotificationTrigger {
     case dateComponents(DateComponents)
     case location(CLRegion)
     
-    var unTrigger: UNNotificationTrigger? {
+    var unNotificationTrigger: UNNotificationTrigger? {
         switch self {
         case .immediate:
             return nil
@@ -215,8 +215,8 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
         let options: UNAuthorizationOptions = [.alert, .sound, .badge]
         isNotificationsEnabled = try await notificationCenter.requestAuthorization(options: options)
         
-        analytics.trackEvent(AnalyticsEvent(
-            name: "notification_authorization_requested",
+        analytics.trackEvent(Core_AnalyticsEvent(
+            type: .custom,
             parameters: ["authorized": String(isNotificationsEnabled)]
         ))
         
@@ -265,7 +265,7 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
         let request = UNNotificationRequest(
             identifier: notification.id,
             content: content,
-            trigger: notification.trigger.unTrigger
+            trigger: notification.trigger.unNotificationTrigger
         )
         
         try await notificationCenter.add(request)
@@ -290,8 +290,8 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
             // Convert userInfo to string dictionary
             var stringUserInfo: [String: String] = [:]
             for (key, value) in content.userInfo {
-                if let keyString = key as? String, let valueString = String(describing: value) {
-                    stringUserInfo[keyString] = valueString
+                if let keyString = key as? String {
+                    stringUserInfo[keyString] = String(describing: value)
                 }
             }
             
@@ -348,8 +348,8 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
             // Convert userInfo to string dictionary
             var stringUserInfo: [String: String] = [:]
             for (key, value) in content.userInfo {
-                if let keyString = key as? String, let valueString = String(describing: value) {
-                    stringUserInfo[keyString] = valueString
+                if let keyString = key as? String {
+                    stringUserInfo[keyString] = String(describing: value)
                 }
             }
             
@@ -446,8 +446,8 @@ extension UnifiedNotificationManager: UNUserNotificationCenterDelegate {
         let content = notification.request.content
         var stringUserInfo: [String: String] = [:]
         for (key, value) in content.userInfo {
-            if let keyString = key as? String, let valueString = String(describing: value) {
-                stringUserInfo[keyString] = valueString
+            if let keyString = key as? String {
+                stringUserInfo[keyString] = String(describing: value)
             }
         }
         

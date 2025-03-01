@@ -157,6 +157,12 @@ I've made significant progress in resolving the build issues:
     - Updated to use `ObservableYeelightManager` instead of `YeelightManager`
     - Added proper imports for `Core` and `UI.Components`
 
+27. ✅ Fixed string conversion in `UnifiedNotificationManager.swift`:
+    - Fixed conditional binding issues in userInfo dictionary conversion
+    - Corrected the method name from `unTrigger` to `unNotificationTrigger` to match `Core_AppNotificationTrigger` enum
+    - Updated `AnalyticsEvent` reference to `Core_AnalyticsEvent` with correct parameters
+    - Simplified string conversion logic to only check for the key being a string
+
 ## Current Status
 
 The Core module now builds successfully! I've fixed all the critical issues in the Core module, and I've made significant progress on the UI module issues. I've created all the necessary observable wrapper classes, centralized common UI components, and added missing types for UI components. I've also updated several UI files to use the centralized components and observable wrapper classes.

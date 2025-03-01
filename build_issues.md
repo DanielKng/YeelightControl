@@ -87,6 +87,11 @@
 40. ✅ Updated `DeviceDetailView.swift` to use the centralized `ConnectionStatusView` component
 41. ✅ Updated `NetworkTestsView.swift` to use the centralized `StatusRow` component
 42. ✅ Updated `EffectsListView.swift` to use the centralized `DeviceChip` component
+43. ✅ Fixed string conversion in `UnifiedNotificationManager.swift`:
+    - Fixed conditional binding issues in userInfo dictionary conversion
+    - Corrected the method name from `unTrigger` to `unNotificationTrigger` to match `Core_AppNotificationTrigger` enum
+    - Updated `AnalyticsEvent` reference to `Core_AnalyticsEvent` with correct parameters
+    - Simplified string conversion logic to only check for the key being a string
 
 ## Remaining Issues
 
