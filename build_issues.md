@@ -97,50 +97,55 @@
 
 Based on the build output, we still have several issues to fix:
 
-1. Duplicate view declarations:
-   - Need to update `CreateAutomationView.swift` to use the centralized `LocationPicker` component
-   - Need to update `DetailContentView.swift` to use the centralized `DeviceDetailView` component
+1. **Actor isolation issues**:
+   - Several manager classes have async property access in functions that don't support concurrency
+   - Need to properly implement nonisolated properties that access actor-isolated state
 
-2. ObservableObject conformance issues:
-   - Need to update UI files to use the observable wrapper classes instead of the actor types directly
-   - Need to update UI files to use `@EnvironmentObject` with the observable wrapper classes
+2. **Type conversion issues**:
+   - Cannot convert between types like `Device` and `Core_Device`
+   - Need to ensure proper type conversions or implement conformance to required protocols
 
-3. ServiceContainer access issues:
-   - Need to update UI files to import the `ServiceContainer+UI.swift` file
-   - Need to update UI files to use the UI-specific properties from `ServiceContainer`
+3. **Storage method call issues**:
+   - Incorrect method calls to storage manager methods
+   - Need to update method calls to match the expected parameter names and types
 
-## Recommended Approach
+4. **Protocol conformance issues**:
+   - Some types don't conform to their required protocols
+   - Need to implement all required methods with the correct signatures
 
-1. Fix duplicate view declarations:
-   - Update all UI files to use the centralized components
-   - Remove duplicate view declarations from the original files
+5. **Missing members and properties**:
+   - Some types are missing expected members or properties
+   - Need to add the missing members or update the code to use the correct property names
 
-2. Fix ObservableObject conformance issues:
-   - Update all UI files to use the observable wrapper classes
-   - Update all UI files to use `@EnvironmentObject` with the observable wrapper classes
+## Updated Approach
 
-3. Fix ServiceContainer access issues:
-   - Update all UI files to import the `ServiceContainer+UI.swift` file
-   - Update all UI files to use the UI-specific properties from `ServiceContainer`
+1. **Fix actor isolation issues**:
+   - Properly implement nonisolated properties that access actor-isolated state
+   - Use Task and await properly in nonisolated contexts
 
-4. Test the build:
-   - Run the build to see if the issues have been resolved
-   - Address any remaining issues one by one
+2. **Fix type conversion issues**:
+   - Ensure proper type conversions between Core types and implementation types
+   - Implement conformance to required protocols
+
+3. **Fix storage method call issues**:
+   - Update method calls to match the expected parameter names and types
+   - Ensure proper error handling for storage operations
+
+4. **Fix protocol conformance issues**:
+   - Implement all required methods with the correct signatures
+   - Ensure all required properties are properly implemented
+
+5. **Fix missing members and properties**:
+   - Add missing members or properties to types
+   - Update code to use the correct property names
 
 ## Specific Files Needing Attention
 
-- `CreateAutomationView.swift`: Update to use centralized components
-- `CreateGroupView.swift`: Update to use observable wrapper classes
-- `CreateSceneView.swift`: Update to use observable wrapper classes
-- `DetailContentView.swift`: Update to use centralized components
-- `DeviceCard.swift`: Update to use centralized components
-- `DeviceSetupView.swift`: Update to use observable wrapper classes
-- `FlowEffectEditor.swift`: Update to use observable wrapper classes
-- `GroupManagementView.swift`: Update to use observable wrapper classes
-- `LocationPicker.swift`: Update to use centralized components
-- `MainView.swift`: Update to use observable wrapper classes
-- `NetworkDiagnosticsView.swift`: Update to use centralized components
-- `SceneCreator.swift`: Update to use observable wrapper classes
-- `ScenePreview.swift`: Update to use observable wrapper classes
+- `UnifiedLocationManager.swift`: Fix async property access issues
+- `UnifiedLogger.swift`: Fix protocol conformance and storage method call issues
+- `UnifiedDeviceManager.swift`: Fix type conversion and property access issues
+- `UnifiedEffectManager.swift`: Fix storage method call issues
+- `UnifiedErrorHandler.swift`: Fix async property access and method call issues
+- `BaseServiceContainer.swift`: Fix async/await usage
 
 More about potential fixing, [HERE](docs/guides/fixing_build_issues.md)

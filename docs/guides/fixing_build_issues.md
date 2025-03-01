@@ -165,69 +165,146 @@ I've made significant progress in resolving the build issues:
 
 ## Current Status
 
-The Core module now builds successfully! I've fixed all the critical issues in the Core module, and I've made significant progress on the UI module issues. I've created all the necessary observable wrapper classes, centralized common UI components, and added missing types for UI components. I've also updated several UI files to use the centralized components and observable wrapper classes.
+We've made progress on fixing the Core module issues, but there are still several critical issues that need to be addressed:
+
+1. **Actor isolation issues**: Several manager classes have async property access in functions that don't support concurrency.
+2. **Type conversion issues**: Cannot convert between types like `Device` and `Core_Device`.
+3. **Storage method call issues**: Incorrect method calls to storage manager methods.
+4. **Protocol conformance issues**: Some types don't conform to their required protocols.
+5. **Missing members and properties**: Some types are missing expected members or properties.
 
 ## Remaining Issues to Fix
 
+### Core Module Issues
+
+1. **Actor isolation issues**:
+   - Fix nonisolated properties that access actor-isolated state in:
+     - `UnifiedLocationManager`
+     - `UnifiedLogger`
+     - `UnifiedNetworkManager`
+     - `UnifiedDeviceManager`
+     - `UnifiedErrorHandler`
+
+2. **Type conversion issues**:
+   - Fix type conversions between Core types and implementation types in:
+     - `UnifiedDeviceManager`
+     - `UnifiedEffectManager`
+
+3. **Storage method call issues**:
+   - Update method calls to match the expected parameter names and types in:
+     - `UnifiedLogger`
+     - `UnifiedEffectManager`
+
+4. **Protocol conformance issues**:
+   - Fix protocol conformance in:
+     - `UnifiedLogger`
+
+5. **Missing members and properties**:
+   - Add missing members or update property names in:
+     - `UnifiedDeviceManager`
+     - `UnifiedErrorHandler`
+
 ### UI Module Issues
 
-The UI module still has a few issues that need to be addressed:
+Once the Core module is fixed, we'll need to address the UI module issues:
 
-1. **ObservableObject conformance issues**:
-   - Need to update remaining UI files to use the observable wrapper classes instead of the actor types directly
-   - Need to update remaining UI files to use `@EnvironmentObject` with the observable wrapper classes
+1. **Duplicate view declarations**:
+   - Update UI files to use centralized components
+   - Remove duplicate view declarations from the original files
 
-2. **ServiceContainer access issues**:
-   - Need to update remaining UI files to import the `ServiceContainer+UI.swift` file
-   - Need to update remaining UI files to use the UI-specific properties from `ServiceContainer`
+2. **ObservableObject conformance issues**:
+   - Update UI files to use the observable wrapper classes
+   - Update UI files to use `@EnvironmentObject` with the observable wrapper classes
 
-## Detailed UI Fix Plan
+3. **ServiceContainer access issues**:
+   - Update UI files to import the `ServiceContainer+UI.swift` file
+   - Update UI files to use the UI-specific properties from `ServiceContainer`
 
-### 1. Fix Duplicate View Declarations
+## Detailed Core Fix Plan
 
-Update UI files to use centralized components:
+### 1. Fix Actor Isolation Issues
+
+Update nonisolated properties that access actor-isolated state:
 
 ```swift
-// Before (in DetailContentView.swift)
-struct DeviceDetailView: View {
-    // Duplicate implementation
+// Before
+nonisolated public var isEnabled: Bool {
+    _isEnabled // Error: 'async' property access in a function that does not support concurrency
 }
 
-// After (in DetailContentView.swift)
-// Use the centralized DeviceDetailView component
+// After
+nonisolated public var isEnabled: Bool {
+    get {
+        let task = Task { await _isEnabled }
+        return (try? task.result.get()) ?? false
+    }
+}
 ```
 
-### 2. Update UI Files to Use Observable Wrapper Classes
+### 2. Fix Type Conversion Issues
 
-Update UI files to use the observable wrapper classes:
+Ensure proper type conversions between Core types and implementation types:
 
 ```swift
 // Before
-@EnvironmentObject private var effectManager: UnifiedEffectManager
+return await _devices as [Core_Device] // Error: cannot convert value of type '[Device]' to type '[Core_Device]'
 
 // After
-@EnvironmentObject private var effectManager: ObservableEffectManager
+return await _devices.map { $0 as Core_Device }
 ```
 
-### 3. Fix ServiceContainer Access Issues
+### 3. Fix Storage Method Call Issues
 
-Update UI files to import and use the UI-specific properties from `ServiceContainer`:
+Update method calls to match the expected parameter names and types:
 
 ```swift
 // Before
-let effectManager = serviceContainer.effectManager
+try await storageManager.save(effect, withId: effect.id, inCollection: "effects") // Error: incorrect argument labels
 
 // After
-import ServiceContainer_UI
-let effectManager = serviceContainer.observableEffectManager
+try await storageManager.save(key: "effects.\(effect.id)", value: effect)
+```
+
+### 4. Fix Protocol Conformance Issues
+
+Implement all required methods with the correct signatures:
+
+```swift
+// Before
+public nonisolated func log(_ message: String, level: Core_LogLevel, category: Core_LogCategory, file: String = #file, function: String = #function, line: Int = #line)
+
+// After
+public func log(message: String, level: String, category: String, file: String = #file, function: String = #function, line: Int = #line) async
+```
+
+### 5. Fix Missing Members and Properties
+
+Add missing members or update property names:
+
+```swift
+// Before
+device.isConnected = true // Error: value of type 'Device' has no member 'isConnected'
+
+// After
+// Add the missing property to the Device struct or update the code to use the correct property name
 ```
 
 ## Implementation Strategy
 
-1. Update remaining UI files to use centralized components
-2. Update remaining UI files to use observable wrapper classes
-3. Update remaining UI files to use UI-specific properties from `ServiceContainer`
-4. Test the build after each set of changes
+1. Fix the Core module issues first, focusing on the most critical files:
+   - `UnifiedLocationManager.swift`
+   - `UnifiedLogger.swift`
+   - `UnifiedDeviceManager.swift`
+   - `UnifiedEffectManager.swift`
+   - `UnifiedErrorHandler.swift`
+   - `BaseServiceContainer.swift`
+
+2. Once the Core module builds successfully, address the UI module issues:
+   - Update UI files to use centralized components
+   - Update UI files to use observable wrapper classes
+   - Fix ServiceContainer access issues
+
+3. Test the build after each set of changes to ensure progress is being made
 
 ## Testing the Fixes
 
