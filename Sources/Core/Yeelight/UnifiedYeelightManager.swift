@@ -15,11 +15,12 @@ import SwiftUI
 public final class UnifiedYeelightManager: ObservableObject, Core_YeelightManaging, Core_BaseService {
     // MARK: - Properties
     private var _isEnabled: Bool = true
-    public private(set) var isEnabled: Bool {
-        get { _isEnabled }
-        set {
-            _isEnabled = newValue
-            objectWillChange.send()
+    nonisolated public var isEnabled: Bool {
+        get {
+            let task = Task { () -> Bool in
+                return _isEnabled
+            }
+            return (try? task.result.get()) ?? false
         }
     }
     @Published private var _yeelightDevices: [YeelightDevice] = []
@@ -89,6 +90,27 @@ public final class UnifiedYeelightManager: ObservableObject, Core_YeelightManagi
     public func clearDevices() async {
         _yeelightDevices.removeAll()
         deviceUpdateSubject.send(YeelightDeviceUpdate(device: nil, updateType: .cleared))
+    }
+    
+    // MARK: - Scene Methods
+    
+    public func applyScene(_ scene: any Scene, to device: YeelightDevice) {
+        print("Applying scene \(scene.name) to device \(device.id)")
+        // Implementation for applying a scene to a device
+        // This would typically involve sending the appropriate commands to the device
+        // based on the scene type and parameters
+    }
+    
+    public func stopEffect(on device: YeelightDevice) {
+        print("Stopping effects on device \(device.id)")
+        // Implementation for stopping any active effects on the device
+        // This would typically involve sending a command to reset the device to its default state
+    }
+    
+    // MARK: - Helper Methods
+    
+    nonisolated public func getDevice(id: String) -> YeelightDevice? {
+        return _yeelightDevices.first { $0.id == id }
     }
     
     // MARK: - Private Methods

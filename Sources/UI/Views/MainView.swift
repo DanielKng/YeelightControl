@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import Network
+import Core
 
 /// Main tab-based navigation view for the application
 /// Provides access to all major features through a tab interface
@@ -51,8 +52,9 @@ struct MainView: View {
 @State private var showingAdvancedSettings = false
 @State private var showingHelp = false
 @State private var selectedDevice: UnifiedYeelightDevice?
-@State private var selectedScene: Scene?
-@State private var selectedEffect: Effect?
+@State private var selectedScene: (any Scene)?
+@State private var selectedEffect: Core_Effect?
+@State private var showingLocationPicker = false
 
 private var cancellables = Set<AnyCancellable>()
 

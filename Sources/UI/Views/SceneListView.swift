@@ -1,16 +1,18 @@
 import SwiftUI
+import Core
 
 /// View for displaying and managing scenes
 struct SceneListView: View {
-    @ObservedObject var sceneManager: SceneManager
-    @State private var showingCreateScene = false
-    @State private var selectedScene: Scene?
+    @ObservedObject var sceneManager: UnifiedSceneManager
+    @State private var searchText = ""
+    @State private var showingAddScene = false
+    @State private var selectedScene: (any Scene)?
     @State private var showingDeleteConfirmation = false
     
     var body: some View {
         NavigationStack {
             List {
-                ForEach(sceneManager.scenes) { scene in
+                ForEach(filteredScenes) { scene in
                     SceneRow(scene: scene)
                         .contentShape(Rectangle())
                         .onTapGesture {
@@ -43,17 +45,19 @@ struct SceneListView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        showingCreateScene = true
+                        showingAddScene = true
                     }) {
                         Image(systemName: "plus")
                     }
                 }
             }
-            .sheet(isPresented: $showingCreateScene) {
+            .searchable(text: $searchText, prompt: "Search scenes")
+            .sheet(isPresented: $showingAddScene) {
                 CreateSceneView(sceneManager: sceneManager)
             }
             .sheet(item: $selectedScene) { scene in
-                EditSceneView(sceneManager: sceneManager, scene: scene)
+                ScenePreview(scene: scene)
+                    .environmentObject(sceneManager)
             }
             .alert("Delete Scene", isPresented: $showingDeleteConfirmation, presenting: selectedScene) { scene in
                 Button("Cancel", role: .cancel) {}
@@ -69,31 +73,53 @@ struct SceneListView: View {
                 if sceneManager.scenes.isEmpty {
                     ContentUnavailableView(
                         "No Scenes",
-                        systemImage: "lightbulb.slash",
-                        description: Text("Tap the + button to create a new scene")
+                        systemImage: "theatermasks",
+                        description: Text("Create a scene using the + button")
                     )
                 }
             }
         }
     }
     
+    private var filteredScenes: [any Scene] {
+        if searchText.isEmpty {
+            return sceneManager.scenes
+        } else {
+            return sceneManager.scenes.filter { scene in
+                scene.name.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+    }
+    
     private func deleteScenes(at offsets: IndexSet) {
-        sceneManager.deleteScene(at: offsets)
+        for index in offsets {
+            let scene = filteredScenes[index]
+            sceneManager.deleteScene(scene.id)
+        }
     }
 }
 
 // MARK: - Supporting Views
 
 private struct SceneRow: View {
-    let scene: Scene
+    let scene: any Scene
     
     var body: some View {
         HStack {
-            VStack(alignment: .leading) {
+            Image(systemName: iconForScene(scene))
+                .font(.title2)
+                .foregroundColor(.accentColor)
+                .frame(width: 40, height: 40)
+                .background(
+                    Circle()
+                        .fill(Color.gray.opacity(0.2))
+                )
+            
+            VStack(alignment: .leading, spacing: 4) {
                 Text(scene.name)
                     .font(.headline)
                 
-                Text("\(scene.devices.count) devices")
+                Text(scene.description ?? "No description")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -105,17 +131,27 @@ private struct SceneRow: View {
             }) {
                 Image(systemName: "play.fill")
                     .foregroundColor(.accentColor)
+                    .padding(8)
+                    .background(
+                        Circle()
+                            .fill(Color.gray.opacity(0.2))
+                    )
             }
             .buttonStyle(.plain)
         }
         .padding(.vertical, 4)
+    }
+    
+    private func iconForScene(_ scene: any Scene) -> String {
+        // Determine icon based on scene type
+        return "theatermasks.fill"
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-NavigationView {
-SceneListView(sceneManager: ServiceContainer.shared.sceneManager)
-}
+    NavigationView {
+        SceneListView(sceneManager: ServiceContainer.shared.sceneManager)
+    }
 } 

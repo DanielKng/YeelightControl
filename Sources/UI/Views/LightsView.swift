@@ -1,7 +1,9 @@
 import SwiftUI
+import Core
 
 struct LightsView: View {
-    @ObservedObject var deviceManager: DeviceManager
+    @ObservedObject var deviceManager: UnifiedDeviceManager
+    @EnvironmentObject private var yeelightManager: UnifiedYeelightManager
     @State private var searchText = ""
     @State private var showingAddDevice = false
     @State private var selectedDevice: YeelightDevice?
@@ -48,12 +50,14 @@ struct LightsView: View {
         }
         .sheet(isPresented: $showingAddDevice) {
             AddDeviceView(deviceManager: deviceManager)
+                .environmentObject(yeelightManager)
         }
         .sheet(item: $selectedDevice) { device in
             DeviceDetailView(device: device)
+                .environmentObject(yeelightManager)
         }
         .overlay {
-            if deviceManager.devices.isEmpty && !deviceManager.isDiscovering {
+            if yeelightManager.devices.isEmpty && !deviceManager.isDiscovering {
                 ContentUnavailableView(
                     "No Devices Found",
                     systemImage: "lightbulb.slash",
@@ -65,9 +69,9 @@ struct LightsView: View {
     
     private var filteredDevices: [YeelightDevice] {
         if searchText.isEmpty {
-            return deviceManager.devices
+            return yeelightManager.devices
         } else {
-            return deviceManager.devices.filter { device in
+            return yeelightManager.devices.filter { device in
                 device.name.localizedCaseInsensitiveContains(searchText) ||
                 device.id.localizedCaseInsensitiveContains(searchText) ||
                 device.ipAddress.localizedCaseInsensitiveContains(searchText)
@@ -76,26 +80,31 @@ struct LightsView: View {
     }
     
     private func refreshDevices() {
-        deviceManager.startDiscovery()
+        Task {
+            try? await yeelightManager.discover()
+        }
     }
     
     private func refreshDevicesAsync() async {
         isRefreshing = true
-        deviceManager.startDiscovery()
+        try? await yeelightManager.discover()
         // Wait for discovery to complete or timeout
         try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
         isRefreshing = false
     }
 }
 
+// MARK: - Supporting Views
+
 struct DeviceRow: View {
     @ObservedObject var device: YeelightDevice
+    @EnvironmentObject private var yeelightManager: UnifiedYeelightManager
     
     var body: some View {
         HStack {
             Image(systemName: "lightbulb.fill")
                 .font(.title2)
-                .foregroundColor(device.isOn ? .yellow : .gray)
+                .foregroundColor(device.isPoweredOn ? .yellow : .gray)
                 .frame(width: 40, height: 40)
                 .background(
                     Circle()
@@ -124,10 +133,10 @@ struct DeviceRow: View {
             }
             
             Button(action: {
-                device.togglePower()
+                togglePower()
             }) {
-                Image(systemName: device.isOn ? "power" : "power")
-                    .foregroundColor(device.isOn ? .green : .gray)
+                Image(systemName: device.isPoweredOn ? "power" : "power")
+                    .foregroundColor(device.isPoweredOn ? .green : .gray)
                     .padding(8)
                     .background(
                         Circle()
@@ -138,12 +147,21 @@ struct DeviceRow: View {
         }
         .padding(.vertical, 4)
     }
+    
+    private func togglePower() {
+        Task {
+            var updatedDevice = device
+            updatedDevice.isPoweredOn.toggle()
+            try? await yeelightManager.updateDevice(updatedDevice)
+        }
+    }
 }
 
 // MARK: - Preview
 
 #Preview {
-NavigationView {
-LightsView(deviceManager: ServiceContainer.shared.deviceManager)
-}
+    NavigationView {
+        LightsView(deviceManager: ServiceContainer.shared.deviceManager)
+            .environmentObject(ServiceContainer.shared.yeelightManager)
+    }
 } 

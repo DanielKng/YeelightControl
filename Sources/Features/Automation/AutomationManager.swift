@@ -120,12 +120,12 @@ enum Comparison: String, Codable {
     case lessThanOrEqual
 }
 
-final class AutomationManager: AutomationManaging {
+final class UnifiedAutomationManager: AutomationManaging {
     private let services: BaseServiceContainer
-    private let storage: StorageManagingServiceServiceServiceServiceService
+    private let storage: Core_StorageManaging
     private let deviceManager: DeviceManaging
     private let notificationManager: NotificationManaging
-    private let locationManager: LocationManagingServiceServiceServiceServiceService
+    private let locationManager: Core_LocationManaging
     private var automations: [Automation] = []
     private let automationsSubject = CurrentValueSubject<[Automation], Never>([])
     private var subscriptions = Set<AnyCancellable>()

@@ -8,6 +8,7 @@
 4. Missing type definitions
 5. Duplicate type definitions across multiple files
 6. Sendability issues with non-sendable types in actor-isolated contexts
+7. UI component type mismatches with Core module types
 
 ## Progress Made
 
@@ -21,34 +22,42 @@
 8. ✅ Fixed actor isolation issues in several manager classes
 9. ✅ Fixed `Core_BaseService` protocol conformance in `UnifiedStorageManager`, `UnifiedAnalyticsManager`, and `UnifiedConfigurationManager`
 10. ✅ Made `UserDefaults` and `FileManager` conform to `Sendable` to fix actor isolation issues
+11. ✅ Fixed `UnifiedYeelightManager` to properly conform to `Core_YeelightManaging` and `Core_BaseService`
+12. ✅ Added missing methods to `UnifiedYeelightManager` (`applyScene` and `stopEffect`)
+13. ✅ Fixed UI components to use correct device types:
+    - Updated `ScenePreview.swift` to use `YeelightDevice` instead of `UnifiedYeelightDevice`
+    - Fixed `DeviceStateRow`, `MultiLightPreview`, and `StripEffectPreview` components
+    - Updated `LightsView.swift` to properly handle `YeelightDevice` type
+14. ✅ Fixed type alias for `YeelightDevice` in `UIEnvironment.swift`
+15. ✅ Fixed background manager issues in `UnifiedBackgroundManager.swift`
 
 ## Remaining Issues
 
 1. UI module issues:
-   - Missing type references in UI components
+   - Missing type references in some UI components
    - Duplicate view declarations across multiple files
-   - Environment object type mismatches
+   - Some environment object type mismatches
    - Invalid use of protocols as types without 'any' keyword
 
-2. Background manager issues:
-   - Type mismatches in method calls
-   - Accessing non-existent members
+2. Theme environment issues:
+   - Several components use @Environment(\.theme) which needs proper implementation
+   - Need to create a proper theme environment key or use a different approach
 
 ## Recommended Approach
 
-1. Fix UI module issues:
-   - Ensure proper imports of Core types in UI components
+1. Fix remaining UI module issues:
+   - Ensure proper imports of Core types in all UI components
    - Resolve duplicate view declarations
-   - Update environment object types to match the Core module
+   - Verify all environment object types match Core module types
    - Add 'any' keyword where protocols are used as types
 
-2. Fix background manager issues:
-   - Update method calls to match the expected parameter types
-   - Ensure all member accesses are valid
+2. Fix theme environment issues:
+   - Create proper theme environment key
+   - Ensure consistent theme usage across UI components
 
 ## Specific Files Needing Attention
 
-- UI module view files: Fix type references and environment object declarations
-- UnifiedBackgroundManager.swift: Fix method calls and member accesses
+- Remaining UI module view files: Fix any type references and environment object declarations
+- Theme-related files: Implement proper theme environment support
 
 More about potential fixing, [HERE](docs/guides/fixing_build_issues.md)

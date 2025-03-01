@@ -1,4 +1,5 @@
 import SwiftUI
+import Core
 
 struct UnifiedGridView<Data: Identifiable, Content: View>: View {
     let title: String
@@ -13,6 +14,7 @@ struct UnifiedGridView<Data: Identifiable, Content: View>: View {
     let footer: String?
     let content: (Data) -> Content
     
+    @Environment(\.theme) private var theme
     @State private var isRefreshing = false
     
     init(
@@ -99,8 +101,11 @@ struct UnifiedGridView<Data: Identifiable, Content: View>: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
+        .padding()
     }
 }
+
+// MARK: - Preview
 
 struct UnifiedGridView_Previews: PreviewProvider {
     struct PreviewItem: Identifiable {
@@ -110,8 +115,7 @@ struct UnifiedGridView_Previews: PreviewProvider {
     }
     
     static var previews: some View {
-        Group {
-            // With items
+        NavigationView {
             UnifiedGridView(
                 title: "Sample Grid",
                 items: [
@@ -120,7 +124,7 @@ struct UnifiedGridView_Previews: PreviewProvider {
                     PreviewItem(title: "Item 3", color: .green),
                     PreviewItem(title: "Item 4", color: .orange)
                 ],
-                footer: "Tap an item to select it"
+                onItemTap: { _ in }
             ) { item in
                 VStack {
                     RoundedRectangle(cornerRadius: 12)
@@ -131,19 +135,9 @@ struct UnifiedGridView_Previews: PreviewProvider {
                         .font(.subheadline)
                 }
             }
-            .previewDisplayName("With Items")
-            
-            // Empty state
-            UnifiedGridView(
-                title: "Empty Grid",
-                items: [PreviewItem](),
-                emptyStateTitle: "No Items Found",
-                emptyStateMessage: "Add some items to see them here"
-            ) { item in
-                EmptyView()
-            }
-            .previewDisplayName("Empty State")
+            .navigationTitle("Grid Example")
         }
+        .environment(\.theme, Theme.default)
     }
 }
 

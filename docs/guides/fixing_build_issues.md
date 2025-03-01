@@ -4,7 +4,7 @@ This guide provides detailed steps to resolve the compilation errors in the Yeel
 
 ## Progress Update
 
-We've made significant progress in resolving the build issues:
+I've made significant progress in resolving the build issues:
 
 1. ✅ Removed duplicate `Core_Color` definitions by:
    - Moving the definition to a dedicated `ColorTypes.swift` file
@@ -30,6 +30,7 @@ We've made significant progress in resolving the build issues:
    - `UnifiedStateManager` now properly conforms to `Core_StateManaging`
    - `UnifiedAnalyticsManager` now properly conforms to `Core_BaseService`
    - `UnifiedConfigurationManager` now properly conforms to `Core_BaseService`
+   - `UnifiedYeelightManager` now properly conforms to `Core_YeelightManaging` and `Core_BaseService`
 
 6. ✅ Fixed `Core_ConfigurationError` usage in `ServiceContainer.swift`
 
@@ -39,6 +40,21 @@ We've made significant progress in resolving the build issues:
    - Made `UserDefaults` and `FileManager` conform to `Sendable`
    - Fixed `isEnabled` property in manager classes to be properly nonisolated
    - Ensured proper async/await usage in actor methods
+
+9. ✅ Fixed background manager issues in `UnifiedBackgroundManager.swift`:
+   - Updated method calls to match the expected parameter types
+   - Ensured all member accesses are valid
+   - Added proper constants for task identifiers and refresh intervals
+
+10. ✅ Fixed UI components to use correct device types:
+    - Updated `ScenePreview.swift` to use `YeelightDevice` instead of `UnifiedYeelightDevice`
+    - Fixed `DeviceStateRow`, `MultiLightPreview`, and `StripEffectPreview` to work with the correct device type
+    - Updated `LightsView.swift` to properly handle `YeelightDevice` type
+    - Added missing `yeelightManager` environment object to UI components
+
+11. ✅ Added missing methods to `UnifiedYeelightManager`:
+    - Implemented `applyScene` and `stopEffect` methods required by UI components
+    - Fixed type alias for `YeelightDevice` in `UIEnvironment.swift`
 
 ## Root Causes
 
@@ -50,55 +66,135 @@ The project has several structural issues that lead to compilation errors:
 4. **Actor Isolation Problems**: Actor-isolated properties are used to satisfy nonisolated protocol requirements
 5. **Missing Type Definitions**: Some referenced types are not defined in the codebase
 6. **Sendability Issues**: Non-sendable types are passed into actor-isolated contexts
+7. **UI/Core Type Mismatches**: UI components reference types that don't match the Core module definitions
 
 ## Current Status
 
-The Core module now builds successfully! We've fixed all the critical issues in the Core module, including:
+The Core module now builds successfully! I've fixed all the critical issues in the Core module, including:
 
 1. ✅ Fixed actor isolation issues in BaseServiceContainer
 2. ✅ Fixed storage method signature issues in UnifiedStorageManager
 3. ✅ Fixed analytics manager issues in UnifiedAnalyticsManager
 4. ✅ Fixed configuration manager issues in UnifiedConfigurationManager
+5. ✅ Fixed background manager issues in UnifiedBackgroundManager
+6. ✅ Fixed Yeelight manager issues in UnifiedYeelightManager
+7. ✅ Fixed UI components to use correct device types
 
 ## Remaining Issues to Fix
 
-### 1. UI Module Issues
+### UI Module Issues
 
-The UI module has several issues:
-- Missing type references in UI components
-- Duplicate view declarations across multiple files
-- Environment object type mismatches
-- Invalid use of protocols as types without 'any' keyword
+The UI module has several issues that need to be addressed:
 
-**Solution:**
-1. Ensure proper imports of Core types in UI components
-2. Resolve duplicate view declarations
-3. Update environment object types to match the Core module
-4. Add 'any' keyword where protocols are used as types
+1. **Missing imports for Core types**:
+   - Many UI files are missing imports for Core module types
+   - Need to add proper imports for all Core types used in UI components
 
-### 2. Background Manager Issues
+2. **Use of protocols as types without 'any' keyword**:
+   - Swift 5.6+ requires the 'any' keyword when using protocols as types
+   - Need to update all protocol type references with the 'any' keyword
 
-The `UnifiedBackgroundManager` still has some issues:
-- Type mismatches in method calls
-- Accessing non-existent members
+3. **Duplicate view declarations**:
+   - Several views are declared multiple times in different files
+   - Need to consolidate or rename duplicate views
 
-**Solution:**
-1. Update method calls to match the expected parameter types
-2. Ensure all member accesses are valid
+4. **Environment object type mismatches**:
+   - Some UI components may still reference manager types that don't match the Core module
+   - Need to verify all environment object types match Core module types
 
-## Step-by-Step Fix Plan
+5. **Missing access to ServiceContainer**:
+   - UI components can't find ServiceContainer
+   - Need to ensure proper import and access to ServiceContainer
 
-### 1. Fix UI Module Issues
+6. **Theme environment issues**:
+   - Several components use @Environment(\.theme) which doesn't exist
+   - Need to create a proper theme environment key or use a different approach
 
-1. Update imports in UI files to include necessary Core types
-2. Resolve duplicate view declarations by consolidating or renaming
-3. Update environment object types to match the Core module
-4. Add 'any' keyword where protocols are used as types
+## Detailed UI Fix Plan
 
-### 2. Fix Background Manager Issues
+### 1. Fix Missing Imports
 
-1. Update method calls to match the expected parameter types
-2. Ensure all member accesses are valid
+Add the following imports to UI files as needed:
+```swift
+import Core
+import YeelightControl
+```
+
+### 2. Fix Protocol Usage
+
+Replace protocol type usage with 'any' keyword:
+```swift
+// Before
+@State private var selectedScene: Scene?
+
+// After
+@State private var selectedScene: any Scene?
+```
+
+### 3. Fix Duplicate View Declarations
+
+For each duplicate view:
+1. Identify all occurrences
+2. Keep one primary implementation
+3. Remove or rename others
+4. Update all references
+
+Duplicate views to fix:
+- DeviceRow
+- DeviceDetailView
+- LogViewerView
+- FilterChip
+- BackupView
+- RestoreView
+- LocationPicker
+- DeviceChip
+- ConnectionStatusView
+- StatusRow
+
+### 4. Fix Environment Object Types
+
+Update environment object types to match Core module:
+```swift
+// Before
+@EnvironmentObject private var yeelightManager: YeelightManager
+
+// After
+@EnvironmentObject private var yeelightManager: UnifiedYeelightManager
+```
+
+### 5. Fix ServiceContainer Access
+
+Ensure ServiceContainer is properly imported and accessed:
+```swift
+import Core
+
+// Then use
+ServiceContainer.shared.yeelightManager
+```
+
+### 6. Fix Theme Environment
+
+Create a proper theme environment key or use a different approach:
+```swift
+// Create theme environment key
+struct ThemeKey: EnvironmentKey {
+    static let defaultValue: Theme = .default
+}
+
+extension EnvironmentValues {
+    var theme: Theme {
+        get { self[ThemeKey.self] }
+        set { self[ThemeKey.self] = newValue }
+    }
+}
+```
+
+## Implementation Strategy
+
+1. Start with a common UI file that has many imports and fix it first
+2. Create a UI utilities file with proper environment keys and extensions
+3. Fix one view at a time, starting with the most critical ones
+4. Test each fix incrementally
 
 ## Testing the Fixes
 

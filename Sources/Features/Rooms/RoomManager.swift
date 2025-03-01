@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import Core
 
 protocol RoomManaging {
     func createRoom(_ room: Room) async throws
@@ -31,12 +32,14 @@ struct RoomPosition: Codable {
     var height: Double
 }
 
-final class RoomManager: RoomManaging {
+final class UnifiedRoomManager: RoomManaging, Core_BaseService {
     private let services: BaseServiceContainer
-    private let storage: StorageManagingServiceServiceServiceServiceServiceService
+    private let storage: Core_StorageManaging
     private let deviceManager: DeviceManaging
     private let roomsSubject = CurrentValueSubject<[Room], Never>([])
     private var subscriptions = Set<AnyCancellable>()
+    
+    nonisolated public var isEnabled: Bool = true
     
     init(services: BaseServiceContainer) {
         self.services = services
