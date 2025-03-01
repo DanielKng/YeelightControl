@@ -211,5 +211,3 @@ echo -e "\nConfig files:"
 ls -la "$CONFIGS_DIR"
 echo -e "\nModule files:"
 ls -la "$MODULES_DIR"
-echo -e "\nSymlinks:"
-find "$BUILD_DIR/Sources" -type l -ls 

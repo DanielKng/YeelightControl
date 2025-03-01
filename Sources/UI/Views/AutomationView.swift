@@ -1,10 +1,11 @@
 import SwiftUI
+import Core
 
 struct AutomationView: View {
     // MARK: - Properties
     
-    @EnvironmentObject private var automationManager: UnifiedAutomationManager
-    @EnvironmentObject private var yeelightManager: UnifiedYeelightManager
+    @EnvironmentObject private var automationManager: ObservableAutomationManager
+    @EnvironmentObject private var yeelightManager: ObservableYeelightManager
     
     // State variables
     @State private var searchText = ""
@@ -96,7 +97,7 @@ struct AutomationView: View {
 
 struct AutomationRow: View {
     let automation: Automation
-    @EnvironmentObject private var automationManager: UnifiedAutomationManager
+    @EnvironmentObject private var automationManager: ObservableAutomationManager
     
     var body: some View {
         HStack {
@@ -167,7 +168,7 @@ struct AutomationRow: View {
 
 struct DeviceChip: View {
     let deviceID: DeviceID
-    @EnvironmentObject private var yeelightManager: UnifiedYeelightManager
+    @EnvironmentObject private var yeelightManager: ObservableYeelightManager
     
     var body: some View {
         HStack(spacing: 4) {

@@ -150,16 +150,16 @@ public final class UnifiedThemeManager: ObservableObject, Core_ThemeManaging, Co
         }
     }
     
-    public func getThemeColors() -> ThemeColors {
-        return colors as ThemeColors
+    public func getThemeColors() -> any ThemeColors {
+        return colors as any ThemeColors
     }
     
-    public func getThemeFonts() -> ThemeFonts {
-        return fonts as ThemeFonts
+    public func getThemeFonts() -> any ThemeFonts {
+        return fonts as any ThemeFonts
     }
     
-    public func getThemeMetrics() -> ThemeMetrics {
-        return metrics as ThemeMetrics
+    public func getThemeMetrics() -> any ThemeMetrics {
+        return metrics as any ThemeMetrics
     }
     
     // MARK: - Initialization
@@ -205,11 +205,16 @@ public final class UnifiedThemeManager: ObservableObject, Core_ThemeManaging, Co
     
     private func loadTheme() async {
         do {
-            let savedTheme: Core_Theme = try await storageManager.load(forKey: "app_theme")
-            
-            await MainActor.run {
-                currentTheme = savedTheme
-                updateThemeComponents()
+            if let savedTheme = try await storageManager.load(Core_Theme.self, forKey: "app_theme") {
+                await MainActor.run {
+                    currentTheme = savedTheme
+                    updateThemeComponents()
+                }
+            } else {
+                await MainActor.run {
+                    currentTheme = .system
+                    updateThemeComponents()
+                }
             }
         } catch {
             print("Error loading theme: \(error)")

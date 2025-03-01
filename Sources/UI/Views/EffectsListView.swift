@@ -1,17 +1,18 @@
 import SwiftUI
+import Core
 
 /// View for displaying and managing light effects
 struct EffectsListView: View {
     // MARK: - Environment
 
-    @EnvironmentObject private var effectManager: UnifiedEffectManager
-    @EnvironmentObject private var yeelightManager: UnifiedYeelightManager
+    @EnvironmentObject private var effectManager: ObservableEffectManager
+    @EnvironmentObject private var yeelightManager: ObservableYeelightManager
 
     // MARK: - State
 
     @State private var isCreatingEffect = false
     @State private var selectedEffect: Effect?
-    @State private var selectedDevices: Set<UnifiedYeelightDevice> = []
+    @State private var selectedDeviceIDs: Set<DeviceID> = []
 
     // MARK: - Body
 
@@ -33,7 +34,8 @@ struct EffectsListView: View {
                 EffectRow(
                     effect: effect,
                     onActivate: {
-                        effectManager.startEffect(effect, on: Array(selectedDevices))
+                        let selectedDevices = yeelightManager.devices.filter { selectedDeviceIDs.contains($0.id) }
+                        effectManager.startEffect(effect, on: selectedDevices)
                     },
                     onEdit: {
                         selectedEffect = effect
@@ -48,17 +50,19 @@ struct EffectsListView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
-                .disabled(selectedDevices.isEmpty)
+                .disabled(selectedDeviceIDs.isEmpty)
             }
         }
         .sheet(isPresented: $isCreatingEffect) {
             NavigationView {
-                FlowEffectEditor(devices: Array(selectedDevices))
+                let selectedDevices = yeelightManager.devices.filter { selectedDeviceIDs.contains($0.id) }
+                FlowEffectEditor(devices: selectedDevices)
             }
         }
         .sheet(item: $selectedEffect) { effect in
             NavigationView {
-                FlowEffectEditor(effect: effect, devices: Array(selectedDevices))
+                let selectedDevices = yeelightManager.devices.filter { selectedDeviceIDs.contains($0.id) }
+                FlowEffectEditor(effect: effect, devices: selectedDevices)
             }
         }
     }
@@ -69,16 +73,20 @@ struct EffectsListView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(yeelightManager.devices) { device in
-                            DeviceChip(
-                                device: device,
-                                isSelected: selectedDevices.contains(device)
-                            ) {
-                                if selectedDevices.contains(device) {
-                                    selectedDevices.remove(device)
-                                } else {
-                                    selectedDevices.insert(device)
-                                }
+                            Button {
+                                toggleDeviceSelection(device.id)
+                            } label: {
+                                DeviceChip(deviceID: device.id)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 4)
+                                    .background(selectedDeviceIDs.contains(device.id) ? Color.accentColor.opacity(0.2) : Color(.tertiarySystemFill))
+                                    .cornerRadius(16)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .strokeBorder(selectedDeviceIDs.contains(device.id) ? Color.accentColor : .clear, lineWidth: 1)
+                                    )
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding()
@@ -90,39 +98,17 @@ struct EffectsListView: View {
             }
         }
     }
+    
+    private func toggleDeviceSelection(_ deviceID: DeviceID) {
+        if selectedDeviceIDs.contains(deviceID) {
+            selectedDeviceIDs.remove(deviceID)
+        } else {
+            selectedDeviceIDs.insert(deviceID)
+        }
+    }
 }
 
 // MARK: - Supporting Views
-
-private struct DeviceChip: View {
-    let device: UnifiedYeelightDevice
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button {
-            onTap()
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "lightbulb.fill")
-                    .imageScale(.small)
-                    .foregroundColor(device.isOn ? .yellow : .gray)
-
-                Text(device.name)
-                    .font(.caption)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(isSelected ? Color.accentColor.opacity(0.2) : Color(.tertiarySystemFill))
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
 
 private struct EffectRow: View {
     let effect: Effect
@@ -166,7 +152,7 @@ private struct EffectRow: View {
 #Preview {
     NavigationView {
         EffectsListView()
-            .environmentObject(ServiceContainer.shared.effectManager)
-            .environmentObject(ServiceContainer.shared.yeelightManager)
+            .environmentObject(ServiceContainer.shared.observableEffectManager)
+            .environmentObject(ServiceContainer.shared.observableYeelightManager)
     }
 } 

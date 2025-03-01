@@ -1,7 +1,9 @@
 import SwiftUI
+import Core
 
 struct DeviceDetailView: View {
     @ObservedObject var device: YeelightDevice
+    @EnvironmentObject private var yeelightManager: ObservableYeelightManager
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     
@@ -91,7 +93,7 @@ struct DeviceHeader: View {
                 Text(device.name)
                     .font(.headline)
                 
-                ConnectionStatusView(state: device.connectionState)
+                ConnectionStatusView(isConnected: device.isConnected, lastSeen: device.lastSeen)
                     .font(.caption)
             }
             
@@ -104,43 +106,6 @@ struct DeviceHeader: View {
                 }
             ))
             .labelsHidden()
-        }
-    }
-}
-
-struct ConnectionStatusView: View {
-    let state: DeviceConnectionState
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            
-            Text(statusText)
-                .foregroundColor(.secondary)
-        }
-    }
-    
-    private var statusColor: Color {
-        switch state {
-        case .connected:
-            return .green
-        case .connecting:
-            return .yellow
-        case .disconnected:
-            return .red
-        }
-    }
-    
-    private var statusText: String {
-        switch state {
-        case .connected:
-            return "Connected"
-        case .connecting:
-            return "Connecting..."
-        case .disconnected:
-            return "Disconnected"
         }
     }
 } 

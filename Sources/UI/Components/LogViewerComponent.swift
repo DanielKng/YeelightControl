@@ -1,14 +1,17 @@
 import SwiftUI
 import Core
 
-struct LogViewerView: View {
+/// View for displaying and filtering log entries
+public struct LogViewerView: View {
     @StateObject private var logger = ObservableLogger.shared
     @Environment(\.dismiss) private var dismiss
     @State private var selectedCategory: LogEntry.Category?
     @State private var selectedLevel: LogEntry.Level?
     @State private var searchText = ""
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Filters
@@ -96,12 +99,18 @@ struct LogViewerView: View {
 
         return logs
     }
+    
+    private func exportLogs() {
+        // In a real implementation, this would export logs to a file
+        print("Exporting logs...")
+    }
 }
 
-struct LogEntryRow: View {
+/// Row for displaying a log entry
+public struct LogEntryRow: View {
     let entry: LogEntry
 
-    var body: some View {
+    public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: entry.category.icon)

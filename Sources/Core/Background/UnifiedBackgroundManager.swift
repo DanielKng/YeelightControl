@@ -164,11 +164,7 @@ extension UserDefaults {
 // MARK: - Core_AppError Extension
 extension Core_AppError {
     init(error: Error, context: String) {
-        self.init(
-            code: .unknown,
-            message: error.localizedDescription,
-            underlyingError: error,
-            context: ["context": context]
-        )
+        // Create a general error with the provided context
+        self = .general("\(context): \(error.localizedDescription)")
     }
 } 

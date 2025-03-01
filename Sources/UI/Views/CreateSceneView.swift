@@ -1,17 +1,20 @@
 import SwiftUI
+import Core
 
 struct CreateSceneView: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject var sceneManager: SceneManager
+    @EnvironmentObject private var sceneManager: SceneManager
+    @EnvironmentObject private var yeelightManager: ObservableYeelightManager
     
     @State private var sceneName = ""
     @State private var selectedDevices: Set<DeviceID> = []
     @State private var deviceSettings: [DeviceID: DeviceSettings] = [:]
     @State private var showingDeviceSelector = false
     @State private var currentEditingDevice: DeviceID?
+    @State private var selectedPreset: ScenePreset?
     
     private var availableDevices: [YeelightDevice] {
-        DeviceManager.shared.devices
+        yeelightManager.devices
     }
     
     var body: some View {
@@ -183,9 +186,16 @@ struct DeviceSettingRow: View {
                 
                 Spacer()
                 
-                Circle()
-                    .fill(settings.color)
-                    .frame(width: 24, height: 24)
+                if let color = settings.color {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 24, height: 24)
+                } else if let temp = settings.colorTemperature {
+                    // Show color temperature indicator
+                    Circle()
+                        .fill(colorForTemperature(temp))
+                        .frame(width: 24, height: 24)
+                }
                 
                 Image(systemName: "chevron.right")
                     .foregroundColor(.secondary)
@@ -197,15 +207,30 @@ struct DeviceSettingRow: View {
     private var settingsSummary: String {
         var summary = [String]()
         
-        if settings.power {
+        if settings.isOn {
             summary.append("On")
         } else {
             summary.append("Off")
         }
         
-        summary.append("Brightness: \(Int(settings.brightness * 100))%")
+        summary.append("Brightness: \(Int(settings.brightness))%")
+        
+        if settings.mode == .temperature, let temp = settings.colorTemperature {
+            summary.append("\(Int(temp))K")
+        }
         
         return summary.joined(separator: " • ")
+    }
+    
+    private func colorForTemperature(_ temp: Double) -> Color {
+        // Simple mapping from color temperature to RGB
+        // This is a simplified version, not physically accurate
+        let normalizedTemp = (temp - 1700) / (6500 - 1700)
+        return Color(
+            red: 1.0,
+            green: normalizedTemp * 0.8 + 0.2,
+            blue: normalizedTemp
+        )
     }
 }
 
@@ -227,33 +252,47 @@ struct DeviceSettingsEditor: View {
         NavigationStack {
             Form {
                 Section(header: Text("Power")) {
-                    Toggle("Power", isOn: $settings.power)
+                    Toggle("Power", isOn: $settings.isOn)
                 }
                 
                 Section(header: Text("Brightness")) {
                     VStack {
-                        Slider(value: $settings.brightness, in: 0...1, step: 0.01)
-                        Text("\(Int(settings.brightness * 100))%")
+                        Slider(value: $settings.brightness, in: 0...100, step: 1)
+                        Text("\(Int(settings.brightness))%")
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
                 }
                 
-                Section(header: Text("Color")) {
-                    ColorPicker("Light Color", selection: $settings.color)
+                Section(header: Text("Mode")) {
+                    Picker("Light Mode", selection: $settings.mode) {
+                        Text("Color").tag(DeviceSettings.DeviceMode.color)
+                        Text("Temperature").tag(DeviceSettings.DeviceMode.temperature)
+                    }
+                    .pickerStyle(.segmented)
                 }
                 
-                if device.supportsColorTemperature {
+                if settings.mode == .color {
+                    Section(header: Text("Color")) {
+                        ColorPicker("Light Color", selection: Binding(
+                            get: { settings.color ?? .white },
+                            set: { settings.color = $0 }
+                        ))
+                    }
+                } else if settings.mode == .temperature && device.supportsColorTemperature {
                     Section(header: Text("Color Temperature")) {
                         VStack {
                             Slider(
-                                value: $settings.colorTemperature,
-                                in: Double(device.colorTempRange.lowerBound)...Double(device.colorTempRange.upperBound),
+                                value: Binding(
+                                    get: { settings.colorTemperature ?? 4000 },
+                                    set: { settings.colorTemperature = $0 }
+                                ),
+                                in: 1700...6500,
                                 step: 100
                             )
                             HStack {
                                 Text("Warm")
                                 Spacer()
-                                Text("\(Int(settings.colorTemperature))K")
+                                Text("\(Int(settings.colorTemperature ?? 4000))K")
                                 Spacer()
                                 Text("Cool")
                             }
@@ -282,6 +321,7 @@ struct DeviceSettingsEditor: View {
 }
 
 #Preview {
-CreateSceneView()
-.environmentObject(YeelightManager.shared)
+    CreateSceneView()
+        .environmentObject(SceneManager.shared)
+        .environmentObject(ObservableYeelightManager(manager: ServiceContainer.shared.yeelightManager))
 } 

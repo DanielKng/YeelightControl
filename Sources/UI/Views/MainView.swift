@@ -9,17 +9,17 @@ struct MainView: View {
 // MARK: - Environment Objects
 
 // Core Device Management
-@EnvironmentObject private var yeelightManager: UnifiedYeelightManager
-@EnvironmentObject private var deviceManager: UnifiedDeviceManager
+@EnvironmentObject private var yeelightManager: ObservableYeelightManager
+@EnvironmentObject private var deviceManager: DeviceManager
 
 // Feature Management
 @EnvironmentObject private var effectManager: UnifiedEffectManager
-@EnvironmentObject private var sceneManager: UnifiedSceneManager
-@EnvironmentObject private var automationManager: UnifiedAutomationManager
+@EnvironmentObject private var sceneManager: SceneManager
+@EnvironmentObject private var automationManager: ObservableAutomationManager
 @EnvironmentObject private var roomManager: UnifiedRoomManager
 
 // Core Services
-@EnvironmentObject private var networkManager: UnifiedNetworkManager
+@EnvironmentObject private var networkManager: NetworkMonitor
 @EnvironmentObject private var storageManager: UnifiedStorageManager
 @EnvironmentObject private var backgroundManager: UnifiedBackgroundManager
 @EnvironmentObject private var notificationManager: UnifiedNotificationManager

@@ -56,145 +56,172 @@ I've made significant progress in resolving the build issues:
     - Implemented `applyScene` and `stopEffect` methods required by UI components
     - Fixed type alias for `YeelightDevice` in `UIEnvironment.swift`
 
-## Root Causes
+12. ✅ Fixed circular reference in `UIEnvironment.swift`:
+    - Changed `YeelightDevice` typealias to reference `Core.YeelightDevice` instead of itself
+    - Fixed other type aliases to use valid types
 
-The project has several structural issues that lead to compilation errors:
+13. ✅ Created proper `Theme` implementation in `UIEnvironment.swift`:
+    - Updated `Theme` struct to match the Core module's theme structure
+    - Made `ThemeKey` and `EnvironmentValues` extension public
+    - Added proper properties to match `Core_ThemeColors`
 
-1. **Type Redeclarations**: Multiple files define the same types with `Core_` prefix
-2. **Ambiguous Type References**: Due to redeclarations, the compiler cannot determine which type to use
-3. **Protocol Conformance Issues**: Some types don't properly conform to their declared protocols
-4. **Actor Isolation Problems**: Actor-isolated properties are used to satisfy nonisolated protocol requirements
-5. **Missing Type Definitions**: Some referenced types are not defined in the codebase
-6. **Sendability Issues**: Non-sendable types are passed into actor-isolated contexts
-7. **UI/Core Type Mismatches**: UI components reference types that don't match the Core module definitions
+14. ✅ Added `YeelightScene` protocol to avoid ambiguity with `SwiftUI.Scene`:
+    - Created a dedicated protocol for Yeelight scenes
+    - This will help resolve ambiguity errors in UI components
+
+15. ✅ Created observable wrapper classes for actor types:
+    - Created `ObservableYeelightManager` wrapper class for `UnifiedYeelightManager`
+    - Created `ObservableLogger` wrapper class for `UnifiedLogger`
+    - Created `ObservableAutomationManager` wrapper class for `UnifiedAutomationManager`
+    - Added `@Published` properties to wrapper classes
+    - Made wrapper classes `@MainActor` to ensure UI updates happen on the main thread
+
+16. ✅ Added missing types for UI components:
+    - Added `LogEntry` type with `Level` and `Category` enums
+    - Added `Automation` type with `AutomationTrigger` and `AutomationAction` enums
+    - Added `DeviceSettings` type for scene creation
+    - Added `ScenePreset` type for predefined scenes
+    - Added `Color` extension to make it `Codable`
+
+17. ✅ Fixed UI files to use observable wrapper classes:
+    - Updated `MainView.swift` to use `ObservableYeelightManager` and other wrapper classes
+    - Updated `AutomationView.swift` to use `ObservableAutomationManager`
+    - Updated `LogViewerView.swift` to use `ObservableLogger`
+    - Updated `SceneListView.swift` to use `YeelightScene` instead of `Scene`
+    - Updated `CreateSceneView.swift` to use `DeviceSettings` type correctly
+
+18. ✅ Created common UI components to avoid duplication:
+    - Created `FilterChip` component in `CommonComponents.swift`
+    - Created `DeviceChip` component in `CommonComponents.swift`
+    - Created `ConnectionStatusView` component in `CommonComponents.swift`
+    - Created `StatusRow` component in `CommonComponents.swift`
+    - Created `DeviceRow` component in `CommonComponents.swift`
+
+19. ✅ Created centralized components for commonly duplicated views:
+    - Created centralized `LogViewerView` component in `LogViewerComponent.swift`
+    - Created centralized `BackupView` and `RestoreView` components in `BackupRestoreComponents.swift`
+
+20. ✅ Created more observable wrapper classes:
+    - Created `ObservableDeviceManager` for `UnifiedDeviceManager`
+    - Created `ObservableEffectManager` for `UnifiedEffectManager`
+    - Created `ObservableSceneManager` for `UnifiedSceneManager`
+    - Created `ObservableNetworkManager` for `UnifiedNetworkManager`
+    - Created `ObservableStorageManager` for `UnifiedStorageManager`
+    - Created `ObservableLocationManager` for `UnifiedLocationManager`
+    - Created `ObservablePermissionManager` for `UnifiedPermissionManager`
+    - Created `ObservableAnalyticsManager` for `UnifiedAnalyticsManager`
+    - Created `ObservableConfigurationManager` for `UnifiedConfigurationManager`
+    - Created `ObservableStateManager` for `UnifiedStateManager`
+    - Created `ObservableSecurityManager` for `UnifiedSecurityManager`
+    - Created `ObservableErrorManager` for `UnifiedErrorManager`
+    - Created `ObservableThemeManager` for `UnifiedThemeManager`
+    - Created `ObservableConnectionManager` for `UnifiedConnectionManager`
+    - Created `ObservableRoomManager` for `UnifiedRoomManager`
+
+21. ✅ Added missing types for UI components:
+    - Added `Device` type for UI components
+    - Added `DeviceState` type for UI components
+    - Added `Effect` type for UI components
+    - Added `EffectParameters` type for UI components
+    - Added `FlowParams` type for UI components
+    - Added `FlowTransition` type for UI components
+    - Added `Room` type for UI components
+    - Added `DeviceGroup` type for UI components
+    - Added `MultiLightScene` type for UI components
+    - Added `StripEffect` type for UI components
+
+22. ✅ Updated type aliases in `UIEnvironment.swift` to use observable wrapper classes
+
+23. ✅ Created `ServiceContainer+UI.swift` to extend `ServiceContainer` with UI-specific properties
+
+24. ✅ Updated UI files to use centralized components:
+    - Updated `SettingsView.swift` to use the centralized `LogViewerView` component
+    - Updated `SettingsView.swift` to use the centralized `BackupView` and `RestoreView` components
+    - Updated `AdvancedSettingsView.swift` to use the centralized `FilterChip` component
+    - Updated `LightsView.swift` to use the centralized `DeviceRow` component
+    - Updated `DeviceDetailView.swift` to use the centralized `ConnectionStatusView` component
+    - Updated `NetworkTestsView.swift` to use the centralized `StatusRow` component
+    - Updated `EffectsListView.swift` to use the centralized `DeviceChip` component
+
+25. ✅ Added more centralized UI components:
+    - Created centralized `StatusSection` component in `CommonComponents.swift`
+    - Created centralized `EnhancedDeviceSelectionList` component in `CommonComponents.swift`
+    - Updated `NetworkTestsView.swift` to use the centralized `StatusSection` component
+    - Updated `CreateAutomationView.swift` to use the centralized `LocationPicker` component
+    - Updated `CreateAutomationView.swift` to use the centralized `EnhancedDeviceSelectionList` component
+    - Updated `CreateAutomationView.swift` to use observable wrapper classes
+
+26. ✅ Updated DetailContentView.swift to use centralized components:
+    - Removed duplicate `DeviceRow` implementation
+    - Removed duplicate `DeviceDetailView` implementation
+    - Updated to use `ObservableYeelightManager` instead of `YeelightManager`
+    - Added proper imports for `Core` and `UI.Components`
 
 ## Current Status
 
-The Core module now builds successfully! I've fixed all the critical issues in the Core module, including:
-
-1. ✅ Fixed actor isolation issues in BaseServiceContainer
-2. ✅ Fixed storage method signature issues in UnifiedStorageManager
-3. ✅ Fixed analytics manager issues in UnifiedAnalyticsManager
-4. ✅ Fixed configuration manager issues in UnifiedConfigurationManager
-5. ✅ Fixed background manager issues in UnifiedBackgroundManager
-6. ✅ Fixed Yeelight manager issues in UnifiedYeelightManager
-7. ✅ Fixed UI components to use correct device types
+The Core module now builds successfully! I've fixed all the critical issues in the Core module, and I've made significant progress on the UI module issues. I've created all the necessary observable wrapper classes, centralized common UI components, and added missing types for UI components. I've also updated several UI files to use the centralized components and observable wrapper classes.
 
 ## Remaining Issues to Fix
 
 ### UI Module Issues
 
-The UI module has several issues that need to be addressed:
+The UI module still has a few issues that need to be addressed:
 
-1. **Missing imports for Core types**:
-   - Many UI files are missing imports for Core module types
-   - Need to add proper imports for all Core types used in UI components
+1. **ObservableObject conformance issues**:
+   - Need to update remaining UI files to use the observable wrapper classes instead of the actor types directly
+   - Need to update remaining UI files to use `@EnvironmentObject` with the observable wrapper classes
 
-2. **Use of protocols as types without 'any' keyword**:
-   - Swift 5.6+ requires the 'any' keyword when using protocols as types
-   - Need to update all protocol type references with the 'any' keyword
-
-3. **Duplicate view declarations**:
-   - Several views are declared multiple times in different files
-   - Need to consolidate or rename duplicate views
-
-4. **Environment object type mismatches**:
-   - Some UI components may still reference manager types that don't match the Core module
-   - Need to verify all environment object types match Core module types
-
-5. **Missing access to ServiceContainer**:
-   - UI components can't find ServiceContainer
-   - Need to ensure proper import and access to ServiceContainer
-
-6. **Theme environment issues**:
-   - Several components use @Environment(\.theme) which doesn't exist
-   - Need to create a proper theme environment key or use a different approach
+2. **ServiceContainer access issues**:
+   - Need to update remaining UI files to import the `ServiceContainer+UI.swift` file
+   - Need to update remaining UI files to use the UI-specific properties from `ServiceContainer`
 
 ## Detailed UI Fix Plan
 
-### 1. Fix Missing Imports
+### 1. Fix Duplicate View Declarations
 
-Add the following imports to UI files as needed:
+Update UI files to use centralized components:
+
 ```swift
-import Core
-import YeelightControl
-```
-
-### 2. Fix Protocol Usage
-
-Replace protocol type usage with 'any' keyword:
-```swift
-// Before
-@State private var selectedScene: Scene?
-
-// After
-@State private var selectedScene: any Scene?
-```
-
-### 3. Fix Duplicate View Declarations
-
-For each duplicate view:
-1. Identify all occurrences
-2. Keep one primary implementation
-3. Remove or rename others
-4. Update all references
-
-Duplicate views to fix:
-- DeviceRow
-- DeviceDetailView
-- LogViewerView
-- FilterChip
-- BackupView
-- RestoreView
-- LocationPicker
-- DeviceChip
-- ConnectionStatusView
-- StatusRow
-
-### 4. Fix Environment Object Types
-
-Update environment object types to match Core module:
-```swift
-// Before
-@EnvironmentObject private var yeelightManager: YeelightManager
-
-// After
-@EnvironmentObject private var yeelightManager: UnifiedYeelightManager
-```
-
-### 5. Fix ServiceContainer Access
-
-Ensure ServiceContainer is properly imported and accessed:
-```swift
-import Core
-
-// Then use
-ServiceContainer.shared.yeelightManager
-```
-
-### 6. Fix Theme Environment
-
-Create a proper theme environment key or use a different approach:
-```swift
-// Create theme environment key
-struct ThemeKey: EnvironmentKey {
-    static let defaultValue: Theme = .default
+// Before (in DetailContentView.swift)
+struct DeviceDetailView: View {
+    // Duplicate implementation
 }
 
-extension EnvironmentValues {
-    var theme: Theme {
-        get { self[ThemeKey.self] }
-        set { self[ThemeKey.self] = newValue }
-    }
-}
+// After (in DetailContentView.swift)
+// Use the centralized DeviceDetailView component
+```
+
+### 2. Update UI Files to Use Observable Wrapper Classes
+
+Update UI files to use the observable wrapper classes:
+
+```swift
+// Before
+@EnvironmentObject private var effectManager: UnifiedEffectManager
+
+// After
+@EnvironmentObject private var effectManager: ObservableEffectManager
+```
+
+### 3. Fix ServiceContainer Access Issues
+
+Update UI files to import and use the UI-specific properties from `ServiceContainer`:
+
+```swift
+// Before
+let effectManager = serviceContainer.effectManager
+
+// After
+import ServiceContainer_UI
+let effectManager = serviceContainer.observableEffectManager
 ```
 
 ## Implementation Strategy
 
-1. Start with a common UI file that has many imports and fix it first
-2. Create a UI utilities file with proper environment keys and extensions
-3. Fix one view at a time, starting with the most critical ones
-4. Test each fix incrementally
+1. Update remaining UI files to use centralized components
+2. Update remaining UI files to use observable wrapper classes
+3. Update remaining UI files to use UI-specific properties from `ServiceContainer`
+4. Test the build after each set of changes
 
 ## Testing the Fixes
 
@@ -212,4 +239,5 @@ After implementing the fixes:
 4. **Reduce Interdependencies**: Minimize dependencies between modules
 5. **Automated Tests**: Add tests to catch type and protocol conformance issues early
 6. **Sendability Annotations**: Add proper sendability annotations to all types that cross actor boundaries
-7. **Consistent Async/Await Usage**: Ensure all async code properly uses the await keyword 
+7. **Consistent Async/Await Usage**: Ensure all async code properly uses the await keyword
+8. **Proper Actor Design**: Design actors with UI interaction in mind, using MainActor where appropriate 

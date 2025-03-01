@@ -1,8 +1,9 @@
 import SwiftUI
+import Core
 
 struct AdvancedSettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var yeelightManager: YeelightManager
+    @EnvironmentObject private var yeelightManager: ObservableYeelightManager
     @State private var powerOnBehavior: PowerOnBehavior = .stay
     @State private var powerOnBrightness: Double = 100
     @State private var powerOnColor: Color = .white
@@ -169,123 +170,49 @@ struct AdvancedSettingsView: View {
     }
 }
 
-struct LogViewerView: View {
-    @StateObject private var logger = Logger.shared
-    @Environment(\.dismiss) private var dismiss
-    @State private var selectedLevel: LogLevel?
-    @State private var searchText = ""
-
-    var filteredLogs: [LogEntry] {
-        logger.logs.filter { log in
-            let matchesSearch = searchText.isEmpty || 
-            log.message.localizedCaseInsensitiveContains(searchText)
-            let matchesLevel = selectedLevel == nil || log.level == selectedLevel
-            return matchesSearch && matchesLevel
-        }
-    }
-
+struct UnifiedSearchBar: View {
+    @Binding var text: String
+    var placeholder: String
+    
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Search and filter
-                VStack(spacing: 8) {
-                    UnifiedSearchBar(
-                        text: $searchText,
-                        placeholder: "Search logs"
-                    )
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(LogLevel.allCases) { level in
-                                FilterChip(
-                                    title: level.rawValue.capitalized,
-                                    isSelected: level == selectedLevel,
-                                    action: {
-                                        if selectedLevel == level {
-                                            selectedLevel = nil
-                                        } else {
-                                            selectedLevel = level
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                }
-                .padding(.vertical, 8)
-                .background(.bar)
-
-                // Log list
-                UnifiedListView(
-                    items: filteredLogs,
-                    emptyStateMessage: "No logs found"
-                ) { log in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(log.message)
-                            .font(.system(.body, design: .monospaced))
-
-                        HStack {
-                            Text(log.timestamp, style: .time)
-
-                            Text("•")
-
-                            Text(log.level.rawValue.uppercased())
-                                .foregroundColor(log.level.color)
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-            .navigationTitle("Debug Logs")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Clear") {
-                        logger.clearLogs()
-                    }
-                }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") {
-                        dismiss()
-                    }
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            
+            TextField(placeholder, text: $text)
+                .textFieldStyle(.plain)
+            
+            if !text.isEmpty {
+                Button(action: { text = "" }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
                 }
             }
         }
+        .padding(8)
+        .background(Color(.systemGray6))
+        .cornerRadius(8)
+        .padding(.horizontal)
     }
 }
 
-struct FilterChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-
+struct UnifiedListView<T: Identifiable, Content: View>: View {
+    let items: [T]
+    let emptyStateMessage: String
+    let content: (T) -> Content
+    
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.footnote)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(isSelected ? .tint : .clear)
-                .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(16)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(isSelected ? .clear : .secondary.opacity(0.3), lineWidth: 1)
+        if items.isEmpty {
+            ContentUnavailableView {
+                Label(emptyStateMessage, systemImage: "doc.text")
+            }
+        } else {
+            List {
+                ForEach(items) { item in
+                    content(item)
                 }
-        }
-    }
-}
-
-extension LogLevel {
-    var color: Color {
-        switch self {
-        case .debug: return .secondary
-        case .info: return .blue
-        case .warning: return .orange
-        case .error: return .red
+            }
+            .listStyle(.plain)
         }
     }
 }

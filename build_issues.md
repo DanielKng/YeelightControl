@@ -30,34 +30,112 @@
     - Updated `LightsView.swift` to properly handle `YeelightDevice` type
 14. ✅ Fixed type alias for `YeelightDevice` in `UIEnvironment.swift`
 15. ✅ Fixed background manager issues in `UnifiedBackgroundManager.swift`
+16. ✅ Fixed circular reference in `UIEnvironment.swift` for `YeelightDevice` typealias
+17. ✅ Created proper `Theme` implementation in `UIEnvironment.swift`
+18. ✅ Added `YeelightScene` protocol to avoid ambiguity with `SwiftUI.Scene`
+19. ✅ Created `ObservableYeelightManager` wrapper class for `UnifiedYeelightManager`
+20. ✅ Created `ObservableLogger` wrapper class for `UnifiedLogger`
+21. ✅ Added `LogEntry` type for UI components
+22. ✅ Added `Automation` types and `ObservableAutomationManager` for UI components
+23. ✅ Added `DeviceSettings` and `ScenePreset` types for scene creation
+24. ✅ Fixed `SceneListView.swift` to use `YeelightScene` instead of `Scene` to avoid ambiguity
+25. ✅ Updated `MainView.swift` to use observable wrapper classes
+26. ✅ Updated `AutomationView.swift` to use observable wrapper classes
+27. ✅ Updated `LogViewerView.swift` to use `ObservableLogger`
+28. ✅ Updated `CreateSceneView.swift` to use `DeviceSettings` type correctly
+29. ✅ Created common UI components to avoid duplication:
+    - Created `FilterChip` component in `CommonComponents.swift`
+    - Created `DeviceChip` component in `CommonComponents.swift`
+    - Created `ConnectionStatusView` component in `CommonComponents.swift`
+    - Created `StatusRow` component in `CommonComponents.swift`
+    - Created `DeviceRow` component in `CommonComponents.swift`
+30. ✅ Created centralized `LogViewerView` component in `LogViewerComponent.swift`
+31. ✅ Created centralized `BackupView` and `RestoreView` components in `BackupRestoreComponents.swift`
+32. ✅ Created more observable wrapper classes:
+    - Created `ObservableDeviceManager` for `UnifiedDeviceManager`
+    - Created `ObservableEffectManager` for `UnifiedEffectManager`
+    - Created `ObservableSceneManager` for `UnifiedSceneManager`
+    - Created `ObservableNetworkManager` for `UnifiedNetworkManager`
+    - Created `ObservableStorageManager` for `UnifiedStorageManager`
+    - Created `ObservableLocationManager` for `UnifiedLocationManager`
+    - Created `ObservablePermissionManager` for `UnifiedPermissionManager`
+    - Created `ObservableAnalyticsManager` for `UnifiedAnalyticsManager`
+    - Created `ObservableConfigurationManager` for `UnifiedConfigurationManager`
+    - Created `ObservableStateManager` for `UnifiedStateManager`
+    - Created `ObservableSecurityManager` for `UnifiedSecurityManager`
+    - Created `ObservableErrorManager` for `UnifiedErrorManager`
+    - Created `ObservableThemeManager` for `UnifiedThemeManager`
+    - Created `ObservableConnectionManager` for `UnifiedConnectionManager`
+    - Created `ObservableRoomManager` for `UnifiedRoomManager`
+33. ✅ Added missing types:
+    - Added `Device` type for UI components
+    - Added `DeviceState` type for UI components
+    - Added `Effect` type for UI components
+    - Added `EffectParameters` type for UI components
+    - Added `FlowParams` type for UI components
+    - Added `FlowTransition` type for UI components
+    - Added `Room` type for UI components
+    - Added `DeviceGroup` type for UI components
+    - Added `MultiLightScene` type for UI components
+    - Added `StripEffect` type for UI components
+34. ✅ Updated type aliases in `UIEnvironment.swift` to use observable wrapper classes
+35. ✅ Created `ServiceContainer+UI.swift` to extend `ServiceContainer` with UI-specific properties
+36. ✅ Updated `SettingsView.swift` to use the centralized `LogViewerView` component
+37. ✅ Updated `SettingsView.swift` to use the centralized `BackupView` and `RestoreView` components
+38. ✅ Updated `AdvancedSettingsView.swift` to use the centralized `FilterChip` component
+39. ✅ Updated `LightsView.swift` to use the centralized `DeviceRow` component
+40. ✅ Updated `DeviceDetailView.swift` to use the centralized `ConnectionStatusView` component
+41. ✅ Updated `NetworkTestsView.swift` to use the centralized `StatusRow` component
+42. ✅ Updated `EffectsListView.swift` to use the centralized `DeviceChip` component
 
 ## Remaining Issues
 
-1. UI module issues:
-   - Missing type references in some UI components
-   - Duplicate view declarations across multiple files
-   - Some environment object type mismatches
-   - Invalid use of protocols as types without 'any' keyword
+Based on the build output, we still have several issues to fix:
 
-2. Theme environment issues:
-   - Several components use @Environment(\.theme) which needs proper implementation
-   - Need to create a proper theme environment key or use a different approach
+1. Duplicate view declarations:
+   - Need to update `CreateAutomationView.swift` to use the centralized `LocationPicker` component
+   - Need to update `DetailContentView.swift` to use the centralized `DeviceDetailView` component
+
+2. ObservableObject conformance issues:
+   - Need to update UI files to use the observable wrapper classes instead of the actor types directly
+   - Need to update UI files to use `@EnvironmentObject` with the observable wrapper classes
+
+3. ServiceContainer access issues:
+   - Need to update UI files to import the `ServiceContainer+UI.swift` file
+   - Need to update UI files to use the UI-specific properties from `ServiceContainer`
 
 ## Recommended Approach
 
-1. Fix remaining UI module issues:
-   - Ensure proper imports of Core types in all UI components
-   - Resolve duplicate view declarations
-   - Verify all environment object types match Core module types
-   - Add 'any' keyword where protocols are used as types
+1. Fix duplicate view declarations:
+   - Update all UI files to use the centralized components
+   - Remove duplicate view declarations from the original files
 
-2. Fix theme environment issues:
-   - Create proper theme environment key
-   - Ensure consistent theme usage across UI components
+2. Fix ObservableObject conformance issues:
+   - Update all UI files to use the observable wrapper classes
+   - Update all UI files to use `@EnvironmentObject` with the observable wrapper classes
+
+3. Fix ServiceContainer access issues:
+   - Update all UI files to import the `ServiceContainer+UI.swift` file
+   - Update all UI files to use the UI-specific properties from `ServiceContainer`
+
+4. Test the build:
+   - Run the build to see if the issues have been resolved
+   - Address any remaining issues one by one
 
 ## Specific Files Needing Attention
 
-- Remaining UI module view files: Fix any type references and environment object declarations
-- Theme-related files: Implement proper theme environment support
+- `CreateAutomationView.swift`: Update to use centralized components
+- `CreateGroupView.swift`: Update to use observable wrapper classes
+- `CreateSceneView.swift`: Update to use observable wrapper classes
+- `DetailContentView.swift`: Update to use centralized components
+- `DeviceCard.swift`: Update to use centralized components
+- `DeviceSetupView.swift`: Update to use observable wrapper classes
+- `FlowEffectEditor.swift`: Update to use observable wrapper classes
+- `GroupManagementView.swift`: Update to use observable wrapper classes
+- `LocationPicker.swift`: Update to use centralized components
+- `MainView.swift`: Update to use observable wrapper classes
+- `NetworkDiagnosticsView.swift`: Update to use centralized components
+- `SceneCreator.swift`: Update to use observable wrapper classes
+- `ScenePreview.swift`: Update to use observable wrapper classes
 
 More about potential fixing, [HERE](docs/guides/fixing_build_issues.md)

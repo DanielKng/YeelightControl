@@ -2,8 +2,8 @@ import SwiftUI
 import Core
 
 struct LightsView: View {
-    @ObservedObject var deviceManager: UnifiedDeviceManager
-    @EnvironmentObject private var yeelightManager: UnifiedYeelightManager
+    @EnvironmentObject private var deviceManager: ObservableDeviceManager
+    @EnvironmentObject private var yeelightManager: ObservableYeelightManager
     @State private var searchText = ""
     @State private var showingAddDevice = false
     @State private var selectedDevice: YeelightDevice?
@@ -20,11 +20,9 @@ struct LightsView: View {
             }
             
             ForEach(filteredDevices) { device in
-                DeviceRow(device: device)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectedDevice = device
-                    }
+                DeviceRow(device: device) {
+                    selectedDevice = device
+                }
             }
         }
         .navigationTitle("Lights")
@@ -49,12 +47,10 @@ struct LightsView: View {
             await refreshDevicesAsync()
         }
         .sheet(isPresented: $showingAddDevice) {
-            AddDeviceView(deviceManager: deviceManager)
-                .environmentObject(yeelightManager)
+            AddDeviceView()
         }
         .sheet(item: $selectedDevice) { device in
             DeviceDetailView(device: device)
-                .environmentObject(yeelightManager)
         }
         .overlay {
             if yeelightManager.devices.isEmpty && !deviceManager.isDiscovering {
@@ -94,74 +90,12 @@ struct LightsView: View {
     }
 }
 
-// MARK: - Supporting Views
-
-struct DeviceRow: View {
-    @ObservedObject var device: YeelightDevice
-    @EnvironmentObject private var yeelightManager: UnifiedYeelightManager
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "lightbulb.fill")
-                .font(.title2)
-                .foregroundColor(device.isPoweredOn ? .yellow : .gray)
-                .frame(width: 40, height: 40)
-                .background(
-                    Circle()
-                        .fill(Color.gray.opacity(0.2))
-                )
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(device.name)
-                    .font(.headline)
-                
-                Text(device.model)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(device.isConnected ? "Connected" : "Disconnected")
-                    .font(.caption)
-                    .foregroundColor(device.isConnected ? .green : .red)
-                
-                Text(device.ipAddress)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            Button(action: {
-                togglePower()
-            }) {
-                Image(systemName: device.isPoweredOn ? "power" : "power")
-                    .foregroundColor(device.isPoweredOn ? .green : .gray)
-                    .padding(8)
-                    .background(
-                        Circle()
-                            .fill(Color.gray.opacity(0.2))
-                    )
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.vertical, 4)
-    }
-    
-    private func togglePower() {
-        Task {
-            var updatedDevice = device
-            updatedDevice.isPoweredOn.toggle()
-            try? await yeelightManager.updateDevice(updatedDevice)
-        }
-    }
-}
-
 // MARK: - Preview
 
 #Preview {
     NavigationView {
-        LightsView(deviceManager: ServiceContainer.shared.deviceManager)
-            .environmentObject(ServiceContainer.shared.yeelightManager)
+        LightsView()
+            .environmentObject(ServiceContainer.shared.observableDeviceManager)
+            .environmentObject(ServiceContainer.shared.observableYeelightManager)
     }
 } 

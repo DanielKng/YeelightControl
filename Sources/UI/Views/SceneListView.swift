@@ -6,7 +6,7 @@ struct SceneListView: View {
     @ObservedObject var sceneManager: UnifiedSceneManager
     @State private var searchText = ""
     @State private var showingAddScene = false
-    @State private var selectedScene: (any Scene)?
+    @State private var selectedScene: (any YeelightScene)?
     @State private var showingDeleteConfirmation = false
     
     var body: some View {
@@ -81,7 +81,7 @@ struct SceneListView: View {
         }
     }
     
-    private var filteredScenes: [any Scene] {
+    private var filteredScenes: [any YeelightScene] {
         if searchText.isEmpty {
             return sceneManager.scenes
         } else {
@@ -93,8 +93,10 @@ struct SceneListView: View {
     
     private func deleteScenes(at offsets: IndexSet) {
         for index in offsets {
-            let scene = filteredScenes[index]
-            sceneManager.deleteScene(scene.id)
+            if index < sceneManager.scenes.count {
+                let scene = sceneManager.scenes[index]
+                sceneManager.deleteScene(scene)
+            }
         }
     }
 }
@@ -102,7 +104,7 @@ struct SceneListView: View {
 // MARK: - Supporting Views
 
 private struct SceneRow: View {
-    let scene: any Scene
+    let scene: any YeelightScene
     
     var body: some View {
         HStack {
@@ -142,7 +144,7 @@ private struct SceneRow: View {
         .padding(.vertical, 4)
     }
     
-    private func iconForScene(_ scene: any Scene) -> String {
+    private func iconForScene(_ scene: any YeelightScene) -> String {
         // Determine icon based on scene type
         return "theatermasks.fill"
     }

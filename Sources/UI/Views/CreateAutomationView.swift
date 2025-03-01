@@ -1,21 +1,25 @@
 import CoreLocation
 import SwiftUI
+import Core
 
 struct CreateAutomationView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var deviceManager = YeelightManager.shared
+    @EnvironmentObject private var yeelightManager: ObservableYeelightManager
+    @EnvironmentObject private var automationManager: ObservableAutomationManager
 
     @State private var name = ""
     @State private var selectedTrigger: TriggerType = .time
     @State private var selectedTime = Date()
     @State private var selectedLocation: Automation.Location?
-    @State private var selectedDevices: Set<String> = []
+    @State private var selectedDeviceIDs: Set<DeviceID> = []
     @State private var selectedAction: ActionType = .scene
     @State private var selectedScene: ScenePreset?
     @State private var powerState = true
     @State private var brightness: Double = 100
     @State private var showingSceneSelector = false
     @State private var showingLocationPicker = false
+    @State private var locationCoordinate = CLLocationCoordinate2D()
+    @State private var locationRadius: Double = 100
 
     enum TriggerType {
         case time, sunset, sunrise, location
@@ -99,7 +103,7 @@ struct CreateAutomationView: View {
                 }
 
                 Section("Devices") {
-                    EnhancedDeviceSelectionList(selectedDevices: $selectedDevices)
+                    EnhancedDeviceSelectionList(selectedDevices: $selectedDeviceIDs)
                 }
 
                 Section("Action") {
@@ -150,13 +154,23 @@ struct CreateAutomationView: View {
                 ScenePickerView(selectedScene: $selectedScene)
             }
             .sheet(isPresented: $showingLocationPicker) {
-                LocationPicker(selectedLocation: $selectedLocation)
+                LocationPicker(coordinate: $locationCoordinate, radius: $locationRadius)
+                    .onDisappear {
+                        if showingLocationPicker == false && locationCoordinate.latitude != 0 {
+                            // Create a location from the picker data
+                            selectedLocation = Automation.Location(
+                                name: "Custom Location",
+                                coordinate: locationCoordinate,
+                                radius: Int(locationRadius)
+                            )
+                        }
+                    }
             }
         }
     }
 
     private var isValid: Bool {
-        guard !name.isEmpty && !selectedDevices.isEmpty else { return false }
+        guard !name.isEmpty && !selectedDeviceIDs.isEmpty else { return false }
 
         switch selectedTrigger {
         case .location:
@@ -189,11 +203,11 @@ struct CreateAutomationView: View {
         let action: Automation.Action
         switch selectedAction {
         case .scene:
-            action = .setScene(deviceIPs: Array(selectedDevices), scene: selectedScene!.scene)
+            action = .setScene(deviceIDs: Array(selectedDeviceIDs), scene: selectedScene!.scene)
         case .power:
-            action = .setPower(deviceIPs: Array(selectedDevices), on: powerState)
+            action = .setPower(deviceIDs: Array(selectedDeviceIDs), on: powerState)
         case .brightness:
-            action = .setBrightness(deviceIPs: Array(selectedDevices), level: Int(brightness))
+            action = .setBrightness(deviceIDs: Array(selectedDeviceIDs), level: Int(brightness))
         }
 
         let automation = Automation(
@@ -203,56 +217,7 @@ struct CreateAutomationView: View {
             action: action
         )
 
-        DeviceStorage.shared.saveAutomation(automation)
+        automationManager.saveAutomation(automation)
         dismiss()
-    }
-}
-
-struct LocationPicker: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var selectedLocation: Automation.Location?
-    @State private var locationName = ""
-    @State private var radius: Double = 100
-    @State private var coordinate = CLLocationCoordinate2D()
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Location Name", text: $locationName)
-
-                    VStack(alignment: .leading) {
-                        Text("Radius: \(Int(radius))m")
-                        Slider(value: $radius, in: 50...500)
-                    }
-
-                    // Map view would go here
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.2))
-                        .frame(height: 200)
-                        .overlay {
-                            Text("Map View")
-                        }
-                }
-            }
-            .navigationTitle("Select Location")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        selectedLocation = Automation.Location(
-                            name: locationName,
-                            coordinate: coordinate,
-                            radius: Int(radius)
-                        )
-                        dismiss()
-                    }
-                    .disabled(locationName.isEmpty)
-                }
-            }
-        }
     }
 } 

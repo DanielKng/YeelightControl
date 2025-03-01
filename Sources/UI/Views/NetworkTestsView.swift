@@ -1,7 +1,10 @@
 import SwiftUI
+import Core
+import UI.Components
 
 struct NetworkTestsView: View {
     @StateObject private var networkMonitor = NetworkMonitor.shared
+    @EnvironmentObject private var networkManager: ObservableNetworkManager
     @State private var testResults: [TestResult] = []
     @State private var isRunningTests = false
     @State private var currentTest: String?
@@ -13,29 +16,9 @@ struct NetworkTestsView: View {
     struct TestResult: Identifiable {
         let id = UUID()
         let name: String
-        let status: Status
+        let status: StatusRow.Status
         let message: String
         let timestamp = Date()
-        
-        enum Status {
-            case success, warning, failure
-            
-            var icon: String {
-                switch self {
-                case .success: return "checkmark.circle.fill"
-                case .warning: return "exclamationmark.triangle.fill"
-                case .failure: return "xmark.circle.fill"
-                }
-            }
-            
-            var color: Color {
-                switch self {
-                case .success: return .green
-                case .warning: return .yellow
-                case .failure: return .red
-                }
-            }
-        }
     }
     
     enum DNSStatus {
@@ -63,7 +46,7 @@ struct NetworkTestsView: View {
                             title: "Network",
                             value: networkMonitor.connectionDescription,
                             icon: "network",
-                            status: networkMonitor.isConnected ? .success : .failure
+                            status: networkMonitor.isConnected ? .success : .error
                         )
                         
                         StatusRow(
@@ -90,7 +73,7 @@ struct NetworkTestsView: View {
                                 StatusRow(
                                     title: result.name,
                                     value: result.message,
-                                    icon: result.status.icon,
+                                    icon: statusIcon(for: result.status),
                                     status: result.status
                                 )
                             }
@@ -104,7 +87,7 @@ struct NetworkTestsView: View {
                                 title: "Status",
                                 value: dnsStatusDescription,
                                 icon: dnsStatusIcon,
-                                status: dnsStatus == .resolved ? .success : (dnsStatus == .failed ? .failure : .warning)
+                                status: dnsStatus == .resolved ? .success : (dnsStatus == .failed ? .error : .warning)
                             )
                             
                             if !resolvedIPs.isEmpty {
@@ -166,7 +149,7 @@ struct NetworkTestsView: View {
             } else {
                 addTestResult(
                     name: "Connectivity",
-                    status: .failure,
+                    status: .error,
                     message: "No network connection available"
                 )
                 throw NetworkError.noConnection
@@ -252,13 +235,13 @@ struct NetworkTestsView: View {
             status = .warning
             message = "Fair: \(Int(avgLatency))ms"
         } else {
-            status = .failure
+            status = .error
             message = "Poor: \(Int(avgLatency))ms"
         }
         
         addTestResult(name: "Latency", status: status, message: message)
         
-        if status == .failure {
+        if status == .error {
             throw NetworkError.highLatency
         }
     }
@@ -281,19 +264,28 @@ struct NetworkTestsView: View {
             status = .warning
             message = "Slow: \(formatBandwidth(speed))"
         } else {
-            status = .failure
+            status = .error
             message = "Very slow: \(formatBandwidth(speed))"
         }
         
         addTestResult(name: "Bandwidth", status: status, message: message)
         
-        if status == .failure {
+        if status == .error {
             throw NetworkError.lowBandwidth
         }
     }
     
     private func addTestResult(name: String, status: TestResult.Status, message: String) {
         testResults.append(TestResult(name: name, status: status, message: message))
+    }
+    
+    private func statusIcon(for status: StatusRow.Status) -> String {
+        switch status {
+        case .success: return "checkmark.circle.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .error: return "xmark.circle.fill"
+        case .info: return "info.circle.fill"
+        }
     }
     
     private var dnsStatusDescription: String {
@@ -333,57 +325,4 @@ enum NetworkError: Error {
     case dnsResolutionFailed
     case highLatency
     case lowBandwidth
-}
-
-struct StatusSection<Content: View>: View {
-    let title: String
-    let content: Content
-    
-    init(title: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.content = content()
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
-                .padding(.bottom, 4)
-            
-            content
-        }
-        .padding()
-        .background(Color(UIColor.secondarySystemBackground))
-        .cornerRadius(12)
-    }
-}
-
-struct StatusRow: View {
-    let title: String
-    let value: String
-    let icon: String
-    let status: NetworkTestsView.TestResult.Status
-    
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundColor(.secondary)
-                .frame(width: 24)
-            
-            VStack(alignment: .leading) {
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                Text(value)
-                    .font(.body)
-            }
-            
-            Spacer()
-            
-            Image(systemName: status.icon)
-                .foregroundColor(status.color)
-        }
-        .padding(.vertical, 4)
-    }
 } 
