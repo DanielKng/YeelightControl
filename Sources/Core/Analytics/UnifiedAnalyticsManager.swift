@@ -3,70 +3,32 @@ import Combine
 import SwiftUI
 
 // MARK: - Analytics Managing Protocol
-public protocol Core_AnalyticsManaging: Core_BaseService {
-    var isEnabled: Bool { get set }
-    func trackEvent(_ event: Core_AnalyticsEvent)
-    func startSession() async
-    func endSession() async
-    func logError(_ error: Error, context: [String: Any]?) async
-    func setUserProperty(_ value: Any?, forKey key: String) async
-    func incrementMetric(_ metric: Core_AnalyticsMetric) async
-}
+// Protocol is already defined in AnalyticsTypes.swift
+// Removing duplicate definition
 
 // MARK: - Analytics Event
-public struct Core_AnalyticsEvent: Codable, Identifiable {
-    public var id: String { UUID().uuidString }
-    public let name: String
-    public let category: Core_AnalyticsCategory
-    public let parameters: [String: String]
-    public let timestamp: Date
-    
-    public init(
-        name: String,
-        category: Core_AnalyticsCategory,
-        parameters: [String: String] = [:],
-        timestamp: Date = Date()
-    ) {
-        self.name = name
-        self.category = category
-        self.parameters = parameters
-        self.timestamp = timestamp
-    }
-}
+// Core_AnalyticsEvent is already defined in AnalyticsTypes.swift
+// Removing duplicate definition
 
 // MARK: - Analytics Category
-public enum Core_AnalyticsCategory: String, Codable {
-    case device
-    case room
-    case scene
-    case effect
-    case automation
-    case network
-    case error
-    case performance
-    case user
-    case analytics
-}
+// Core_AnalyticsCategory is already defined in AnalyticsTypes.swift
+// Removing duplicate definition
 
 // MARK: - Analytics Metric
-public enum Core_AnalyticsMetric: String {
-    case deviceCount
-    case roomCount
-    case sceneCount
-    case effectCount
-    case automationCount
-    case networkRequests
-    case errorCount
-    case sessionDuration
-    case appLaunchTime
-    case backgroundTaskCount
-}
+// Core_AnalyticsMetric is already defined in AnalyticsTypes.swift
+// Removing duplicate definition
 
-@MainActor
-public final class UnifiedAnalyticsManager: ObservableObject, Core_AnalyticsManaging {
+public actor UnifiedAnalyticsManager: Core_AnalyticsManaging, Core_BaseService {
     // MARK: - Published Properties
-    @Published public var isEnabled = false
-    @Published public private(set) var events: [Core_AnalyticsEvent] = []
+    public private(set) var _isEnabled = false
+    public private(set) var events: [Core_AnalyticsEvent] = []
+    
+    // MARK: - Core_BaseService Conformance
+    nonisolated public var isEnabled: Bool {
+        get async {
+            await _isEnabled
+        }
+    }
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
@@ -75,6 +37,7 @@ public final class UnifiedAnalyticsManager: ObservableObject, Core_AnalyticsMana
     private var sessionStartTime: Date?
     private var eventBuffer: [Core_AnalyticsEvent] = []
     private let maxBufferSize = 100
+    private let analyticsEventsSubject = PassthroughSubject<Core_AnalyticsEvent, Never>()
     
     // MARK: - Constants
     private enum Constants {
@@ -84,6 +47,24 @@ public final class UnifiedAnalyticsManager: ObservableObject, Core_AnalyticsMana
         static let batchSize = 50
     }
     
+    // MARK: - Core_BaseService
+    public var serviceIdentifier: String {
+        return "core.analytics"
+    }
+    
+    // MARK: - Core_AnalyticsManaging Protocol Conformance
+    public nonisolated var analyticsEvents: AnyPublisher<Core_AnalyticsEvent, Never> {
+        let publisher = PassthroughSubject<Core_AnalyticsEvent, Never>()
+        
+        Task {
+            for await event in await analyticsEventsSubject.values {
+                publisher.send(event)
+            }
+        }
+        
+        return publisher.eraseToAnyPublisher()
+    }
+    
     // MARK: - Initialization
     public init(storageManager: any Core_StorageManaging) {
         self.storage = storageManager
@@ -91,51 +72,89 @@ public final class UnifiedAnalyticsManager: ObservableObject, Core_AnalyticsMana
         Task {
             await loadSettings()
             await loadEvents()
-            setupPeriodicUpload()
+            await setupPeriodicUpload()
         }
     }
     
     // MARK: - Public Methods
+    
     public func setEnabled(_ enabled: Bool) async {
-        isEnabled = enabled
+        _isEnabled = enabled
         if !enabled {
             await clearEvents()
         }
         await saveSettings()
     }
     
-    public func trackEvent(_ event: Core_AnalyticsEvent) {
-        // TODO: Implement analytics tracking
-        print("Analytics event tracked: \(event.name) with parameters: \(event.parameters)")
+    public nonisolated func trackEvent(_ event: Core_AnalyticsEvent) {
+        Task {
+            await trackEventInternal(event)
+        }
     }
     
-    public func startSession() async {
+    private func trackEventInternal(_ event: Core_AnalyticsEvent) {
+        // TODO: Implement analytics tracking
+        print("Analytics event tracked: \(event.type) with parameters: \(event.parameters)")
+        analyticsEventsSubject.send(event)
+    }
+    
+    public nonisolated func startSession() {
+        Task {
+            await startSessionInternal()
+        }
+    }
+    
+    private func startSessionInternal() {
         sessionStartTime = Date()
     }
     
-    public func endSession() async {
+    public nonisolated func endSession() {
+        Task {
+            await endSessionInternal()
+        }
+    }
+    
+    private func endSessionInternal() {
         guard let startTime = sessionStartTime else { return }
         let duration = Date().timeIntervalSince(startTime)
         print("Session ended with duration: \(duration) seconds")
         sessionStartTime = nil
     }
     
-    public func logError(_ error: Error, context: [String: Any]?) async {
+    public nonisolated func logError(_ error: Error, context: [String: Any]?) {
+        Task {
+            await logErrorInternal(error, context: context)
+        }
+    }
+    
+    private func logErrorInternal(_ error: Error, context: [String: Any]?) {
         print("Analytics error logged: \(error.localizedDescription) with context: \(context ?? [:])")
     }
     
-    public func setUserProperty(_ value: Any?, forKey key: String) async {
-        print("Setting user property \(key) to \(String(describing: value))")
+    public nonisolated func setUserProperty(_ property: String, value: String) {
+        Task {
+            await setUserPropertyInternal(property, value: value)
+        }
     }
     
-    public func incrementMetric(_ metric: Core_AnalyticsMetric) async {
+    private func setUserPropertyInternal(_ property: String, value: String) {
+        print("Setting user property \(property) to \(value)")
+    }
+    
+    public nonisolated func incrementMetric(_ metric: Core_AnalyticsMetric) {
+        Task {
+            await incrementMetricInternal(metric)
+        }
+    }
+    
+    private func incrementMetricInternal(_ metric: Core_AnalyticsMetric) {
         print("Incrementing metric: \(metric.rawValue)")
     }
     
     public func clearEvents() async {
         events.removeAll()
         do {
-            try await storage.delete(forKey: Constants.storageKey)
+            try await storage.remove(forKey: Constants.storageKey)
         } catch {
             print("Failed to clear analytics events: \(error)")
         }
@@ -145,9 +164,7 @@ public final class UnifiedAnalyticsManager: ObservableObject, Core_AnalyticsMana
     private func loadEvents() async {
         do {
             let loadedEvents: [Core_AnalyticsEvent] = try await storage.load(forKey: Constants.storageKey)
-            await MainActor.run {
-                events = loadedEvents
-            }
+            events = loadedEvents
         } catch {
             print("Failed to load analytics events: \(error)")
         }
@@ -161,15 +178,15 @@ public final class UnifiedAnalyticsManager: ObservableObject, Core_AnalyticsMana
         }
     }
     
-    private func setupPeriodicUpload() {
-        Timer.publish(every: 300, on: .main, in: .common)
+    private func setupPeriodicUpload() async {
+        let timer = Timer.publish(every: 300, on: .main, in: .common)
             .autoconnect()
-            .sink { [weak self] _ in
-                Task {
-                    await self?.uploadEvents()
-                }
+        
+        Task {
+            for await _ in timer.values {
+                await uploadEvents()
             }
-            .store(in: &cancellables)
+        }
     }
     
     private func uploadEvents() async {
@@ -198,20 +215,16 @@ public final class UnifiedAnalyticsManager: ObservableObject, Core_AnalyticsMana
     private func loadSettings() async {
         do {
             let enabled: Bool = try await storage.load(forKey: Constants.settingsKey)
-            await MainActor.run {
-                isEnabled = enabled
-            }
+            _isEnabled = enabled
         } catch {
             print("Failed to load analytics settings: \(error)")
-            await MainActor.run {
-                isEnabled = true // Default to enabled
-            }
+            _isEnabled = true // Default to enabled
         }
     }
     
     private func saveSettings() async {
         do {
-            try await storage.save(isEnabled, forKey: Constants.settingsKey)
+            try await storage.save(_isEnabled, forKey: Constants.settingsKey)
         } catch {
             print("Failed to save analytics settings: \(error)")
         }

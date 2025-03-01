@@ -21,6 +21,20 @@ We've made significant progress in resolving the build issues:
 
 4. ✅ Created proper separation between device and Yeelight types
 
+5. ✅ Fixed protocol conformance issues for several manager classes:
+   - `UnifiedNotificationManager` now properly conforms to `Core_BaseService`
+   - `UnifiedStorageManager` now properly conforms to `Core_BaseService`
+   - `UnifiedDeviceManager` now properly conforms to `Core_DeviceManaging`
+   - `UnifiedErrorHandler` now properly conforms to `Core_ErrorHandling`
+   - `UnifiedNetworkManager` now properly conforms to `Core_BaseService`
+   - `UnifiedStateManager` now properly conforms to `Core_StateManaging`
+   - `UnifiedAnalyticsManager` now properly conforms to `Core_BaseService`
+   - `UnifiedConfigurationManager` now properly conforms to `Core_BaseService`
+
+6. ✅ Fixed `Core_ConfigurationError` usage in `ServiceContainer.swift`
+
+7. ✅ Cleaned up `TypeDefinitions.swift` to remove duplicate type definitions and add clear comments
+
 ## Root Causes
 
 The project has several structural issues that lead to compilation errors:
@@ -30,131 +44,77 @@ The project has several structural issues that lead to compilation errors:
 3. **Protocol Conformance Issues**: Some types don't properly conform to their declared protocols
 4. **Actor Isolation Problems**: Actor-isolated properties are used to satisfy nonisolated protocol requirements
 5. **Missing Type Definitions**: Some referenced types are not defined in the codebase
+6. **Sendability Issues**: Non-sendable types are passed into actor-isolated contexts
 
 ## Remaining Issues to Fix
 
-### 1. Storage-related Type Duplications
+### 1. Actor Isolation Issues in BaseServiceContainer
 
-The `Core_StorageKey` and `Core_StorageDirectory` enums are defined in both:
-- `Sources/Core/Types/Storage/StorageTypes.swift`
-- `Sources/Core/Storage/UnifiedStorageManager.swift`
-
-**Solution:**
-1. Keep only one definition in `StorageTypes.swift`
-2. Remove the duplicate definitions from `UnifiedStorageManager.swift`
-3. Add comments indicating where the types are defined
-
-### 2. Analytics-related Type Duplications
-
-Analytics-related types are defined in multiple places:
-- `Sources/Core/Types/Analytics/AnalyticsTypes.swift`
-- `Sources/Core/Analytics/UnifiedAnalyticsManager.swift`
+The `BaseServiceContainer` class has several actor isolation issues:
+- Passing non-sendable types (`UserDefaults` and `FileManager`) into actor-isolated contexts
+- Not properly awaiting async calls
+- Type mismatches between `BaseServiceContainer` and `ServiceContainer`
 
 **Solution:**
-1. Keep only one definition in `AnalyticsTypes.swift`
-2. Remove the duplicate definitions from `UnifiedAnalyticsManager.swift`
-3. Add comments indicating where the types are defined
+1. Make `UserDefaults` and `FileManager` conform to `Sendable` or use alternative approaches
+2. Properly await async calls with the `await` keyword
+3. Ensure `BaseServiceContainer` and `ServiceContainer` are compatible
 
-### 3. Configuration-related Type Duplications
+### 2. Storage Method Signature Issues
 
-Configuration-related types are defined in multiple places:
-- `Sources/Core/Types/Configuration/ConfigurationTypes.swift`
-- `Sources/Core/Configuration/UnifiedConfigurationManager.swift`
-
-**Solution:**
-1. Keep only one definition in `ConfigurationTypes.swift`
-2. Remove the duplicate definitions from `UnifiedConfigurationManager.swift`
-3. Add comments indicating where the types are defined
-
-### 4. TypeDefinitions.swift Issues
-
-The `TypeDefinitions.swift` file contains many type definitions that are duplicated elsewhere.
+The `UnifiedStorageManager` methods have signature issues:
+- The `load` method is not being called with the correct generic type parameter
+- The `save` method is being called with non-Codable types
 
 **Solution:**
-1. Review all type definitions in this file
-2. Remove duplicates and add comments indicating where the types are defined
-3. Consider refactoring this file to be a central place for type aliases rather than definitions
+1. Update method calls to include the correct generic type parameter
+2. Ensure all types being saved conform to `Codable`
 
-### 5. Actor Isolation Issues
+### 3. Analytics Manager Issues
 
-Actor-isolated properties are used to satisfy nonisolated protocol requirements.
+The `UnifiedAnalyticsManager` has several issues:
+- Type mismatches in the `load` method calls
+- Missing generic type parameters
 
 **Solution:**
-1. Mark protocol requirements as `nonisolated` where appropriate
-2. Use `nonisolated` getters for properties that need to be accessed outside the actor
-3. Consider using publishers for state that needs to be observed
+1. Update method calls to include the correct generic type parameter
+2. Ensure all types being loaded/saved conform to `Codable`
 
-Example:
-```swift
-protocol Core_LocationManaging {
-    nonisolated var currentLocation: CLLocation? { get }
-}
+### 4. Background Manager Issues
 
-actor UnifiedLocationManager: Core_LocationManaging {
-    private var _currentLocation: CLLocation?
-    
-    nonisolated public var currentLocation: CLLocation? {
-        get {
-            _currentLocation
-        }
-    }
-}
-```
+The `UnifiedBackgroundManager` has several issues:
+- Type mismatches in method calls
+- Accessing private constants
+- Accessing non-existent members
+
+**Solution:**
+1. Update method calls to match the expected parameter types
+2. Make constants accessible or use alternative approaches
+3. Ensure all member accesses are valid
 
 ## Step-by-Step Fix Plan
 
-### 1. Fix Remaining Type Redeclarations
+### 1. Fix BaseServiceContainer Issues
 
-For each redeclared type:
+1. Update the `BaseServiceContainer` class to properly handle actor isolation
+2. Ensure all async calls are properly awaited
+3. Make `BaseServiceContainer` compatible with `ServiceContainer`
 
-1. Identify all occurrences of the type (e.g., `Core_StorageKey`)
-2. Keep only one definition in the appropriate file
-3. Update all references to use the single definition
+### 2. Fix Storage Method Signature Issues
 
-### 2. Resolve Protocol Conformance Issues
+1. Update all calls to `load` and `save` methods to include the correct generic type parameters
+2. Ensure all types being saved conform to `Codable`
 
-For each type with conformance issues:
+### 3. Fix Analytics Manager Issues
 
-1. Identify the required protocol methods and properties
-2. Implement all required methods and properties
-3. Ensure the implementations match the protocol requirements
+1. Update all calls to `load` and `save` methods to include the correct generic type parameters
+2. Ensure all types being loaded/saved conform to `Codable`
 
-### 3. Address Actor Isolation Issues
+### 4. Fix Background Manager Issues
 
-For actor-isolated properties used in protocols:
-
-1. Mark protocol requirements as `nonisolated` where appropriate
-2. Use `nonisolated` getters for properties that need to be accessed outside the actor
-3. Consider using publishers for state that needs to be observed
-
-### 4. Fix Missing Type Definitions
-
-For each missing type:
-
-1. Identify where the type should be defined
-2. Create the appropriate definition
-3. Update all references to use the new definition
-
-## Critical Files to Fix Next
-
-1. **Core/Types/Storage/StorageTypes.swift** and **Core/Storage/UnifiedStorageManager.swift**
-   - Resolve duplicate `Core_StorageKey` and `Core_StorageDirectory` definitions
-   - Keep definitions only in `StorageTypes.swift`
-
-2. **Core/Types/Analytics/AnalyticsTypes.swift** and **Core/Analytics/UnifiedAnalyticsManager.swift**
-   - Resolve duplicate analytics-related type definitions
-   - Keep definitions only in `AnalyticsTypes.swift`
-
-3. **Core/Types/Configuration/ConfigurationTypes.swift** and **Core/Configuration/UnifiedConfigurationManager.swift**
-   - Resolve duplicate configuration-related type definitions
-   - Keep definitions only in `ConfigurationTypes.swift`
-
-4. **Core/Types/TypeDefinitions.swift**
-   - Remove or properly organize duplicate type definitions
-   - Add comments indicating where types are defined
-
-5. **Core/Services/ServiceContainer.swift**
-   - Ensure proper type aliases are used consistently
+1. Update method calls to match the expected parameter types
+2. Make constants accessible or use alternative approaches
+3. Ensure all member accesses are valid
 
 ## Testing the Fixes
 
@@ -170,4 +130,6 @@ After implementing the fixes:
 2. **Use Namespaces**: When Swift introduces proper namespaces, refactor to use them
 3. **Consistent Naming**: Adopt a consistent naming convention without prefixes
 4. **Reduce Interdependencies**: Minimize dependencies between modules
-5. **Automated Tests**: Add tests to catch type and protocol conformance issues early 
+5. **Automated Tests**: Add tests to catch type and protocol conformance issues early
+6. **Sendability Annotations**: Add proper sendability annotations to all types that cross actor boundaries
+7. **Consistent Async/Await Usage**: Ensure all async code properly uses the await keyword 

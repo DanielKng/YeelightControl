@@ -14,12 +14,44 @@ open class BaseServiceContainer {
     
     public init() {
         self.storageManager = UnifiedStorageManager()
+        
+        // Initialize async properties
+        Task {
+            await initializeAsyncManagers()
+        }
     }
+    
+    // MARK: - Async initialization
+    
+    private func initializeAsyncManagers() async {
+        self._stateManager = await createStateManager()
+        self._securityManager = await createSecurityManager()
+        self._notificationManager = await createNotificationManager()
+    }
+    
+    // MARK: - Async property creation methods
+    
+    private func createStateManager() async -> UnifiedStateManager {
+        return UnifiedStateManager(services: self)
+    }
+    
+    private func createSecurityManager() async -> UnifiedSecurityManager {
+        return UnifiedSecurityManager(services: self)
+    }
+    
+    private func createNotificationManager() async -> UnifiedNotificationManager {
+        return UnifiedNotificationManager()
+    }
+    
+    // MARK: - Private properties for async managers
+    private var _stateManager: UnifiedStateManager?
+    private var _securityManager: UnifiedSecurityManager?
+    private var _notificationManager: UnifiedNotificationManager?
     
     // MARK: - Lazy Managers
     
     lazy var logManager: UnifiedLogger = {
-        return UnifiedLogger(storageManager: self.storageManager as any Core_StorageManaging)
+        return UnifiedLogger(storageManager: self.storageManager)
     }()
     
     lazy var themeManager: UnifiedThemeManager = {
@@ -34,9 +66,13 @@ open class BaseServiceContainer {
         return UnifiedDeviceManager(storageManager: self.storageManager as any Core_StorageManaging)
     }()
     
-    lazy var stateManager: UnifiedStateManager = {
-        return await UnifiedStateManager(services: self)
-    }()
+    // Replace lazy properties with computed properties for async-initialized managers
+    var stateManager: UnifiedStateManager {
+        guard let manager = _stateManager else {
+            fatalError("StateManager not initialized yet. Access this property after initialization is complete.")
+        }
+        return manager
+    }
     
     lazy var sceneManager: UnifiedSceneManager = {
         return UnifiedSceneManager(
@@ -57,9 +93,13 @@ open class BaseServiceContainer {
         return UnifiedConfigurationManager(storageManager: self.storageManager as any Core_StorageManaging)
     }()
     
-    lazy var securityManager: UnifiedSecurityManager = {
-        return await UnifiedSecurityManager(services: self)
-    }()
+    // Replace lazy property with computed property for async-initialized manager
+    var securityManager: UnifiedSecurityManager {
+        guard let manager = _securityManager else {
+            fatalError("SecurityManager not initialized yet. Access this property after initialization is complete.")
+        }
+        return manager
+    }
     
     lazy var networkManager: UnifiedNetworkManager = {
         return UnifiedNetworkManager()
@@ -67,14 +107,17 @@ open class BaseServiceContainer {
     
     lazy var analyticsManager: UnifiedAnalyticsManager = {
         return UnifiedAnalyticsManager(
-            storageManager: self.storageManager as any Core_StorageManaging,
-            configurationManager: self.configurationManager as any Core_ConfigurationManaging
+            storageManager: self.storageManager as any Core_StorageManaging
         )
     }()
     
-    lazy var notificationManager: UnifiedNotificationManager = {
-        return await UnifiedNotificationManager()
-    }()
+    // Replace lazy property with computed property for async-initialized manager
+    var notificationManager: UnifiedNotificationManager {
+        guard let manager = _notificationManager else {
+            fatalError("NotificationManager not initialized yet. Access this property after initialization is complete.")
+        }
+        return manager
+    }
     
     lazy var yeelightManager: UnifiedYeelightManager = {
         return UnifiedYeelightManager(

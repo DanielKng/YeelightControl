@@ -1,18 +1,16 @@
+// MARK: - Type Definitions
+// This file contains type definitions and protocols that are used throughout the Core module.
+// Many types have been moved to their own dedicated files to avoid duplication.
+
 import Foundation
 import SwiftUI
 import CoreLocation
 import Combine
 
 // MARK: - Theme Types
+// Core_Theme is defined in ThemeTypes.swift
 
-// Core_Theme is already defined in UnifiedThemeManager.swift
-// public enum Core_Theme: String, Codable, CaseIterable {
-//     case light
-//     case dark
-//     case system
-//     case custom
-// }
-
+// Theme-related protocols
 public protocol ThemeColors {
     var primary: Color { get }
     var secondary: Color { get }
@@ -42,198 +40,41 @@ public protocol ThemeMetrics {
 }
 
 // MARK: - Permission Types
-
-// Core_AppPermissionType is already defined in UnifiedPermissionManager.swift
-// public enum Core_AppPermissionType: String, CaseIterable {
-//     case location
-//     case notification
-//     case camera
-//     case microphone
-//     case photoLibrary
-//     case contacts
-//     case calendar
-//     case reminders
-//     case bluetooth
-//     case backgroundRefresh
-//     case localNetwork
-// }
-
-// Core_PermissionStatus is already defined in UnifiedPermissionManager.swift
-// public enum Core_PermissionStatus: String {
-//     case notDetermined
-//     case restricted
-//     case denied
-//     case authorized
-//     case ephemeral
-//     case provisional
-// }
+// Core_PermissionType is defined in PermissionTypes.swift
+// Core_PermissionStatus is defined in PermissionTypes.swift
 
 // MARK: - Notification Types
-
-public typealias Core_InternalNotificationCategory = Core_AppNotificationCategory
-public typealias Core_InternalNotificationTrigger = Core_AppNotificationTrigger
-
-public struct Core_NotificationRequest {
-    public let id: String
-    public let title: String
-    public let body: String
-    public let category: Core_AppNotificationCategory
-    public let trigger: Core_AppNotificationTrigger
-    
-    public init(
-        id: String = UUID().uuidString,
-        title: String,
-        body: String,
-        category: Core_AppNotificationCategory,
-        trigger: Core_AppNotificationTrigger
-    ) {
-        self.id = id
-        self.title = title
-        self.body = body
-        self.category = category
-        self.trigger = trigger
-    }
-}
-
-public enum Core_AppNotificationCategory: String, Codable, CaseIterable {
-    case device
-    case scene
-    case effect
-    case system
-    case update
-    case error
-}
-
-public enum Core_AppNotificationTrigger: Codable {
-    case immediate
-    case time(Date)
-    case interval(TimeInterval)
-    case calendar(DateComponents)
-    case location(CLRegion)
-    
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
-        
-        switch type {
-        case "immediate":
-            self = .immediate
-        case "time":
-            let date = try container.decode(Date.self, forKey: .value)
-            self = .time(date)
-        case "interval":
-            let interval = try container.decode(TimeInterval.self, forKey: .value)
-            self = .interval(interval)
-        case "calendar":
-            let components = try container.decode(DateComponents.self, forKey: .value)
-            self = .calendar(components)
-        case "location":
-            let region = try container.decode(CLCircularRegion.self, forKey: .value)
-            self = .location(region)
-        default:
-            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Invalid trigger type")
-        }
-    }
-    
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
-        switch self {
-        case .immediate:
-            try container.encode("immediate", forKey: .type)
-        case .time(let date):
-            try container.encode("time", forKey: .type)
-            try container.encode(date, forKey: .value)
-        case .interval(let interval):
-            try container.encode("interval", forKey: .type)
-            try container.encode(interval, forKey: .value)
-        case .calendar(let components):
-            try container.encode("calendar", forKey: .type)
-            try container.encode(components, forKey: .value)
-        case .location(let region):
-            try container.encode("location", forKey: .type)
-            if let region = region as? CLCircularRegion {
-                try container.encode(region, forKey: .value)
-            } else {
-                throw EncodingError.invalidValue(region, EncodingError.Context(codingPath: [CodingKeys.value], debugDescription: "Only CLCircularRegion is supported"))
-            }
-        }
-    }
-    
-    private enum CodingKeys: String, CodingKey {
-        case type
-        case value
-    }
-}
+// Core_NotificationCategory is defined in NotificationTypes.swift
+// Core_NotificationTrigger is defined in NotificationTypes.swift
+// Core_NotificationRequest is defined in NotificationTypes.swift
+// Core_NotificationEvent is defined in NotificationTypes.swift
 
 // MARK: - Network Types
-
-public enum Core_NetworkRequestMethod: String, Codable {
-    case get = "GET"
-    case post = "POST"
-    case put = "PUT"
-    case delete = "DELETE"
-    case patch = "PATCH"
-    case head = "HEAD"
-    case options = "OPTIONS"
-}
-
-public struct Core_NetworkRequest {
-    public let url: URL
-    public let method: Core_NetworkRequestMethod
-    public let headers: [String: String]
-    public let body: Data?
-    public let timeout: TimeInterval
-    
-    public init(
-        url: URL,
-        method: Core_NetworkRequestMethod = .get,
-        headers: [String: String] = [:],
-        body: Data? = nil,
-        timeout: TimeInterval = 30
-    ) {
-        self.url = url
-        self.method = method
-        self.headers = headers
-        self.body = body
-        self.timeout = timeout
-    }
-}
-
-public struct Core_NetworkResponse {
-    public let statusCode: Int
-    public let headers: [String: String]
-    public let body: Data?
-    
-    public init(
-        statusCode: Int,
-        headers: [String: String],
-        body: Data?
-    ) {
-        self.statusCode = statusCode
-        self.headers = headers
-        self.body = body
-    }
-}
+// Network types are defined in NetworkTypes.swift
 
 // MARK: - Analytics Types
+// Analytics types are defined in AnalyticsTypes.swift
 
-public enum Core_AnalyticsEventType: String, Codable, CaseIterable {
-    case appOpen
-    case appClose
-    case deviceConnected
-    case deviceDisconnected
-    case deviceControlled
-    case sceneActivated
-    case sceneDeactivated
-    case effectStarted
-    case effectStopped
-    case settingsChanged
-    case error
-    case custom
-}
+// MARK: - Effect Types
+// Effect types are defined in EffectTypes.swift
 
-// Note: The following types are defined in their respective files, so we're removing them here:
-// - Effect, EffectType, EffectParameters (in Core/Types/Effect/)
-// - Scene, SceneSchedule, Weekday (in Core/Types/Scene/)
-// - LogEntry, LogLevel, LogCategory (in Core/Logging/) 
+// MARK: - Scene Types
+// Scene types are defined in SceneTypes.swift
+
+// MARK: - Log Types
+// Log types are defined in LogTypes.swift
+
+// MARK: - Storage Types
+// Storage types are defined in StorageTypes.swift
+
+// MARK: - Configuration Types
+// Configuration types are defined in ConfigurationTypes.swift
+
+// MARK: - Device Types
+// Device types are defined in DeviceTypes.swift
+
+// MARK: - Yeelight Types
+// Yeelight types are defined in YeelightTypes.swift
+
+// MARK: - Service Types
+// Service types are defined in ServiceTypes.swift 

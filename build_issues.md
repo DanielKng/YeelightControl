@@ -7,6 +7,7 @@
 3. Actor isolation issues with nonisolated protocol requirements
 4. Missing type definitions
 5. Duplicate type definitions across multiple files
+6. Sendability issues with non-sendable types in actor-isolated contexts
 
 ## Progress Made
 
@@ -14,29 +15,56 @@
 2. ✅ Removed duplicate effect-related types (`Core_Effect`, `Core_EffectType`, `Core_EffectParameters`, `Core_EffectUpdate`)
 3. ✅ Removed duplicate scene-related types
 4. ✅ Created proper separation between device and Yeelight types
+5. ✅ Fixed protocol conformance issues for several manager classes
+6. ✅ Fixed `Core_ConfigurationError` usage in `ServiceContainer.swift`
+7. ✅ Cleaned up `TypeDefinitions.swift` to remove duplicate type definitions
+8. ✅ Fixed actor isolation issues in several manager classes
 
 ## Remaining Issues
 
-1. Storage-related type duplications (`Core_StorageKey`, `Core_StorageDirectory`)
-2. Analytics-related type duplications
-3. Configuration-related type duplications
-4. Actor isolation issues in various manager classes
-5. Protocol conformance issues for some types
+1. Actor isolation issues in BaseServiceContainer:
+   - Passing non-sendable types into actor-isolated contexts
+   - Not properly awaiting async calls
+   - Type mismatches between BaseServiceContainer and ServiceContainer
+
+2. Storage method signature issues:
+   - The `load` method is not being called with the correct generic type parameter
+   - The `save` method is being called with non-Codable types
+
+3. Analytics manager issues:
+   - Type mismatches in the `load` method calls
+   - Missing generic type parameters
+
+4. Background manager issues:
+   - Type mismatches in method calls
+   - Accessing private constants
+   - Accessing non-existent members
 
 ## Recommended Approach
 
-1. Create a clear type hierarchy with proper namespacing
-2. Ensure all Core_ prefixed types are uniquely defined
-3. Update protocol conformances to match requirements
-4. Address actor isolation issues by making protocol requirements nonisolated where appropriate
-5. Fix missing type definitions
+1. Fix BaseServiceContainer issues:
+   - Make UserDefaults and FileManager conform to Sendable or use alternative approaches
+   - Properly await async calls with the await keyword
+   - Ensure BaseServiceContainer and ServiceContainer are compatible
+
+2. Fix storage method signature issues:
+   - Update all calls to load and save methods to include the correct generic type parameters
+   - Ensure all types being saved conform to Codable
+
+3. Fix analytics manager issues:
+   - Update all calls to load and save methods to include the correct generic type parameters
+   - Ensure all types being loaded/saved conform to Codable
+
+4. Fix background manager issues:
+   - Update method calls to match the expected parameter types
+   - Make constants accessible or use alternative approaches
+   - Ensure all member accesses are valid
 
 ## Specific Files Needing Attention
 
-- StorageTypes.swift and UnifiedStorageManager.swift: Resolve duplicate `Core_StorageKey` and `Core_StorageDirectory`
-- AnalyticsTypes.swift and UnifiedAnalyticsManager.swift: Resolve duplicate analytics-related types
-- ConfigurationTypes.swift and UnifiedConfigurationManager.swift: Resolve duplicate configuration-related types
-- TypeDefinitions.swift: Remove or properly organize duplicate type definitions
-- ServiceContainer.swift: Ensure proper type aliases are used consistently
+- BaseServiceContainer.swift: Fix actor isolation issues and type mismatches
+- UnifiedAnalyticsManager.swift: Fix method signature issues
+- UnifiedConfigurationManager.swift: Fix method signature issues
+- UnifiedBackgroundManager.swift: Fix method calls and member accesses
 
 More about potential fixing, [HERE](docs/guides/fixing_build_issues.md)

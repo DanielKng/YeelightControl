@@ -3,49 +3,34 @@ import Combine
 import SwiftUI
 
 // MARK: - Storage Key
-public enum StorageKey: String, CaseIterable {
-    case settings
-    case deviceState
-    case devices
-    case rooms
-    case automations
-    case effects
-    case configuration
-    case theme
-    case errorHistory
-    case sceneHistory
-    case effectHistory
-    case automationHistory
-    case customScene
-    case backup
-}
+// Core_StorageKey is defined in StorageTypes.swift
+// Removing duplicate definition to resolve ambiguity errors
 
 // MARK: - Storage Directory
-public enum StorageDirectory: String, CaseIterable {
-    case documents
-    case cache
-    case temp
-    case logs
-    case backups
-}
+// Core_StorageDirectory is defined in StorageTypes.swift
+// Removing duplicate definition to resolve ambiguity errors
 
 // MARK: - Storage Managing Protocol
-@preconcurrency public protocol StorageManaging: Actor {
-    func save<T: Encodable>(_ value: T, forKey key: StorageKey) async throws
-    func load<T: Decodable>(forKey key: StorageKey) async throws -> T
-    func remove(forKey key: StorageKey) async throws
-    func clear() async throws
-    
-    func save<T: Encodable>(_ value: T, withId id: String, inCollection collection: String) async throws
-    func get<T: Decodable>(withId id: String, fromCollection collection: String) async throws -> T
-    func getAll<T: Decodable>(fromCollection collection: String) async throws -> [T]
-    func delete(withId id: String, fromCollection collection: String) async throws
-    func clearCollection(_ collection: String) async throws
+// Core_StorageManaging protocol is defined in StorageProtocols.swift
+// Removing duplicate definition to resolve ambiguity errors
+
+// MARK: - Storage Error
+public enum Core_StorageError: Error {
+    case itemNotFound
+    case encodingError
+    case decodingError
+    case fileSystemError
 }
 
 // MARK: - Storage Manager Implementation
-public actor UnifiedStorageManager: Core_StorageManaging {
-    public var isEnabled: Bool = true
+public actor UnifiedStorageManager: Core_StorageManaging, Core_BaseService {
+    private var _isEnabled: Bool = true
+    
+    nonisolated public var isEnabled: Bool {
+        get async {
+            await _isEnabled
+        }
+    }
     
     public var serviceIdentifier: String {
         "core.storage"
@@ -84,7 +69,11 @@ public actor UnifiedStorageManager: Core_StorageManaging {
     
     // MARK: - Core_StorageManaging Protocol
     
-    public func save<T: Codable>(_ value: T, forKey key: String) async throws {
+    public nonisolated func save<T: Codable>(_ value: T, forKey key: String) async throws {
+        try await saveInternal(value, forKey: key)
+    }
+    
+    private func saveInternal<T: Encodable>(_ value: T, forKey key: String) throws {
         if let simple = value as? String {
             userDefaults.set(simple, forKey: key)
             return
@@ -114,49 +103,77 @@ public actor UnifiedStorageManager: Core_StorageManaging {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         
-        let data = try encoder.encode(value)
-        let fileURL = storageURL(for: key)
-        
-        try data.write(to: fileURL)
+        do {
+            let data = try encoder.encode(value)
+            let fileURL = storageURL(for: key)
+            
+            try data.write(to: fileURL)
+        } catch {
+            throw Core_StorageError.encodingError
+        }
     }
     
-    public func load<T: Codable>(_ type: T.Type, forKey key: String) async throws -> T? {
+    public nonisolated func load<T: Codable>(_ type: T.Type, forKey key: String) async throws -> T? {
+        do {
+            return try await loadInternal(forKey: key)
+        } catch Core_StorageError.itemNotFound {
+            return nil
+        } catch {
+            throw error
+        }
+    }
+    
+    private func loadInternal<T: Decodable>(forKey key: String) throws -> T {
         // Handle simple types directly from UserDefaults
-        if type == String.self {
-            return userDefaults.string(forKey: key) as? T
+        if T.self == String.self {
+            guard let value = userDefaults.string(forKey: key) as? T else {
+                throw Core_StorageError.itemNotFound
+            }
+            return value
         }
         
-        if type == Int.self {
-            return userDefaults.integer(forKey: key) as? T
+        if T.self == Int.self {
+            return userDefaults.integer(forKey: key) as! T
         }
         
-        if type == Double.self {
-            return userDefaults.double(forKey: key) as? T
+        if T.self == Double.self {
+            return userDefaults.double(forKey: key) as! T
         }
         
-        if type == Bool.self {
-            return userDefaults.bool(forKey: key) as? T
+        if T.self == Bool.self {
+            return userDefaults.bool(forKey: key) as! T
         }
         
-        if type == Date.self {
-            return userDefaults.object(forKey: key) as? T
+        if T.self == Date.self {
+            guard let value = userDefaults.object(forKey: key) as? T else {
+                throw Core_StorageError.itemNotFound
+            }
+            return value
         }
         
         // For complex objects, load from file
         let fileURL = storageURL(for: key)
         
         guard fileManager.fileExists(atPath: fileURL.path) else {
-            return nil
+            throw Core_StorageError.itemNotFound
         }
         
-        let data = try Data(contentsOf: fileURL)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        
-        return try decoder.decode(type, from: data)
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            throw Core_StorageError.decodingError
+        }
     }
     
-    public func remove(forKey key: String) async throws {
+    public nonisolated func remove(forKey key: String) async throws {
+        try await removeInternal(forKey: key)
+    }
+    
+    private func removeInternal(forKey key: String) throws {
         // Remove from UserDefaults
         userDefaults.removeObject(forKey: key)
         
@@ -167,7 +184,11 @@ public actor UnifiedStorageManager: Core_StorageManaging {
         }
     }
     
-    public func clear() async throws {
+    public nonisolated func clear() async throws {
+        try await clearInternal()
+    }
+    
+    private func clearInternal() throws {
         // Clear UserDefaults (domain-specific)
         if let bundleIdentifier = Bundle.main.bundleIdentifier {
             userDefaults.removePersistentDomain(forName: bundleIdentifier)
@@ -175,10 +196,15 @@ public actor UnifiedStorageManager: Core_StorageManaging {
         
         // Clear all files in storage directory
         let storageDirectory = documentsDirectory.appendingPathComponent("Storage", isDirectory: true)
-        let contents = try fileManager.contentsOfDirectory(at: storageDirectory, includingPropertiesForKeys: nil)
         
-        for url in contents {
-            try fileManager.removeItem(at: url)
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: storageDirectory, includingPropertiesForKeys: nil)
+            
+            for url in contents {
+                try fileManager.removeItem(at: url)
+            }
+        } catch {
+            throw Core_StorageError.fileSystemError
         }
     }
     
@@ -188,13 +214,4 @@ public actor UnifiedStorageManager: Core_StorageManaging {
         let sanitizedKey = key.replacingOccurrences(of: "/", with: "_")
         return documentsDirectory.appendingPathComponent("Storage/\(sanitizedKey).json")
     }
-}
-
-// MARK: - Storage Errors
-
-public enum StorageError: Error {
-    case itemNotFound
-    case collectionNotFound
-    case encodingError
-    case decodingError
 } 

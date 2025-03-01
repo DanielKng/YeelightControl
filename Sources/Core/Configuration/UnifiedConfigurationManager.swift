@@ -6,37 +6,20 @@ public typealias CoreConfigurationManaging = Core_ConfigurationManaging
 public typealias CoreConfigKey = Core_ConfigKey
 public typealias CoreConfigurationError = Core_ConfigurationError
 
-// MARK: - Configuration Key
-public enum ConfigKey: String, CaseIterable {
-    case appTheme
-    case deviceRefreshInterval
-    case notificationsEnabled
-    case analyticsEnabled
-    case locationTrackingEnabled
-    case backgroundRefreshEnabled
-    case lastSyncDate
-    case userPreferences
-    case deviceSettings
-    case sceneSettings
-    case effectSettings
-    case debugMode
-    case apiEndpoint
-    case apiKey
-}
+// MARK: - Configuration Keys
+// Core_ConfigKey enum is defined in ConfigurationProtocols.swift
+// Removing duplicate definition to resolve ambiguity errors
 
-// MARK: - Configuration Managing Protocol
-@preconcurrency public protocol ConfigurationManaging: Actor {
-    var configurationUpdates: AnyPublisher<ConfigKey, Never> { get }
-    
-    func getValue<T>(for key: ConfigKey) async throws -> T
-    func setValue<T>(_ value: T, for key: ConfigKey) async throws
-    func removeValue(for key: ConfigKey) async throws
-    func hasValue(for key: ConfigKey) async -> Bool
-    func clearAll() async throws
-}
+// MARK: - Configuration Manager
+// Core_ConfigurationManaging protocol is defined in ConfigurationProtocols.swift
+// Removing duplicate definition to resolve ambiguity errors
+
+// MARK: - Configuration Error
+// Core_ConfigurationError is defined in ConfigurationTypes.swift
+// Removing duplicate definition to resolve ambiguity errors
 
 // MARK: - Configuration Manager Implementation
-public actor UnifiedConfigurationManager: Core_ConfigurationManaging {
+public actor UnifiedConfigurationManager: Core_ConfigurationManaging, Core_BaseService {
     // MARK: - Properties
     private var configValues: [String: Any] = [:]
     private let storageManager: any Core_StorageManaging
@@ -45,7 +28,9 @@ public actor UnifiedConfigurationManager: Core_ConfigurationManaging {
     
     // MARK: - Core_BaseService Implementation
     public nonisolated var isEnabled: Bool {
-        return _isEnabled
+        get async {
+            await _isEnabled
+        }
     }
     
     // MARK: - Initialization
@@ -62,30 +47,53 @@ public actor UnifiedConfigurationManager: Core_ConfigurationManaging {
         return "core.configuration"
     }
     
-    public var values: [Core_ConfigKey: Any] {
-        var result: [Core_ConfigKey: Any] = [:]
-        for (key, value) in configValues {
-            if let configKey = Core_ConfigKey(rawValue: key) {
-                result[configKey] = value
-            }
-        }
-        return result
-    }
-    
     // MARK: - Core_ConfigurationManaging
     
-    public var configurationUpdates: AnyPublisher<Core_ConfigKey, Never> {
-        configSubject.eraseToAnyPublisher()
-    }
-    
-    public func getValue<T>(for key: Core_ConfigKey) throws -> T {
-        guard let value = configValues[key.rawValue] as? T else {
-            throw Core_ConfigurationError.valueNotFound(key)
+    public nonisolated var values: [Core_ConfigKey: Any] {
+        let task = Task {
+            await _configValues
         }
-        return value
+        return (try? task.value) ?? [:]
     }
     
-    public func setValue<T>(_ value: T, for key: Core_ConfigKey) throws {
+    public nonisolated var configurationUpdates: AnyPublisher<Core_ConfigKey, Never> {
+        let publisher = PassthroughSubject<Core_ConfigKey, Never>()
+        
+        Task {
+            for await key in await configSubject.values {
+                publisher.send(key)
+            }
+        }
+        
+        return publisher.eraseToAnyPublisher()
+    }
+    
+    public nonisolated func getValue<T>(for key: Core_ConfigKey) throws -> T {
+        let task = Task { () -> T in
+            guard let value = await configValues[key.rawValue] as? T else {
+                throw Core_ConfigurationError.valueNotFound(key)
+            }
+            return value
+        }
+        
+        do {
+            return try task.result.get()
+        } catch {
+            if let configError = error as? Core_ConfigurationError {
+                throw configError
+            } else {
+                throw Core_ConfigurationError.valueNotFound(key)
+            }
+        }
+    }
+    
+    public nonisolated func setValue<T>(_ value: T, for key: Core_ConfigKey) throws {
+        Task {
+            await setValueInternal(value, for: key)
+        }
+    }
+    
+    private func setValueInternal<T>(_ value: T, for key: Core_ConfigKey) {
         configValues[key.rawValue] = value
         configSubject.send(key)
         
@@ -95,7 +103,13 @@ public actor UnifiedConfigurationManager: Core_ConfigurationManaging {
         }
     }
     
-    public func removeValue(for key: Core_ConfigKey) throws {
+    public nonisolated func removeValue(for key: Core_ConfigKey) throws {
+        Task {
+            await removeValueInternal(for: key)
+        }
+    }
+    
+    private func removeValueInternal(for key: Core_ConfigKey) {
         configValues.removeValue(forKey: key.rawValue)
         configSubject.send(key)
         
@@ -131,12 +145,4 @@ public actor UnifiedConfigurationManager: Core_ConfigurationManaging {
         configValues[Core_ConfigKey.locationEnabled.rawValue] = false
         configValues[Core_ConfigKey.debugMode.rawValue] = false
     }
-}
-
-// MARK: - Configuration Error
-public enum ConfigurationError: Error {
-    case valueNotFound(ConfigKey)
-    case invalidType
-    case saveFailed
-    case loadFailed
 }
