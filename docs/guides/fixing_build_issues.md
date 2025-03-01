@@ -163,46 +163,66 @@ I've made significant progress in resolving the build issues:
     - Updated `AnalyticsEvent` reference to `Core_AnalyticsEvent` with correct parameters
     - Simplified string conversion logic to only check for the key being a string
 
+28. ✅ Partially fixed actor isolation issues in `UnifiedLogger.swift`:
+    - Updated the `log` method to be nonisolated and properly delegate to an internal method
+    - Fixed the `clearLogs` method to be properly async
+    - Added missing protocol requirements for `Core_LoggingService`
+
+29. ✅ Partially fixed actor isolation issues in `UnifiedEffectManager.swift`:
+    - Changed the class to an actor to properly handle isolation
+    - Fixed the `isEnabled` property to properly handle async access
+    - Updated method signatures to match the protocol requirements
+
 ## Current Status
 
 We've made progress on fixing the Core module issues, but there are still several critical issues that need to be addressed:
 
-1. **Actor isolation issues**: Several manager classes have async property access in functions that don't support concurrency.
-2. **Type conversion issues**: Cannot convert between types like `Device` and `Core_Device`.
-3. **Storage method call issues**: Incorrect method calls to storage manager methods.
-4. **Protocol conformance issues**: Some types don't conform to their required protocols.
-5. **Missing members and properties**: Some types are missing expected members or properties.
+1. **Device Type Issues**:
+   - The `Device` struct is missing the `isConnected` property
+   - The `DeviceType` enum is missing the `bulb` and `strip` members
+   - The `DeviceColor` type has issues with the `red` property
+
+2. **Storage Method Call Issues**:
+   - The `storageManager.save` method is being called with incorrect argument labels (`key:value:` instead of `_:forKey:`)
+   - The `storageManager.get` and `storageManager.getAll` methods are missing or have incorrect signatures
+
+3. **Type Conversion Issues**:
+   - Cannot convert between types like `Device` and `Core_Device`
+   - Cannot convert between types like `Effect` and `Core_Effect`
+
+4. **Protocol Conformance Issues**:
+   - `UnifiedDeviceManager` does not conform to `Core_DeviceManaging`
+   - `UnifiedEffectManager` does not conform to `Core_EffectManaging`
+   - `UnifiedLogger` does not conform to `Core_LoggingService`
+
+5. **Error Handling Issues**:
+   - `Core_AppError` does not have a `sourceLocation` property
+   - `Core_AppError.unknown` does not have associated values
 
 ## Remaining Issues to Fix
 
 ### Core Module Issues
 
-1. **Actor isolation issues**:
-   - Fix nonisolated properties that access actor-isolated state in:
-     - `UnifiedLocationManager`
-     - `UnifiedLogger`
-     - `UnifiedNetworkManager`
-     - `UnifiedDeviceManager`
-     - `UnifiedErrorHandler`
+1. **Device Type Issues**:
+   - Add the `isConnected` property to the `Device` struct
+   - Add the missing members to the `DeviceType` enum
+   - Fix the `DeviceColor` type issues
 
-2. **Type conversion issues**:
-   - Fix type conversions between Core types and implementation types in:
-     - `UnifiedDeviceManager`
-     - `UnifiedEffectManager`
+2. **Storage Method Call Issues**:
+   - Update all storage method calls to use the correct argument labels
+   - Ensure the `storageManager` interface is consistent across all files
 
-3. **Storage method call issues**:
-   - Update method calls to match the expected parameter names and types in:
-     - `UnifiedLogger`
-     - `UnifiedEffectManager`
+3. **Type Conversion Issues**:
+   - Implement proper type conversion between Core types and implementation types
+   - Ensure all types properly conform to their Core counterparts
 
-4. **Protocol conformance issues**:
-   - Fix protocol conformance in:
-     - `UnifiedLogger`
+4. **Protocol Conformance Issues**:
+   - Implement all required methods and properties for each protocol
+   - Ensure the method signatures match the protocol requirements
 
-5. **Missing members and properties**:
-   - Add missing members or update property names in:
-     - `UnifiedDeviceManager`
-     - `UnifiedErrorHandler`
+5. **Error Handling Issues**:
+   - Update the `Core_AppError` type to include the required properties
+   - Fix the `unknown` case to properly handle associated values
 
 ### UI Module Issues
 
@@ -222,82 +242,189 @@ Once the Core module is fixed, we'll need to address the UI module issues:
 
 ## Detailed Core Fix Plan
 
-### 1. Fix Actor Isolation Issues
+### 1. Fix Device Type Issues
 
-Update nonisolated properties that access actor-isolated state:
+Update the `Device` struct to include the `isConnected` property:
 
 ```swift
-// Before
-nonisolated public var isEnabled: Bool {
-    _isEnabled // Error: 'async' property access in a function that does not support concurrency
-}
-
-// After
-nonisolated public var isEnabled: Bool {
-    get {
-        let task = Task { await _isEnabled }
-        return (try? task.result.get()) ?? false
+public struct Device: Identifiable, Codable, Hashable {
+    public let id: String
+    public let name: String
+    public let type: DeviceType
+    public let manufacturer: String
+    public let model: String
+    public let firmwareVersion: String
+    public let ipAddress: String
+    public let macAddress: String
+    public var state: DeviceState
+    public var isConnected: Bool // Add this property
+    
+    // Add initializer with isConnected parameter
+    public init(id: String, name: String, type: DeviceType, manufacturer: String, model: String, 
+                firmwareVersion: String, ipAddress: String, macAddress: String, state: DeviceState, 
+                isConnected: Bool = false) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.manufacturer = manufacturer
+        self.model = model
+        self.firmwareVersion = firmwareVersion
+        self.ipAddress = ipAddress
+        self.macAddress = macAddress
+        self.state = state
+        self.isConnected = isConnected
     }
 }
 ```
 
-### 2. Fix Type Conversion Issues
-
-Ensure proper type conversions between Core types and implementation types:
+Update the `DeviceType` enum to include the missing members:
 
 ```swift
-// Before
-return await _devices as [Core_Device] // Error: cannot convert value of type '[Device]' to type '[Core_Device]'
-
-// After
-return await _devices.map { $0 as Core_Device }
+public enum DeviceType: String, Codable {
+    case bulb = "bulb"
+    case strip = "strip"
+    case ceiling = "ceiling"
+    case desk = "desk"
+    case ambient = "ambient"
+    case unknown = "unknown"
+}
 ```
 
-### 3. Fix Storage Method Call Issues
+Fix the `DeviceColor` type issues:
 
-Update method calls to match the expected parameter names and types:
+```swift
+public struct DeviceColor: Codable, Hashable {
+    public let red: Int
+    public let green: Int
+    public let blue: Int
+    
+    public static let white = DeviceColor(red: 255, green: 255, blue: 255)
+    public static let red = DeviceColor(red: 255, green: 0, blue: 0)
+    public static let green = DeviceColor(red: 0, green: 255, blue: 0)
+    public static let blue = DeviceColor(red: 0, green: 0, blue: 255)
+    
+    public init(red: Int, green: Int, blue: Int) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
+}
+```
+
+### 2. Fix Storage Method Call Issues
+
+Update the storage method calls to use the correct argument labels:
 
 ```swift
 // Before
-try await storageManager.save(effect, withId: effect.id, inCollection: "effects") // Error: incorrect argument labels
+try? await storageManager.save(key: "device.\(device.id)", value: device)
 
 // After
-try await storageManager.save(key: "effects.\(effect.id)", value: effect)
+try? await storageManager.save(device, forKey: "device.\(device.id)")
+```
+
+Ensure the `storageManager` interface is consistent:
+
+```swift
+// Before
+if let storedLogs: [Core_LogEntry] = try await storageManager.get(forKey: "logs") {
+    logs = storedLogs
+}
+
+// After
+if let storedLogs: [Core_LogEntry] = try await storageManager.load(forKey: "logs") {
+    logs = storedLogs
+}
+```
+
+### 3. Fix Type Conversion Issues
+
+Implement proper type conversion between Core types and implementation types:
+
+```swift
+// Before
+return await _devices.map { $0 }
+
+// After
+return await _devices.map { $0 }
+```
+
+Ensure all types properly conform to their Core counterparts:
+
+```swift
+// Make Device conform to Core_Device
+extension Device: Core_Device {
+    // Implement any required methods or properties
+}
 ```
 
 ### 4. Fix Protocol Conformance Issues
 
-Implement all required methods with the correct signatures:
+Implement all required methods and properties for each protocol:
 
 ```swift
-// Before
-public nonisolated func log(_ message: String, level: Core_LogLevel, category: Core_LogCategory, file: String = #file, function: String = #function, line: Int = #line)
+// Before (missing method)
+public func getAvailableEffects() -> [Core_Effect] {
+    // Convert local effects to Core_Effect
+    return _effects.map { $0 as Core_Effect }
+}
 
-// After
-public func log(message: String, level: String, category: String, file: String = #file, function: String = #function, line: Int = #line) async
+// After (implemented method)
+public nonisolated func getAvailableEffects() async -> [Core_Effect] {
+    let allEffects = await _effects
+    return allEffects.map { $0 as Core_Effect }
+}
 ```
 
-### 5. Fix Missing Members and Properties
+### 5. Fix Error Handling Issues
 
-Add missing members or update property names:
+Update the `Core_AppError` type to include the required properties:
 
 ```swift
-// Before
-device.isConnected = true // Error: value of type 'Device' has no member 'isConnected'
+public enum Core_AppError: Error, Identifiable {
+    case network(Error)
+    case storage(Error)
+    case device(Error)
+    case configuration(Error)
+    case unknown(Error)
+    
+    public var id: String {
+        switch self {
+        case .network(let error): return "network.\(error.localizedDescription)"
+        case .storage(let error): return "storage.\(error.localizedDescription)"
+        case .device(let error): return "device.\(error.localizedDescription)"
+        case .configuration(let error): return "configuration.\(error.localizedDescription)"
+        case .unknown(let error): return "unknown.\(error.localizedDescription)"
+        }
+    }
+    
+    public var sourceLocation: SourceLocation {
+        return SourceLocation(file: "", function: "", line: 0)
+    }
+}
 
-// After
-// Add the missing property to the Device struct or update the code to use the correct property name
+public struct SourceLocation {
+    public let file: String
+    public let function: String
+    public let line: Int
+    
+    public init(file: String, function: String, line: Int) {
+        self.file = file
+        self.function = function
+        self.line = line
+    }
+}
 ```
 
 ## Implementation Strategy
 
 1. Fix the Core module issues first, focusing on the most critical files:
-   - `UnifiedLocationManager.swift`
-   - `UnifiedLogger.swift`
-   - `UnifiedDeviceManager.swift`
-   - `UnifiedEffectManager.swift`
-   - `UnifiedErrorHandler.swift`
-   - `BaseServiceContainer.swift`
+   - `TypeDefinitions.swift`: Fix the `Device`, `DeviceType`, and `DeviceColor` types
+   - `StorageProtocols.swift`: Ensure the storage manager interface is consistent
+   - `ErrorTypes.swift`: Update the `Core_AppError` type
+   - `UnifiedDeviceManager.swift`: Fix protocol conformance and method calls
+   - `UnifiedEffectManager.swift`: Fix protocol conformance and method calls
+   - `UnifiedLogger.swift`: Fix protocol conformance and method calls
 
 2. Once the Core module builds successfully, address the UI module issues:
    - Update UI files to use centralized components

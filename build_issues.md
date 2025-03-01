@@ -92,60 +92,70 @@
     - Corrected the method name from `unTrigger` to `unNotificationTrigger` to match `Core_AppNotificationTrigger` enum
     - Updated `AnalyticsEvent` reference to `Core_AnalyticsEvent` with correct parameters
     - Simplified string conversion logic to only check for the key being a string
+44. ✅ Partially fixed actor isolation issues in `UnifiedLogger.swift`:
+    - Updated the `log` method to be nonisolated and properly delegate to an internal method
+    - Fixed the `clearLogs` method to be properly async
+    - Added missing protocol requirements for `Core_LoggingService`
+45. ✅ Partially fixed actor isolation issues in `UnifiedEffectManager.swift`:
+    - Changed the class to an actor to properly handle isolation
+    - Fixed the `isEnabled` property to properly handle async access
+    - Updated method signatures to match the protocol requirements
 
 ## Remaining Issues
 
 Based on the build output, we still have several issues to fix:
 
-1. **Actor isolation issues**:
-   - Several manager classes have async property access in functions that don't support concurrency
-   - Need to properly implement nonisolated properties that access actor-isolated state
+1. **Device Type Issues**:
+   - The `Device` struct is missing the `isConnected` property
+   - The `DeviceType` enum is missing the `bulb` and `strip` members
+   - The `DeviceColor` type has issues with the `red` property
 
-2. **Type conversion issues**:
+2. **Storage Method Call Issues**:
+   - The `storageManager.save` method is being called with incorrect argument labels (`key:value:` instead of `_:forKey:`)
+   - The `storageManager.get` and `storageManager.getAll` methods are missing or have incorrect signatures
+
+3. **Type Conversion Issues**:
    - Cannot convert between types like `Device` and `Core_Device`
-   - Need to ensure proper type conversions or implement conformance to required protocols
+   - Cannot convert between types like `Effect` and `Core_Effect`
 
-3. **Storage method call issues**:
-   - Incorrect method calls to storage manager methods
-   - Need to update method calls to match the expected parameter names and types
+4. **Protocol Conformance Issues**:
+   - `UnifiedDeviceManager` does not conform to `Core_DeviceManaging`
+   - `UnifiedEffectManager` does not conform to `Core_EffectManaging`
+   - `UnifiedLogger` does not conform to `Core_LoggingService`
 
-4. **Protocol conformance issues**:
-   - Some types don't conform to their required protocols
-   - Need to implement all required methods with the correct signatures
-
-5. **Missing members and properties**:
-   - Some types are missing expected members or properties
-   - Need to add the missing members or update the code to use the correct property names
+5. **Error Handling Issues**:
+   - `Core_AppError` does not have a `sourceLocation` property
+   - `Core_AppError.unknown` does not have associated values
 
 ## Updated Approach
 
-1. **Fix actor isolation issues**:
-   - Properly implement nonisolated properties that access actor-isolated state
-   - Use Task and await properly in nonisolated contexts
+1. **Fix Device Type Issues**:
+   - Add the `isConnected` property to the `Device` struct
+   - Add the missing members to the `DeviceType` enum
+   - Fix the `DeviceColor` type issues
 
-2. **Fix type conversion issues**:
-   - Ensure proper type conversions between Core types and implementation types
-   - Implement conformance to required protocols
+2. **Fix Storage Method Call Issues**:
+   - Update all storage method calls to use the correct argument labels
+   - Ensure the `storageManager` interface is consistent across all files
 
-3. **Fix storage method call issues**:
-   - Update method calls to match the expected parameter names and types
-   - Ensure proper error handling for storage operations
+3. **Fix Type Conversion Issues**:
+   - Implement proper type conversion between Core types and implementation types
+   - Ensure all types properly conform to their Core counterparts
 
-4. **Fix protocol conformance issues**:
-   - Implement all required methods with the correct signatures
-   - Ensure all required properties are properly implemented
+4. **Fix Protocol Conformance Issues**:
+   - Implement all required methods and properties for each protocol
+   - Ensure the method signatures match the protocol requirements
 
-5. **Fix missing members and properties**:
-   - Add missing members or properties to types
-   - Update code to use the correct property names
+5. **Fix Error Handling Issues**:
+   - Update the `Core_AppError` type to include the required properties
+   - Fix the `unknown` case to properly handle associated values
 
 ## Specific Files Needing Attention
 
-- `UnifiedLocationManager.swift`: Fix async property access issues
-- `UnifiedLogger.swift`: Fix protocol conformance and storage method call issues
-- `UnifiedDeviceManager.swift`: Fix type conversion and property access issues
-- `UnifiedEffectManager.swift`: Fix storage method call issues
-- `UnifiedErrorHandler.swift`: Fix async property access and method call issues
-- `BaseServiceContainer.swift`: Fix async/await usage
+- `UnifiedDeviceManager.swift`: Fix device type issues, storage method calls, and protocol conformance
+- `UnifiedEffectManager.swift`: Fix storage method calls and protocol conformance
+- `UnifiedErrorHandler.swift`: Fix error handling issues
+- `UnifiedLogger.swift`: Fix storage method calls and protocol conformance
+- `TypeDefinitions.swift`: Ensure all required types are properly defined
 
 More about potential fixing, [HERE](docs/guides/fixing_build_issues.md)
