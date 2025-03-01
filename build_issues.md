@@ -19,52 +19,36 @@
 6. ✅ Fixed `Core_ConfigurationError` usage in `ServiceContainer.swift`
 7. ✅ Cleaned up `TypeDefinitions.swift` to remove duplicate type definitions
 8. ✅ Fixed actor isolation issues in several manager classes
+9. ✅ Fixed `Core_BaseService` protocol conformance in `UnifiedStorageManager`, `UnifiedAnalyticsManager`, and `UnifiedConfigurationManager`
+10. ✅ Made `UserDefaults` and `FileManager` conform to `Sendable` to fix actor isolation issues
 
 ## Remaining Issues
 
-1. Actor isolation issues in BaseServiceContainer:
-   - Passing non-sendable types into actor-isolated contexts
-   - Not properly awaiting async calls
-   - Type mismatches between BaseServiceContainer and ServiceContainer
+1. UI module issues:
+   - Missing type references in UI components
+   - Duplicate view declarations across multiple files
+   - Environment object type mismatches
+   - Invalid use of protocols as types without 'any' keyword
 
-2. Storage method signature issues:
-   - The `load` method is not being called with the correct generic type parameter
-   - The `save` method is being called with non-Codable types
-
-3. Analytics manager issues:
-   - Type mismatches in the `load` method calls
-   - Missing generic type parameters
-
-4. Background manager issues:
+2. Background manager issues:
    - Type mismatches in method calls
-   - Accessing private constants
    - Accessing non-existent members
 
 ## Recommended Approach
 
-1. Fix BaseServiceContainer issues:
-   - Make UserDefaults and FileManager conform to Sendable or use alternative approaches
-   - Properly await async calls with the await keyword
-   - Ensure BaseServiceContainer and ServiceContainer are compatible
+1. Fix UI module issues:
+   - Ensure proper imports of Core types in UI components
+   - Resolve duplicate view declarations
+   - Update environment object types to match the Core module
+   - Add 'any' keyword where protocols are used as types
 
-2. Fix storage method signature issues:
-   - Update all calls to load and save methods to include the correct generic type parameters
-   - Ensure all types being saved conform to Codable
-
-3. Fix analytics manager issues:
-   - Update all calls to load and save methods to include the correct generic type parameters
-   - Ensure all types being loaded/saved conform to Codable
-
-4. Fix background manager issues:
+2. Fix background manager issues:
    - Update method calls to match the expected parameter types
-   - Make constants accessible or use alternative approaches
    - Ensure all member accesses are valid
 
 ## Specific Files Needing Attention
 
-- BaseServiceContainer.swift: Fix actor isolation issues and type mismatches
-- UnifiedAnalyticsManager.swift: Fix method signature issues
-- UnifiedConfigurationManager.swift: Fix method signature issues
+- UI module view files: Fix type references and environment object declarations
 - UnifiedBackgroundManager.swift: Fix method calls and member accesses
 
 More about potential fixing, [HERE](docs/guides/fixing_build_issues.md)
