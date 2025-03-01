@@ -135,18 +135,44 @@ public enum Core_AppError: LocalizedError, Hashable, Identifiable {
     case permission(Core_PermissionError)
     case effect(Core_EffectError)
     case scene(Core_SceneError)
-    case unknown(Error? = nil)
-    
-    private var _sourceLocation: SourceLocation?
+    case unknown(Error? = nil, SourceLocation? = nil)
     
     public var sourceLocation: SourceLocation {
-        return _sourceLocation ?? SourceLocation()
+        switch self {
+        case .unknown(_, let location):
+            return location ?? SourceLocation()
+        default:
+            return SourceLocation()
+        }
     }
     
     public func with(sourceLocation: SourceLocation) -> Core_AppError {
-        var result = self
-        result._sourceLocation = sourceLocation
-        return result
+        switch self {
+        case .unknown(let error, _):
+            return .unknown(error, sourceLocation)
+        case .configuration(let error):
+            return .configuration(error)
+        case .storage(let error):
+            return .storage(error)
+        case .network(let error):
+            return .network(error)
+        case .security(let error):
+            return .security(error)
+        case .yeelight(let error):
+            return .yeelight(error)
+        case .general(let message):
+            return .general(message)
+        case .location(let error):
+            return .location(error)
+        case .device(let error):
+            return .device(error)
+        case .permission(let error):
+            return .permission(error)
+        case .effect(let error):
+            return .effect(error)
+        case .scene(let error):
+            return .scene(error)
+        }
     }
     
     public var id: String {
@@ -173,8 +199,8 @@ public enum Core_AppError: LocalizedError, Hashable, Identifiable {
             return "effect-\(error.hashValue)"
         case .scene(let error):
             return "scene-\(error.hashValue)"
-        case .unknown:
-            return "unknown"
+        case .unknown(let error, _):
+            return "unknown-\(error?.localizedDescription.hashValue ?? 0)"
         }
     }
     
@@ -202,7 +228,7 @@ public enum Core_AppError: LocalizedError, Hashable, Identifiable {
             return "Effect error: \(error)"
         case .scene(let error):
             return "Scene error: \(error)"
-        case .unknown(let error):
+        case .unknown(let error, _):
             return error?.localizedDescription ?? "Unknown error occurred"
         }
     }

@@ -135,7 +135,7 @@ public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
         } else {
             // Convert to AppError.unknown
             let sourceLocation = SourceLocation()
-            let appError = Core_AppError.unknown(error).with(sourceLocation: sourceLocation)
+            let appError = Core_AppError.unknown(error, sourceLocation)
             _lastError = appError
             let logger = services.logManager
             await logger.log(
