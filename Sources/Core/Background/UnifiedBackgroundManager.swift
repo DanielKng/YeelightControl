@@ -22,6 +22,13 @@ public struct BackgroundConfiguration: Codable {
     }
 }
 
+// MARK: - Constants
+public enum BackgroundConstants {
+    public static let appRefreshTaskIdentifier = "com.yeelight.control.refresh"
+    public static let minimumRefreshInterval: TimeInterval = 15 * 60 // 15 minutes
+    public static let maximumRefreshInterval: TimeInterval = 24 * 60 * 60 // 24 hours
+}
+
 @MainActor
 public final class UnifiedBackgroundManager: ObservableObject {
     // MARK: - Published Properties
@@ -30,16 +37,9 @@ public final class UnifiedBackgroundManager: ObservableObject {
     @Published public private(set) var nextScheduledRefresh: Date?
     
     // MARK: - Private Properties
-    private let services: BaseServiceContainer
+    private let services: ServiceContainer
     private var cancellables = Set<AnyCancellable>()
     private var backgroundConfig = BackgroundConfiguration()
-    
-    // MARK: - Constants
-    private enum Constants {
-        static let appRefreshTaskIdentifier = "com.yeelight.control.refresh"
-        static let minimumRefreshInterval: TimeInterval = 15 * 60 // 15 minutes
-        static let maximumRefreshInterval: TimeInterval = 24 * 60 * 60 // 24 hours
-    }
     
     // MARK: - Singleton
     public static let shared = UnifiedBackgroundManager()
@@ -74,9 +74,9 @@ public final class UnifiedBackgroundManager: ObservableObject {
         // Update device states
         for device in services.deviceManager.devices {
             do {
-                try await services.deviceManager.updateDeviceState(device)
+                try await services.deviceManager.updateDevice(device)
             } catch {
-                services.errorHandler.handle(error)
+                await services.errorHandler.handle(Core_AppError(error: error, context: "Background refresh"))
             }
         }
         
@@ -91,7 +91,7 @@ public final class UnifiedBackgroundManager: ObservableObject {
     
     private func registerBackgroundTasks() {
         BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: Constants.appRefreshTaskIdentifier,
+            forTaskWithIdentifier: BackgroundConstants.appRefreshTaskIdentifier,
             using: nil
         ) { [weak self] task in
             self?.handleAppRefresh(task as! BGAppRefreshTask)
@@ -99,21 +99,23 @@ public final class UnifiedBackgroundManager: ObservableObject {
     }
     
     private func scheduleBackgroundRefresh() {
-        let request = BGAppRefreshTaskRequest(identifier: Constants.appRefreshTaskIdentifier)
+        let request = BGAppRefreshTaskRequest(identifier: BackgroundConstants.appRefreshTaskIdentifier)
         request.earliestBeginDate = Date(timeIntervalSinceNow:
-            backgroundConfig.appSettings.backgroundRefreshInterval ?? Constants.minimumRefreshInterval
+            backgroundConfig.appSettings.backgroundRefreshInterval ?? BackgroundConstants.minimumRefreshInterval
         )
         
         do {
             try BGTaskScheduler.shared.submit(request)
             nextScheduledRefresh = request.earliestBeginDate
         } catch {
-            services.errorHandler.handle(error)
+            Task {
+                await services.errorHandler.handle(Core_AppError(error: error, context: "Background task scheduling"))
+            }
         }
     }
     
     private func cancelBackgroundRefresh() {
-        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Constants.appRefreshTaskIdentifier)
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: BackgroundConstants.appRefreshTaskIdentifier)
         nextScheduledRefresh = nil
     }
     
@@ -131,6 +133,13 @@ public final class UnifiedBackgroundManager: ObservableObject {
     
     private func refreshDevices() async {
         // Implement device refresh logic here
+        for device in services.deviceManager.devices {
+            do {
+                try await services.deviceManager.updateDevice(device)
+            } catch {
+                await services.errorHandler.handle(Core_AppError(error: error, context: "Device refresh"))
+            }
+        }
     }
 }
 
@@ -139,8 +148,8 @@ extension UserDefaults {
     var backgroundRefreshInterval: TimeInterval? {
         get {
             let interval = TimeInterval(exactly: integer(forKey: "backgroundRefreshInterval"))
-            return interval.map { max(UnifiedBackgroundManager.Constants.minimumRefreshInterval, 
-                                     min($0, UnifiedBackgroundManager.Constants.maximumRefreshInterval)) }
+            return interval.map { max(BackgroundConstants.minimumRefreshInterval, 
+                                     min($0, BackgroundConstants.maximumRefreshInterval)) }
         }
         set {
             if let interval = newValue {
@@ -149,5 +158,17 @@ extension UserDefaults {
                 removeObject(forKey: "backgroundRefreshInterval")
             }
         }
+    }
+}
+
+// MARK: - Core_AppError Extension
+extension Core_AppError {
+    init(error: Error, context: String) {
+        self.init(
+            code: .unknown,
+            message: error.localizedDescription,
+            underlyingError: error,
+            context: ["context": context]
+        )
     }
 } 
