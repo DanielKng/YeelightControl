@@ -1,223 +1,141 @@
 import Foundation
 import Combine
+import SwiftUI
 
-// MARK: - Effect Managing Protocol
-@preconcurrency
-public protocol EffectManaging {
-    var effectUpdates: AnyPublisher<EffectUpdate, Never> { get }
+// MARK: - Effect Manager Protocol
+public protocol EffectManaging: AnyObject {
+    var isEnabled: Bool { get set }
+    var effects: [Effect] { get }
     
-    func createEffect(name: String, type: EffectType, parameters: EffectParameters) async -> Effect
+    var effectUpdates: AnyPublisher<Effect, Never> { get }
+    
     func getEffect(withId id: String) async -> Effect?
     func getAllEffects() async -> [Effect]
+    func createEffect(name: String, type: EffectType, parameters: EffectParameters) async -> Effect
     func updateEffect(_ effect: Effect) async -> Effect
     func deleteEffect(_ effect: Effect) async
     func startEffect(_ effect: Effect) async
     func stopEffect(_ effect: Effect) async
-    func stopAllEffects() async
-}
-
-// MARK: - Effect Model
-struct Effect: Identifiable, Codable, Equatable {
-    let id: String
-    var name: String
-    var icon: String
-    var type: EffectType
-    var parameters: EffectParameters
-    var isPreset: Bool
-    var createdAt: Date
-    var updatedAt: Date
-    
-    init(
-        id: String = UUID().uuidString,
-        name: String,
-        icon: String = "sparkles",
-        type: EffectType,
-        parameters: EffectParameters,
-        isPreset: Bool = false,
-        createdAt: Date = Date(),
-        updatedAt: Date = Date()
-    ) {
-        self.id = id
-        self.name = name
-        self.icon = icon
-        self.type = type
-        self.parameters = parameters
-        self.isPreset = isPreset
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-    }
-    
-    static let presets: [Effect] = [
-        Effect(
-            name: "Pulse",
-            type: .pulse,
-            parameters: .init(
-                duration: 1000,
-                brightness: [20, 100],
-                colorTemperature: nil,
-                colors: nil,
-                repeat: true
-            ),
-            isPreset: true
-        ),
-        Effect(
-            name: "Rainbow",
-            type: .colorFlow,
-            parameters: .init(
-                duration: 2000,
-                brightness: [80],
-                colorTemperature: nil,
-                colors: [
-                    [255, 0, 0],
-                    [255, 127, 0],
-                    [255, 255, 0],
-                    [0, 255, 0],
-                    [0, 0, 255],
-                    [75, 0, 130],
-                    [148, 0, 211]
-                ],
-                repeat: true
-            ),
-            isPreset: true
-        ),
-        Effect(
-            name: "Strobe",
-            type: .strobe,
-            parameters: .init(
-                duration: 100,
-                brightness: [0, 100],
-                colorTemperature: nil,
-                colors: nil,
-                repeat: true
-            ),
-            isPreset: true
-        )
-    ]
-}
-
-// MARK: - Effect Types
-enum EffectType: String, Codable {
-    case smooth
-    case sudden
-    case strobe
-    case pulse
-    case colorFlow
-}
-
-struct EffectParameters: Codable, Equatable {
-    var duration: Int // milliseconds
-    var brightness: [Int]
-    var colorTemperature: [Int]?
-    var colors: [[Int]]? // RGB arrays
-    var `repeat`: Bool
-}
-
-// MARK: - Effect Update Type
-enum EffectUpdate {
-    case created(Effect)
-    case updated(Effect)
-    case deleted(String)
-    case applied(Effect, [String])
-    case stopped([String])
-    case allStopped
+    func applyEffect(_ effect: Effect, to deviceIds: [String]) async
 }
 
 // MARK: - Effect Manager Implementation
-@MainActor
-public final class UnifiedEffectManager: ObservableObject {
-    private let effectSubject = PassthroughSubject<EffectUpdate, Never>()
-    private var effects: [String: Effect] = [:]
-    private var activeEffects: Set<String> = []
+public final class UnifiedEffectManager: EffectManaging, ObservableObject {
+    // MARK: - Properties
+    
+    @Published private(set) var _effects: [Effect] = []
+    public var effects: [Effect] { _effects }
+    
+    private let storageManager: any StorageManaging
+    private let deviceManager: any DeviceManaging
+    private let effectSubject = PassthroughSubject<Effect, Never>()
     private var effectTimers: [String: Timer] = [:]
     
-    public static let shared = UnifiedEffectManager()
+    // MARK: - Initialization
     
-    private init() {
-        // Load preset effects
-        for preset in Effect.presets {
-            effects[preset.id] = preset
+    public init(storageManager: any StorageManaging, deviceManager: any DeviceManaging) {
+        self.storageManager = storageManager
+        self.deviceManager = deviceManager
+        self.isEnabled = true
+        
+        Task {
+            await loadEffects()
         }
+    }
+    
+    // MARK: - BaseService
+    
+    public var isEnabled: Bool
+    
+    // MARK: - EffectManaging
+    
+    public var effectUpdates: AnyPublisher<Effect, Never> {
+        effectSubject.eraseToAnyPublisher()
     }
     
     private func startEffectTimer(_ effect: Effect) {
-        guard !effectTimers.keys.contains(effect.id) else { return }
-        
-        let timer = Timer.scheduledTimer(withTimeInterval: Double(effect.parameters.duration) / 1000.0, repeats: effect.parameters.repeat) { [weak self] _ in
-            self?.applyEffect(effect)
-        }
-        effectTimers[effect.id] = timer
+        // Implementation for starting effect timer
+        // This would typically involve setting up a timer to control the effect
     }
     
     private func stopEffectTimer(_ effect: Effect) {
-        effectTimers[effect.id]?.invalidate()
-        effectTimers.removeValue(forKey: effect.id)
+        // Implementation for stopping effect timer
+        if let timer = effectTimers[effect.id] {
+            timer.invalidate()
+            effectTimers.removeValue(forKey: effect.id)
+        }
     }
     
-    private func applyEffect(_ effect: Effect) {
+    public func applyEffect(_ effect: Effect, to deviceIds: [String]) async {
         // Implementation for applying the effect to devices
-        // This would involve sending commands to the Yeelight devices
-        // based on the effect parameters
-    }
-}
-
-extension UnifiedEffectManager: EffectManaging {
-    public var effectUpdates: AnyPublisher<EffectUpdate, Never> {
-        effectSubject.eraseToAnyPublisher()
+        // This would typically involve sending commands to the devices
     }
     
     public func createEffect(name: String, type: EffectType, parameters: EffectParameters) async -> Effect {
         let effect = Effect(name: name, type: type, parameters: parameters)
-        effects[effect.id] = effect
-        effectSubject.send(.created(effect))
+        _effects.append(effect)
+        
+        try? await storageManager.save(effect, withId: effect.id, inCollection: "effects")
+        effectSubject.send(effect)
+        
         return effect
     }
     
     public func getEffect(withId id: String) async -> Effect? {
-        effects[id]
+        return _effects.first { $0.id == id }
     }
     
     public func getAllEffects() async -> [Effect] {
-        Array(effects.values)
+        return _effects
     }
     
     public func updateEffect(_ effect: Effect) async -> Effect {
-        effects[effect.id] = effect
-        effectSubject.send(.updated(effect))
+        if let index = _effects.firstIndex(where: { $0.id == effect.id }) {
+            _effects[index] = effect
+            
+            try? await storageManager.save(effect, withId: effect.id, inCollection: "effects")
+            effectSubject.send(effect)
+            
+            return effect
+        }
+        
         return effect
     }
     
     public func deleteEffect(_ effect: Effect) async {
-        if activeEffects.contains(effect.id) {
-            await stopEffect(effect)
+        if let index = _effects.firstIndex(where: { $0.id == effect.id }) {
+            _effects.remove(at: index)
+            
+            try? await storageManager.delete(withId: effect.id, fromCollection: "effects")
+            effectSubject.send(effect)
         }
-        effects.removeValue(forKey: effect.id)
-        effectSubject.send(.deleted(effect.id))
     }
     
     public func startEffect(_ effect: Effect) async {
-        guard !activeEffects.contains(effect.id) else { return }
+        var updatedEffect = effect
+        updatedEffect.isActive = true
         
-        activeEffects.insert(effect.id)
-        startEffectTimer(effect)
-        effectSubject.send(.started(effect))
+        await updateEffect(updatedEffect)
+        await applyEffect(updatedEffect, to: [])
+        startEffectTimer(updatedEffect)
     }
     
     public func stopEffect(_ effect: Effect) async {
-        guard activeEffects.contains(effect.id) else { return }
+        var updatedEffect = effect
+        updatedEffect.isActive = false
         
-        activeEffects.remove(effect.id)
-        stopEffectTimer(effect)
-        effectSubject.send(.stopped(effect))
+        await updateEffect(updatedEffect)
+        stopEffectTimer(updatedEffect)
     }
     
-    public func stopAllEffects() async {
-        let activeEffectsCopy = activeEffects
-        for effectId in activeEffectsCopy {
-            if let effect = effects[effectId] {
-                await stopEffect(effect)
-            }
+    // MARK: - Private Methods
+    
+    private func loadEffects() async {
+        do {
+            _effects = try await storageManager.getAll(fromCollection: "effects")
+        } catch {
+            print("Failed to load effects: \(error.localizedDescription)")
         }
-        effectSubject.send(.allStopped)
     }
 }
 
@@ -237,4 +155,4 @@ extension DispatchQueue {
             }
         }
     }
-} 
+}

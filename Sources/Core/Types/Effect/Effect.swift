@@ -1,33 +1,41 @@
 import Foundation
+import SwiftUI
 
-public struct Effect: Identifiable, Codable, Hashable, Equatable {
+// MARK: - Effect Model
+
+public struct Effect: Identifiable, Codable, Equatable, Hashable {
     public let id: String
     public var name: String
-    public var icon: String
     public var type: EffectType
     public var parameters: EffectParameters
-    public var isPreset: Bool
+    public var isActive: Bool
     public var createdAt: Date
     public var updatedAt: Date
     
     public init(
         id: String = UUID().uuidString,
         name: String,
-        icon: String = "sparkles",
         type: EffectType,
         parameters: EffectParameters,
-        isPreset: Bool = false,
+        isActive: Bool = false,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
         self.id = id
         self.name = name
-        self.icon = icon
         self.type = type
         self.parameters = parameters
-        self.isPreset = isPreset
+        self.isActive = isActive
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+    
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    public static func == (lhs: Effect, rhs: Effect) -> Bool {
+        lhs.id == rhs.id
     }
     
     public static let presets: [Effect] = [
@@ -36,44 +44,47 @@ public struct Effect: Identifiable, Codable, Hashable, Equatable {
             type: .pulse,
             parameters: .init(
                 duration: 1000,
-                brightness: [20, 100],
-                colorTemperature: nil,
-                colors: nil,
-                repeat: true
+                colors: [],
+                brightness: 50,
+                temperature: 4000,
+                speed: 50,
+                shouldRepeat: true
             ),
-            isPreset: true
+            isActive: true
         ),
         Effect(
             name: "Rainbow",
             type: .colorFlow,
             parameters: .init(
                 duration: 2000,
-                brightness: [80],
-                colorTemperature: nil,
                 colors: [
-                    [255, 0, 0],
-                    [255, 127, 0],
-                    [255, 255, 0],
-                    [0, 255, 0],
-                    [0, 0, 255],
-                    [75, 0, 130],
-                    [148, 0, 211]
+                    Color.red,
+                    Color.orange,
+                    Color.yellow,
+                    Color.green,
+                    Color.blue,
+                    Color.purple,
+                    Color.init(red: 148/255, green: 0, blue: 211/255)
                 ],
-                repeat: true
+                brightness: 80,
+                temperature: 4000,
+                speed: 50,
+                shouldRepeat: true
             ),
-            isPreset: true
+            isActive: true
         ),
         Effect(
             name: "Strobe",
             type: .strobe,
             parameters: .init(
                 duration: 100,
-                brightness: [0, 100],
-                colorTemperature: nil,
-                colors: nil,
-                repeat: true
+                colors: [],
+                brightness: 50,
+                temperature: 4000,
+                speed: 50,
+                shouldRepeat: true
             ),
-            isPreset: true
+            isActive: true
         )
     ]
 } 

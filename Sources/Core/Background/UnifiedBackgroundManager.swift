@@ -30,9 +30,7 @@ public final class UnifiedBackgroundManager: ObservableObject {
     @Published public private(set) var nextScheduledRefresh: Date?
     
     // MARK: - Private Properties
-    private let deviceManager: UnifiedDeviceManager
-    private let configManager: UnifiedConfigurationManager
-    private let errorHandler: UnifiedErrorHandler
+    private let services: BaseServiceContainer
     private var cancellables = Set<AnyCancellable>()
     private var backgroundConfig = BackgroundConfiguration()
     
@@ -47,10 +45,7 @@ public final class UnifiedBackgroundManager: ObservableObject {
     public static let shared = UnifiedBackgroundManager()
     
     private init() {
-        self.deviceManager = .shared
-        self.configManager = .shared
-        self.errorHandler = .shared
-        
+        self.services = .shared
         setupObservers()
         registerBackgroundTasks()
     }
@@ -77,11 +72,11 @@ public final class UnifiedBackgroundManager: ObservableObject {
         lastRefreshDate = Date()
         
         // Update device states
-        for device in deviceManager.devices {
+        for device in services.deviceManager.devices {
             do {
-                try await deviceManager.updateDeviceState(device)
+                try await services.deviceManager.updateDeviceState(device)
             } catch {
-                errorHandler.handle(error, context: ["device_id": device.id])
+                services.errorHandler.handle(error)
             }
         }
         
@@ -113,7 +108,7 @@ public final class UnifiedBackgroundManager: ObservableObject {
             try BGTaskScheduler.shared.submit(request)
             nextScheduledRefresh = request.earliestBeginDate
         } catch {
-            errorHandler.handle(error)
+            services.errorHandler.handle(error)
         }
     }
     
@@ -139,18 +134,19 @@ public final class UnifiedBackgroundManager: ObservableObject {
     }
 }
 
-// MARK: - Configuration Extension
-extension BackgroundConfiguration.AppSettings {
-    public var backgroundRefreshInterval: TimeInterval? {
+// MARK: - UserDefaults Extension
+extension UserDefaults {
+    var backgroundRefreshInterval: TimeInterval? {
         get {
-            let interval = TimeInterval(exactly: UserDefaults.standard.integer(forKey: "backgroundRefreshInterval"))
-            return interval.map { max(Constants.minimumRefreshInterval, min($0, Constants.maximumRefreshInterval)) }
+            let interval = TimeInterval(exactly: integer(forKey: "backgroundRefreshInterval"))
+            return interval.map { max(UnifiedBackgroundManager.Constants.minimumRefreshInterval, 
+                                     min($0, UnifiedBackgroundManager.Constants.maximumRefreshInterval)) }
         }
         set {
             if let interval = newValue {
-                UserDefaults.standard.set(Int(interval), forKey: "backgroundRefreshInterval")
+                set(Int(interval), forKey: "backgroundRefreshInterval")
             } else {
-                UserDefaults.standard.removeObject(forKey: "backgroundRefreshInterval")
+                removeObject(forKey: "backgroundRefreshInterval")
             }
         }
     }

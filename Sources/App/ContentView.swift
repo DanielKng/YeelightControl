@@ -1,11 +1,11 @@
-import SwiftUI
-import Core
-import UI
+i; ; ; ; mport SwiftUI
+i; ; ; ; mport Core
+i; ; ; ; mport UI
 
-struct ContentView: View {
-    @EnvironmentObject var serviceContainer: ServiceContainer
+s; ; ; ; truct ContentView: View {
+    @; ; ; ; EnvironmentObject var serviceContainer: BaseServiceContainer
     
-    var body: some View {
+ ; ; ; ; var body:; ; ; ; some View {
         MainView()
             .environmentObject(serviceContainer.deviceManager)
             .environmentObject(serviceContainer.sceneManager)
@@ -22,8 +22,8 @@ struct ContentView: View {
     }
 }
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
+s; ; ; ; truct ContentView_Previews: PreviewProvider {
+ ; ; ; ; static var previews:; ; ; ; some View {
         ContentView()
             .environmentObject(ServiceContainer.shared)
     }

@@ -40,12 +40,17 @@ create_swift_module() {
     echo "Set up Swift module $module_name at $target_dir"
     mkdir -p "$target_dir"
     
-    # Create symlinks for Swift files
-    find "$source_dir" -type f -name "*.swift" | while read -r source_file; do
-        relative_path=${source_file#$source_dir/}
+    # Create symlinks for Swift files and directories
+    cd "$source_dir"
+    find . -type d -not -path "*/\.*" | while read -r dir; do
+        mkdir -p "$target_dir/$dir"
+    done
+    
+    find . -type f -name "*.swift" | while read -r source_file; do
+        relative_path=${source_file#./}
         target_path="$target_dir/$relative_path"
         mkdir -p "$(dirname "$target_path")"
-        ln -sf "$source_file" "$target_path"
+        ln -sf "$source_dir/$relative_path" "$target_path"
         echo "Created symlink for $relative_path"
     done
 }
@@ -54,6 +59,9 @@ create_swift_module() {
 create_swift_module "Core" "$SOURCES_DIR/Core"
 create_swift_module "UI" "$SOURCES_DIR/UI"
 create_swift_module "Features" "$SOURCES_DIR/Features"
+create_swift_module "App" "$SOURCES_DIR/App"
+create_swift_module "Widget" "$SOURCES_DIR/Widget"
+create_swift_module "Tests" "$SOURCES_DIR/Tests"
 
 # Function to create Info.plist
 create_info_plist() {
@@ -95,11 +103,6 @@ create_info_plist "UI" "de.knng.app.yeelightcontrol.ui"
 create_info_plist "Features" "de.knng.app.yeelightcontrol.features"
 create_info_plist "Widget" "de.knng.app.yeelightcontrol.widget"
 
-# Create symlinks for App and Widget modules
-create_swift_module "App" "$SOURCES_DIR/App"
-create_swift_module "Widget" "$SOURCES_DIR/Widget"
-create_swift_module "Tests" "$SOURCES_DIR/Tests"
-
 echo "📝 Creating XcodeGen configuration..."
 
 # Generate project.yml
@@ -114,7 +117,7 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    SWIFT_VERSION: 5.0
+    SWIFT_VERSION: 5.9
     DEVELOPMENT_TEAM: \${DEVELOPMENT_TEAM}
     CODE_SIGN_STYLE: Automatic
     ENABLE_BITCODE: NO
@@ -141,6 +144,16 @@ targets:
     platform: iOS
     sources:
       - path: Sources/Core
+    dependencies:
+      - sdk: CoreLocation.framework
+      - sdk: UserNotifications.framework
+      - sdk: Photos.framework
+      - sdk: Contacts.framework
+      - sdk: AVFoundation.framework
+      - sdk: EventKit.framework
+      - sdk: CoreBluetooth.framework
+      - sdk: Security.framework
+      - sdk: LocalAuthentication.framework
     info:
       path: Configs/Core-Info.plist
   UI:
@@ -174,6 +187,15 @@ targets:
       properties:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+  Tests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Sources/Tests
+    dependencies:
+      - target: Core
+      - target: UI
+      - target: Features
 EOF
 
 echo "🛠 Running XcodeGen..."

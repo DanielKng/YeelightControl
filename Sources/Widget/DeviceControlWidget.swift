@@ -1,66 +1,69 @@
-import SwiftUI
-import WidgetKit
+i; mport SwiftUI
+i; ; mport SwiftUI
+i; ; ; mport SwiftUI
+i; ; ; ; mport SwiftUI
+i; ; ; ; mport WidgetKit
 
-// MARK: - Widget Configuration
-struct DeviceControlWidget: Widget {
-    private let kind: String = "DeviceControlWidget"
+// MARK: -; ; ; ; Widget Configuration
+s; ; ; ; truct DeviceControlWidget: Widget {
+ ; ; ; ; private let kind: String = "DeviceControlWidget"
     
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: DeviceControlProvider()) { entry in
+ ; ; ; ; var body:; ; ; ; some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: DeviceControlProvider()) { ; ; ; ; entry in
             DeviceControlWidgetView(entry: entry)
         }
-        .configurationDisplayName("Device Control")
-        .description("Quick access to control your Yeelight devices.")
+        .configurationDisplayName("; ; ; ; Device Control")
+        .description("; ; ; ; Quick access ; ; ; ; to control ; ; ; ; your Yeelight devices.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
 
-// MARK: - Widget Provider
-struct DeviceControlProvider: TimelineProvider {
-    func placeholder(in context: Context) -> DeviceControlEntry {
+// MARK: -; ; ; ; Widget Provider
+s; ; ; ; truct DeviceControlProvider: TimelineProvider {
+ ; ; ; ; func placeholder(; ; ; ; in context: Context) -> DeviceControlEntry {
         DeviceControlEntry(date: Date(), device: .placeholder)
     }
     
-    func getSnapshot(in context: Context, completion: @escaping (DeviceControlEntry) -> Void) {
-        let entry = DeviceControlEntry(date: Date(), device: .placeholder)
+ ; ; ; ; func getSnapshot(; ; ; ; in context: Context, completion: @escaping (DeviceControlEntry) -> Void) {
+ ; ; ; ; let entry = DeviceControlEntry(date: Date(), device: .placeholder)
         completion(entry)
     }
     
-    func getTimeline(in context: Context, completion: @escaping (Timeline<DeviceControlEntry>) -> Void) {
+ ; ; ; ; func getTimeline(; ; ; ; in context: Context, completion: @escaping (Timeline<DeviceControlEntry>) -> Void) {
         Task {
             do {
-                let devices = try await DeviceManager.shared.fetchDevices()
-                let currentDate = Date()
-                let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: currentDate)!
+ ; ; ; ; let devices =; ; ; ; try await DeviceManager.shared.fetchDevices()
+ ; ; ; ; let currentDate = Date()
+ ; ; ; ; let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: currentDate)!
                 
-                let entries = devices.map { device in
+ ; ; ; ; let entries = devices.map { ; ; ; ; device in
                     DeviceControlEntry(date: currentDate, device: device)
                 }
                 
-                let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
+ ; ; ; ; let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
                 completion(timeline)
             } catch {
-                let entry = DeviceControlEntry(date: Date(), device: .placeholder)
-                let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
+ ; ; ; ; let entry = DeviceControlEntry(date: Date(), device: .placeholder)
+ ; ; ; ; let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
                 completion(timeline)
             }
         }
     }
 }
 
-// MARK: - Widget Entry
-struct DeviceControlEntry: TimelineEntry {
-    let date: Date
-    let device: Device
+// MARK: -; ; ; ; Widget Entry
+s; ; ; ; truct DeviceControlEntry: TimelineEntry {
+ ; ; ; ; let date: Date
+ ; ; ; ; let device: Device
 }
 
-// MARK: - Widget Views
-struct DeviceControlWidgetView: View {
-    let entry: DeviceControlEntry
-    @Environment(\.widgetFamily) var family
+// MARK: -; ; ; ; Widget Views
+s; ; ; ; truct DeviceControlWidgetView: View {
+ ; ; ; ; let entry: DeviceControlEntry
+    @Environment(\.widgetFamily); ; ; ; var family
     
-    var body: some View {
-        switch family {
+ ; ; ; ; var body:; ; ; ; some View {
+ ; ; ; ; switch family {
         case .systemSmall:
             SmallDeviceControlView(device: entry.device)
         case .systemMedium:
@@ -71,10 +74,10 @@ struct DeviceControlWidgetView: View {
     }
 }
 
-struct SmallDeviceControlView: View {
-    let device: Device
+s; ; ; ; truct SmallDeviceControlView: View {
+ ; ; ; ; let device: Device
     
-    var body: some View {
+ ; ; ; ; var body:; ; ; ; some View {
         VStack(spacing: 8) {
             HStack {
                 Image(systemName: device.isOn ? "lightbulb.fill" : "lightbulb")
@@ -88,7 +91,7 @@ struct SmallDeviceControlView: View {
                 .font(.caption2)
                 .foregroundColor(.secondary)
             
-            if device.isOn {
+ ; ; ; ; if device.isOn {
                 Text("\(Int(device.brightness))%")
                     .font(.caption2)
                     .foregroundColor(.secondary)
@@ -99,10 +102,10 @@ struct SmallDeviceControlView: View {
     }
 }
 
-struct MediumDeviceControlView: View {
-    let device: Device
+s; ; ; ; truct MediumDeviceControlView: View {
+ ; ; ; ; let device: Device
     
-    var body: some View {
+ ; ; ; ; var body:; ; ; ; some View {
         HStack {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -119,7 +122,7 @@ struct MediumDeviceControlView: View {
             
             Spacer()
             
-            if device.isOn {
+ ; ; ; ; if device.isOn {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("Brightness")
                         .font(.caption)
@@ -134,15 +137,15 @@ struct MediumDeviceControlView: View {
     }
 }
 
-// MARK: - Widget Background
-extension View {
-    func widgetBackground() -> some View {
+// MARK: -; ; ; ; Widget Background
+e; ; ; ; xtension View {
+ ; ; ; ; func widgetBackground() ->; ; ; ; some View {
         if #available(iOS 17.0, *) {
-            return containerBackground(for: .widget) {
+ ; ; ; ; return containerBackground(for: .widget) {
                 Color(uiColor: .systemBackground)
             }
         } else {
-            return background(Color(uiColor: .systemBackground))
+ ; ; ; ; return background(Color(uiColor: .systemBackground))
         }
     }
 } 

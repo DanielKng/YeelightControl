@@ -2,20 +2,25 @@ import Foundation
 
 public struct SceneUpdate: Codable, Equatable {
     public let scene: Scene
-    public let type: UpdateType
+    public let action: SceneAction
     public let timestamp: Date
     
-    public enum UpdateType: String, Codable {
-        case created
-        case updated
-        case deleted
-        case activated
-        case deactivated
-    }
-    
-    public init(scene: Scene, type: UpdateType, timestamp: Date = Date()) {
+    public init(
+        scene: Scene,
+        action: SceneAction,
+        timestamp: Date = Date()
+    ) {
         self.scene = scene
-        self.type = type
+        self.action = action
         self.timestamp = timestamp
     }
+}
+
+public enum SceneAction: String, Codable {
+    case created
+    case updated
+    case deleted
+    case activated
+    case deactivated
+    case applied
 } 

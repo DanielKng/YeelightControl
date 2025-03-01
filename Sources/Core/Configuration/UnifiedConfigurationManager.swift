@@ -1,132 +1,136 @@
 import Foundation
 import Combine
-import SwiftUI
+
+// Create a typealias to disambiguate types
+public typealias CoreConfigurationManaging = Core_ConfigurationManaging
+public typealias CoreConfigKey = Core_ConfigKey
+public typealias CoreConfigurationError = Core_ConfigurationError
+
+// MARK: - Configuration Key
+public enum ConfigKey: String, CaseIterable {
+    case appTheme
+    case deviceRefreshInterval
+    case notificationsEnabled
+    case analyticsEnabled
+    case locationTrackingEnabled
+    case backgroundRefreshEnabled
+    case lastSyncDate
+    case userPreferences
+    case deviceSettings
+    case sceneSettings
+    case effectSettings
+    case debugMode
+    case apiEndpoint
+    case apiKey
+}
 
 // MARK: - Configuration Managing Protocol
-public protocol ConfigurationManaging {
-    var configurationUpdates: AnyPublisher<Configuration, Never> { get }
+@preconcurrency public protocol ConfigurationManaging: Actor {
+    var configurationUpdates: AnyPublisher<ConfigKey, Never> { get }
     
-    func getValue<T>(for key: ConfigKey) throws -> T
-    func setValue<T>(_ value: T, for key: ConfigKey) throws
-    func removeValue(for key: ConfigKey)
-    func resetToDefaults()
+    func getValue<T>(for key: ConfigKey) async throws -> T
+    func setValue<T>(_ value: T, for key: ConfigKey) async throws
+    func removeValue(for key: ConfigKey) async throws
+    func hasValue(for key: ConfigKey) async -> Bool
+    func clearAll() async throws
 }
 
 // MARK: - Configuration Manager Implementation
-@MainActor
-public final class UnifiedConfigurationManager: ObservableObject, ConfigurationManaging {
-    // MARK: - Published Properties
-    @Published public private(set) var configuration: Configuration
-    @Published public private(set) var isDirty = false
-    
-    // MARK: - Private Properties
-    private let services: ServiceContainer
-    private var cancellables = Set<AnyCancellable>()
-    private let configurationSubject = CurrentValueSubject<Configuration, Never>(Configuration())
-    private let storageManager: StorageManaging
-    
-    // MARK: - Constants
-    private enum Constants {
-        static let configFileName = "app_config.json"
-        static let configFileExtension = "json"
-        static let autosaveInterval: TimeInterval = 30
-    }
-    
-    // MARK: - Singleton
-    public static let shared = UnifiedConfigurationManager()
+public actor UnifiedConfigurationManager: Core_ConfigurationManaging {
+    // MARK: - Properties
+    private var configValues: [String: Any] = [:]
+    private let storageManager: any Core_StorageManaging
+    private let configSubject = PassthroughSubject<Core_ConfigKey, Never>()
     
     // MARK: - Initialization
-    public init(services: ServiceContainer) {
-        self.services = services
-        self.storageManager = services.storageManager
-        self.configuration = Configuration()
+    public init(storageManager: any Core_StorageManaging) {
+        self.storageManager = storageManager
         
-        setupObservers()
-        loadConfiguration()
-    }
-    
-    // MARK: - Configuration Management
-    public func getValue<T>(for key: ConfigKey) throws -> T {
-        guard let value = configuration.deviceSettings[key.rawValue] else {
-            throw ConfigurationError.notFound
-        }
-        
-        switch value {
-        case .string(let stringValue) where T.self == String.self:
-            return stringValue as! T
-        case .int(let intValue) where T.self == Int.self:
-            return intValue as! T
-        case .double(let doubleValue) where T.self == Double.self:
-            return doubleValue as! T
-        case .bool(let boolValue) where T.self == Bool.self:
-            return boolValue as! T
-        default:
-            throw ConfigurationError.invalidValue
+        Task {
+            await loadConfiguration()
         }
     }
     
-    public func setValue<T>(_ value: T, for key: ConfigKey) throws {
-        let configValue: ConfigValue
-        
-        switch value {
-        case let stringValue as String:
-            configValue = .string(stringValue)
-        case let intValue as Int:
-            configValue = .int(intValue)
-        case let doubleValue as Double:
-            configValue = .double(doubleValue)
-        case let boolValue as Bool:
-            configValue = .bool(boolValue)
-        default:
-            throw ConfigurationError.invalidValue
+    // MARK: - Core_BaseService
+    public var serviceIdentifier: String {
+        return "core.configuration"
+    }
+    
+    public var values: [Core_ConfigKey: Any] {
+        var result: [Core_ConfigKey: Any] = [:]
+        for (key, value) in configValues {
+            if let configKey = Core_ConfigKey(rawValue: key) {
+                result[configKey] = value
+            }
         }
+        return result
+    }
+    
+    // MARK: - Core_ConfigurationManaging
+    
+    public var configurationUpdates: AnyPublisher<Core_ConfigKey, Never> {
+        configSubject.eraseToAnyPublisher()
+    }
+    
+    public func getValue<T>(for key: Core_ConfigKey) throws -> T {
+        guard let value = configValues[key.rawValue] as? T else {
+            throw Core_ConfigurationError.valueNotFound(key)
+        }
+        return value
+    }
+    
+    public func setValue<T>(_ value: T, for key: Core_ConfigKey) throws {
+        configValues[key.rawValue] = value
+        configSubject.send(key)
         
-        configuration.deviceSettings[key.rawValue] = configValue
-        configurationSubject.send(configuration)
-        try saveConfiguration()
+        // Save to storage
+        Task {
+            try await saveConfiguration()
+        }
     }
     
-    public func removeValue(for key: ConfigKey) {
-        configuration.deviceSettings.removeValue(forKey: key.rawValue)
-        configurationSubject.send(configuration)
-        try? saveConfiguration()
-    }
-    
-    public func resetToDefaults() throws {
-        configuration = Configuration()
-        configurationSubject.send(configuration)
-        try saveConfiguration()
-    }
-    
-    // MARK: - ConfigurationManaging Protocol
-    public var configurationUpdates: AnyPublisher<Configuration, Never> {
-        configurationSubject.eraseToAnyPublisher()
+    public func removeValue(for key: Core_ConfigKey) throws {
+        configValues.removeValue(forKey: key.rawValue)
+        configSubject.send(key)
+        
+        // Save to storage
+        Task {
+            try await saveConfiguration()
+        }
     }
     
     // MARK: - Private Methods
-    private func loadConfiguration() {
-        do {
-            if let data = try storageManager.readData(fromFile: Constants.configFileName) {
-                let decoder = JSONDecoder()
-                configuration = try decoder.decode(Configuration.self, from: data)
-            }
-        } catch {
-            print("Failed to load configuration: \(error)")
-        }
-        configurationSubject.send(configuration)
-    }
     
-    private func saveConfiguration() throws {
+    private func loadConfiguration() async {
         do {
-            let encoder = JSONEncoder()
-            let data = try encoder.encode(configuration)
-            try storageManager.writeData(data, toFile: Constants.configFileName)
+            let config: [String: Any] = try await storageManager.load(forKey: "configuration")
+            self.configValues = config
         } catch {
-            throw ConfigurationError.saveFailed
+            print("Error loading configuration: \(error.localizedDescription)")
+            // Initialize with default values
+            initializeDefaults()
         }
     }
     
-    private func setupObservers() {
-        // Add any necessary observers here
+    private func saveConfiguration() async throws {
+        try await storageManager.save(configValues, forKey: "configuration")
     }
+    
+    private func initializeDefaults() {
+        // Set default values for Core_ConfigKey cases
+        configValues[Core_ConfigKey.appTheme.rawValue] = "system"
+        configValues[Core_ConfigKey.deviceRefreshInterval.rawValue] = 30.0
+        configValues[Core_ConfigKey.notificationsEnabled.rawValue] = true
+        configValues[Core_ConfigKey.analyticsEnabled.rawValue] = false
+        configValues[Core_ConfigKey.locationEnabled.rawValue] = false
+        configValues[Core_ConfigKey.debugMode.rawValue] = false
+    }
+}
+
+// MARK: - Configuration Error
+public enum ConfigurationError: Error {
+    case valueNotFound(ConfigKey)
+    case invalidType
+    case saveFailed
+    case loadFailed
 }

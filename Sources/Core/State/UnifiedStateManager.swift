@@ -3,9 +3,9 @@ import Combine
 import SwiftUI
 
 // MARK: - State Managing Protocol
-@preconcurrency public protocol StateManaging: Actor {
-    nonisolated var deviceStates: [String: DeviceState] { get }
-    nonisolated var stateUpdates: AnyPublisher<DeviceStateUpdate, Never> { get }
+@preconcurrency public protocol StateManaging {
+    var deviceStates: [String: DeviceState] { get }
+    var stateUpdates: AnyPublisher<DeviceStateUpdate, Never> { get }
     
     func getState(for deviceId: String) -> DeviceState?
     func setState(_ state: DeviceState, for deviceId: String) async throws
@@ -14,11 +14,11 @@ import SwiftUI
 
 @MainActor
 public final class UnifiedStateManager: ObservableObject, StateManaging {
-    private let services: ServiceContainer
-    @Published private(set) var deviceStates: [String: DeviceState] = [:]
+    private let services: BaseServiceContainer
+    @Published public private(set) var deviceStates: [String: DeviceState] = [:]
     private let stateSubject = PassthroughSubject<DeviceStateUpdate, Never>()
     
-    public init(services: ServiceContainer) {
+    public init(services: BaseServiceContainer) {
         self.services = services
     }
     
@@ -44,7 +44,7 @@ public final class UnifiedStateManager: ObservableObject, StateManaging {
         deviceStates.removeValue(forKey: deviceId)
     }
     
-    public nonisolated var stateUpdates: AnyPublisher<DeviceStateUpdate, Never> {
+    public var stateUpdates: AnyPublisher<DeviceStateUpdate, Never> {
         stateSubject.eraseToAnyPublisher()
     }
 } 

@@ -3,39 +3,51 @@ import Combine
 import SwiftUI
 
 // MARK: - Error Handling Protocol
-public protocol ErrorHandling {
+@preconcurrency protocol ErrorHandling: Actor {
     var lastError: AppError? { get }
-    var errorUpdates: AnyPublisher<AppError, Never> { get }
+    nonisolated var errorUpdates: AnyPublisher<AppError, Never> { get }
     
-    func handle(_ error: Error)
-    func handle(_ error: AppError)
-    func clearError()
+    func handle(_ error: Error) async
+    func handle(_ appError: AppError) async
+    func clearError() async
 }
 
 // MARK: - Error Record
-private struct ErrorRecord: Codable {
-    let timestamp: Date
-    let severity: ErrorSeverity
-    let message: String
-    let category: LogCategory
-    let file: String
-    let function: String
-    let line: Int
+public struct ErrorRecord: Codable, Hashable {
+    public let error: Error
+    public let timestamp: Date
     
-    init(timestamp: Date = Date(),
-         severity: ErrorSeverity,
-         message: String,
-         category: LogCategory,
-         file: String = #file,
-         function: String = #function,
-         line: Int = #line) {
+    public init(error: Error, timestamp: Date = Date()) {
+        self.error = error
         self.timestamp = timestamp
-        self.severity = severity
-        self.message = message
-        self.category = category
-        self.file = file
-        self.function = function
-        self.line = line
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case error
+        case timestamp
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let errorString = try container.decode(String.self, forKey: .error)
+        error = NSError(domain: "YeelightControl", code: 0, userInfo: [NSLocalizedDescriptionKey: errorString])
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(error.localizedDescription, forKey: .error)
+        try container.encode(timestamp, forKey: .timestamp)
+    }
+    
+    public static func == (lhs: ErrorRecord, rhs: ErrorRecord) -> Bool {
+        return lhs.error.localizedDescription == rhs.error.localizedDescription &&
+               lhs.timestamp == rhs.timestamp
+    }
+    
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(error.localizedDescription)
+        hasher.combine(timestamp)
     }
 }
 
@@ -132,118 +144,39 @@ extension AppError: Identifiable {
 }
 
 // MARK: - Error Handler Implementation
-@MainActor
-public final class UnifiedErrorHandler: ErrorHandling, ObservableObject {
-    // MARK: - Properties
-    @Published public private(set) var lastError: AppError?
+public actor UnifiedErrorHandler: ErrorHandling {
+    private let services: BaseServiceContainer
     private let errorSubject = PassthroughSubject<AppError, Never>()
+    private(set) var lastError: AppError?
     
-    public var errorUpdates: AnyPublisher<AppError, Never> {
+    public init(services: BaseServiceContainer = .shared) {
+        self.services = services
+    }
+    
+    public nonisolated var errorUpdates: AnyPublisher<AppError, Never> {
         errorSubject.eraseToAnyPublisher()
     }
     
-    private let storageManager: StorageManaging
-    private var errorRecords: [ErrorRecord] = []
-    private var cancellables = Set<AnyCancellable>()
-    
-    // MARK: - Constants
-    private enum Constants {
-        static let maxRecords = 1000
-        static let errorLogFile = "error_log.json"
-    }
-    
-    // MARK: - Initialization
-    public init(services: ServiceContainer) {
-        self.storageManager = services.storageManager
-        loadErrorLog()
-    }
-    
-    // MARK: - Public Methods
-    public func handle(_ error: Error) {
-        let appError: AppError
-        
-        switch error {
-        case let networkError as NetworkError:
-            appError = .network(networkError)
-        case let locationError as LocationError:
-            appError = .location(locationError)
-        case let configError as ConfigurationError:
-            appError = .configuration(configError)
-        case let deviceError as DeviceError:
-            appError = .device(deviceError)
-        case let securityError as SecurityError:
-            appError = .security(securityError)
-        case let storageError as StorageError:
-            appError = .storage(storageError)
-        case let permissionError as PermissionError:
-            appError = .permission(permissionError)
-        case let effectError as EffectError:
-            appError = .effect(effectError)
-        case let sceneError as SceneError:
-            appError = .scene(sceneError)
-        default:
-            appError = .unknown
+    public func handle(_ error: Error) async {
+        if let appError = error as? AppError {
+            await handle(appError)
+        } else {
+            // Convert to AppError.unknown
+            let appError = AppError.unknown
+            lastError = appError
+            services.logger.error(error.localizedDescription, category: .error)
+            errorSubject.send(appError)
         }
-        
-        handle(appError)
     }
     
-    public func handle(_ error: AppError) {
-        let category: LogCategory
-        switch error {
-        case .network: category = .network
-        case .location: category = .location
-        case .configuration: category = .configuration
-        case .device: category = .device
-        case .security: category = .security
-        case .storage: category = .storage
-        case .permission: category = .permission
-        case .effect: category = .effect
-        case .scene: category = .scene
-        case .unknown: category = .general
-        }
-        
-        let record = ErrorRecord(
-            severity: error.severity,
-            message: error.localizedDescription ?? "Unknown error",
-            category: category
-        )
-        
-        errorRecords.append(record)
-        if errorRecords.count > Constants.maxRecords {
-            errorRecords.removeFirst()
-        }
-        
-        lastError = error
-        errorSubject.send(error)
-        
-        saveErrorLog()
+    public func handle(_ appError: AppError) async {
+        lastError = appError
+        services.logger.error(appError.errorDescription ?? "Unknown error", category: .error)
+        errorSubject.send(appError)
     }
     
-    public func clearError() {
+    public func clearError() async {
         lastError = nil
-    }
-    
-    // MARK: - Private Methods
-    private func loadErrorLog() {
-        do {
-            if let data = try storageManager.readData(fromFile: Constants.errorLogFile) {
-                let decoder = JSONDecoder()
-                errorRecords = try decoder.decode([ErrorRecord].self, from: data)
-            }
-        } catch {
-            print("Failed to load error log: \(error)")
-        }
-    }
-    
-    private func saveErrorLog() {
-        do {
-            let encoder = JSONEncoder()
-            let data = try encoder.encode(errorRecords)
-            try storageManager.writeData(data, toFile: Constants.errorLogFile)
-        } catch {
-            print("Failed to save error log: \(error)")
-        }
     }
 }
 
@@ -253,7 +186,7 @@ public extension View {
         alert(item: error) { error in
             Alert(
                 title: Text("Error"),
-                message: Text(error.localizedDescription ?? "Unknown error"),
+                message: Text(error.errorDescription ?? "Unknown error"),
                 dismissButton: .default(Text("OK"))
             )
         }

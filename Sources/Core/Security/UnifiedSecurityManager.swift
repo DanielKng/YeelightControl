@@ -43,7 +43,7 @@ public final class UnifiedSecurityManager: ObservableObject {
     @Published public private(set) var isBiometricsAvailable = false
     
     // MARK: - Private Properties
-    private let services: ServiceContainer
+    private let services: BaseServiceContainer
     private let context = LAContext()
     private var cancellables = Set<AnyCancellable>()
     
@@ -67,7 +67,7 @@ public final class UnifiedSecurityManager: ObservableObject {
     public static let shared = UnifiedSecurityManager()
     
     // MARK: - Initialization
-    private init(services: ServiceContainer = .shared) {
+    public init(services: BaseServiceContainer = .shared) {
         self.services = services
         checkBiometricAvailability()
     }

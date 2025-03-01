@@ -32,16 +32,16 @@ struct AppNotification {
     let id: String
     let title: String
     let body: String
-    let category: NotificationCategory
-    let trigger: NotificationTrigger
+    let category: InternalNotificationCategory
+    let trigger: InternalNotificationTrigger
     let userInfo: [String: Any]
     
     init(
         id: String = UUID().uuidString,
         title: String,
         body: String,
-        category: NotificationCategory,
-        trigger: NotificationTrigger,
+        category: InternalNotificationCategory,
+        trigger: InternalNotificationTrigger,
         userInfo: [String: Any] = [:]
     ) {
         self.id = id
@@ -153,7 +153,7 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject {
     // MARK: - Private Properties
     private let notificationCenter = UNUserNotificationCenter.current()
     private let analytics: UnifiedAnalyticsManager
-    private let services: ServiceContainer
+    private let services: BaseServiceContainer
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Constants
@@ -164,19 +164,29 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject {
         
         static let defaultSound = UNNotificationSound.default
         static let criticalSound = UNNotificationSound.defaultCritical
-        static let logCategory: LogCategory = .notification
+        static let logCategory = LogCategory.notification
     }
     
     // MARK: - Singleton
     public static let shared = UnifiedNotificationManager()
     
-    private init() {
+    // MARK: - Initialization
+    public override init() {
         self.analytics = .shared
         self.services = .shared
         super.init()
-        notificationCenter.delegate = self
-        checkNotificationStatus()
-        refreshNotificationLists()
+        
+        // Set up notification center delegate
+        UNUserNotificationCenter.current().delegate = self
+        
+        // Initialize properties
+        self.pendingNotifications = []
+        self.deliveredNotifications = []
+        
+        // Request authorization if needed
+        Task {
+            await requestAuthorization()
+        }
     }
     
     // MARK: - Public Methods
@@ -319,7 +329,7 @@ extension UnifiedNotificationManager: UNUserNotificationCenterDelegate {
 
 // MARK: - Logger Category Extension
 extension LogCategory {
-    static let notification: LogCategory = "notification"
+    static let notification = LogCategory.notification
 }
 
 // MARK: - Constants

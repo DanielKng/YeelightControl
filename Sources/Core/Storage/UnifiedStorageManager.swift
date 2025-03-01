@@ -2,321 +2,199 @@ import Foundation
 import Combine
 import SwiftUI
 
-// MARK: - Storage Managing Protocol
-@preconcurrency public protocol StorageManaging: Actor {
-    func save<T: Encodable>(_ value: T, forKey key: StorageKey) async throws
-    func load<T: Decodable>(forKey key: StorageKey) async throws -> T
-    func remove(forKey key: StorageKey) async throws
-    nonisolated func exists(forKey key: StorageKey) -> Bool
-    func clear() async throws
-}
-
-// MARK: - Storage Keys
+// MARK: - Storage Key
 public enum StorageKey: String, CaseIterable {
+    case settings
+    case deviceState
     case devices
     case rooms
     case automations
     case effects
     case configuration
+    case theme
     case errorHistory
-    case deviceState
+    case sceneHistory
+    case effectHistory
+    case automationHistory
     case customScene
     case backup
-    case theme
-    case scenes
-    case analytics
-    
-    var fileName: String {
-        switch self {
-        case .devices:
-            return "devices.json"
-        case .rooms:
-            return "rooms.json"
-        case .automations:
-            return "automations.json"
-        case .effects:
-            return "effects.json"
-        case .configuration:
-            return "config.json"
-        case .errorHistory:
-            return "errors.json"
-        case .deviceState(let deviceId):
-            return "device_state_\(deviceId).json"
-        case .customScene(let name):
-            return "scene_\(name).json"
-        case .backup(let date):
-            return "backup_\(date).json"
-        case .theme:
-            return "theme.json"
-        case .scenes:
-            return "scenes.json"
-        case .analytics:
-            return "analytics.json"
-        }
-    }
-    
-    var directory: StorageDirectory {
-        switch self {
-        case .devices, .rooms, .automations, .effects, .configuration, .theme:
-            return .documents
-        case .errorHistory:
-            return .logs
-        case .deviceState:
-            return .cache
-        case .customScene:
-            return .documents
-        case .backup:
-            return .backups
-        case .scenes, .effects:
-            return .documents
-        case .analytics:
-            return .cache
-        }
-    }
 }
 
 // MARK: - Storage Directory
-enum StorageDirectory: String {
-    case documents = "Documents"
-    case cache = "Cache"
-    case logs = "Logs"
-    case backups = "Backups"
-    
-    var url: URL {
-        let baseURL: URL
-        switch self {
-        case .documents:
-            baseURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        case .cache:
-            baseURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        case .logs, .backups:
-            baseURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent(rawValue)
-        }
-        return baseURL
-    }
+public enum StorageDirectory: String, CaseIterable {
+    case documents
+    case cache
+    case temp
+    case logs
+    case backups
 }
 
-@MainActor
-public final class UnifiedStorageManager: ObservableObject, StorageManaging {
-    // MARK: - Published Properties
-    @Published public private(set) var lastSaveDate: Date?
-    @Published public private(set) var lastLoadDate: Date?
-    @Published public private(set) var isLoading = false
+// MARK: - Storage Managing Protocol
+@preconcurrency public protocol StorageManaging: Actor {
+    func save<T: Encodable>(_ value: T, forKey key: StorageKey) async throws
+    func load<T: Decodable>(forKey key: StorageKey) async throws -> T
+    func remove(forKey key: StorageKey) async throws
+    func clear() async throws
     
-    // MARK: - Private Properties
-    private let fileManager = FileManager.default
-    private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
-    private let queue = DispatchQueue(label: "com.yeelightcontrol.storage", qos: .utility)
+    func save<T: Encodable>(_ value: T, withId id: String, inCollection collection: String) async throws
+    func get<T: Decodable>(withId id: String, fromCollection collection: String) async throws -> T
+    func getAll<T: Decodable>(fromCollection collection: String) async throws -> [T]
+    func delete(withId id: String, fromCollection collection: String) async throws
+    func clearCollection(_ collection: String) async throws
+}
+
+// MARK: - Storage Manager Implementation
+public actor UnifiedStorageManager: Core_StorageManaging {
+    public var isEnabled: Bool = true
     
-    // MARK: - Constants
-    private struct Constants {
-        static let storageDirectory = "YeelightControl"
-        static let backupDirectory = "Backups"
-        static let fileExtension = "json"
+    public var serviceIdentifier: String {
+        "core.storage"
     }
     
-    // MARK: - Singleton
-    public static let shared = UnifiedStorageManager()
+    private let userDefaults: UserDefaults
+    private let fileManager: FileManager
+    private let documentsDirectory: URL
     
-    private init() {
-        setupStorage()
-        setupEncoder()
+    public init(userDefaults: UserDefaults = .standard, fileManager: FileManager = .default) {
+        self.userDefaults = userDefaults
+        self.fileManager = fileManager
+        
+        // Get the documents directory
+        guard let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            fatalError("Could not access documents directory")
+        }
+        self.documentsDirectory = documentsDirectory
+        
+        Task {
+            await setupDirectories()
+        }
     }
     
-    // MARK: - Public Methods
-    public func save<T: Encodable>(_ value: T, forKey key: StorageKey) async throws {
-        try await Task.detached {
-            let url = self.getURL(for: key)
-            let data = try self.encoder.encode(value)
-            
-            // Create directory if needed
-            try self.createDirectoryIfNeeded(for: key.directory)
-            
-            // Write data
-            try data.write(to: url, options: .atomic)
-            
-            // Clean up if needed
-            if key.directory == .cache {
-                try self.cleanupCacheIfNeeded()
-            } else if key.directory == .backups {
-                try self.cleanupBackupsIfNeeded()
+    private func setupDirectories() {
+        let storageDirectory = documentsDirectory.appendingPathComponent("Storage", isDirectory: true)
+        
+        do {
+            if !fileManager.fileExists(atPath: storageDirectory.path) {
+                try fileManager.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
             }
-            
-            await MainActor.run {
-                self.lastSaveDate = Date()
-            }
-        }.value
+        } catch {
+            print("Error creating storage directory: \(error)")
+        }
     }
     
-    public func load<T: Decodable>(forKey key: StorageKey) async throws -> T {
-        try await Task.detached {
-            let url = self.getURL(for: key)
-            let data = try Data(contentsOf: url)
-            let value = try self.decoder.decode(T.self, from: data)
-            
-            await MainActor.run {
-                self.lastLoadDate = Date()
-            }
-            
-            return value
-        }.value
+    // MARK: - Core_StorageManaging Protocol
+    
+    public func save<T: Codable>(_ value: T, forKey key: String) async throws {
+        if let simple = value as? String {
+            userDefaults.set(simple, forKey: key)
+            return
+        }
+        
+        if let simple = value as? Int {
+            userDefaults.set(simple, forKey: key)
+            return
+        }
+        
+        if let simple = value as? Double {
+            userDefaults.set(simple, forKey: key)
+            return
+        }
+        
+        if let simple = value as? Bool {
+            userDefaults.set(simple, forKey: key)
+            return
+        }
+        
+        if let simple = value as? Date {
+            userDefaults.set(simple, forKey: key)
+            return
+        }
+        
+        // For complex objects, encode to JSON and save to file
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        
+        let data = try encoder.encode(value)
+        let fileURL = storageURL(for: key)
+        
+        try data.write(to: fileURL)
     }
     
-    public func remove(forKey key: StorageKey) async throws {
-        try await Task.detached {
-            let url = self.getURL(for: key)
-            try self.fileManager.removeItem(at: url)
-        }.value
+    public func load<T: Codable>(_ type: T.Type, forKey key: String) async throws -> T? {
+        // Handle simple types directly from UserDefaults
+        if type == String.self {
+            return userDefaults.string(forKey: key) as? T
+        }
+        
+        if type == Int.self {
+            return userDefaults.integer(forKey: key) as? T
+        }
+        
+        if type == Double.self {
+            return userDefaults.double(forKey: key) as? T
+        }
+        
+        if type == Bool.self {
+            return userDefaults.bool(forKey: key) as? T
+        }
+        
+        if type == Date.self {
+            return userDefaults.object(forKey: key) as? T
+        }
+        
+        // For complex objects, load from file
+        let fileURL = storageURL(for: key)
+        
+        guard fileManager.fileExists(atPath: fileURL.path) else {
+            return nil
+        }
+        
+        let data = try Data(contentsOf: fileURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        
+        return try decoder.decode(type, from: data)
     }
     
-    public nonisolated func exists(forKey key: StorageKey) -> Bool {
-        let url = getURL(for: key)
-        return fileManager.fileExists(atPath: url.path)
+    public func remove(forKey key: String) async throws {
+        // Remove from UserDefaults
+        userDefaults.removeObject(forKey: key)
+        
+        // Remove file if it exists
+        let fileURL = storageURL(for: key)
+        if fileManager.fileExists(atPath: fileURL.path) {
+            try fileManager.removeItem(at: fileURL)
+        }
     }
     
     public func clear() async throws {
-        try await Task.detached {
-            for directory in StorageDirectory.allCases {
-                let url = directory.url
-                let contents = try self.fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
-                for fileURL in contents {
-                    try self.fileManager.removeItem(at: fileURL)
-                }
-            }
-        }.value
-    }
-    
-    public func createBackup() async throws -> URL {
-        let backupURL = try getBackupURL()
-        let storageURL = try getStorageURL()
-        
-        // Create backup directory if needed
-        try fileManager.createDirectory(at: backupURL, withIntermediateDirectories: true)
-        
-        // Create backup folder with timestamp
-        let timestamp = ISO8601DateFormatter().string(from: Date())
-        let backupFolderURL = backupURL.appendingPathComponent(timestamp)
-        try fileManager.createDirectory(at: backupFolderURL, withIntermediateDirectories: true)
-        
-        // Copy all files to backup
-        let contents = try fileManager.contentsOfDirectory(at: storageURL, includingPropertiesForKeys: nil)
-        try contents.forEach { sourceURL in
-            let destinationURL = backupFolderURL.appendingPathComponent(sourceURL.lastPathComponent)
-            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        // Clear UserDefaults (domain-specific)
+        if let bundleIdentifier = Bundle.main.bundleIdentifier {
+            userDefaults.removePersistentDomain(forName: bundleIdentifier)
         }
         
-        return backupFolderURL
-    }
-    
-    public func restoreFromBackup(_ backupURL: URL) async throws {
-        guard fileManager.fileExists(atPath: backupURL.path) else {
-            throw StorageError.backupNotFound
-        }
+        // Clear all files in storage directory
+        let storageDirectory = documentsDirectory.appendingPathComponent("Storage", isDirectory: true)
+        let contents = try fileManager.contentsOfDirectory(at: storageDirectory, includingPropertiesForKeys: nil)
         
-        let storageURL = try getStorageURL()
-        
-        // Clear current storage
-        try clear()
-        
-        // Copy backup files to storage
-        let contents = try fileManager.contentsOfDirectory(at: backupURL, includingPropertiesForKeys: nil)
-        try contents.forEach { sourceURL in
-            let destinationURL = storageURL.appendingPathComponent(sourceURL.lastPathComponent)
-            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        for url in contents {
+            try fileManager.removeItem(at: url)
         }
     }
     
-    // MARK: - Private Methods
-    private func setupStorage() {
-        do {
-            let url = try getStorageURL()
-            try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
-        } catch {
-            print("Failed to setup storage: \(error)")
-        }
-    }
+    // MARK: - Helper Methods
     
-    private func setupEncoder() {
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = .prettyPrinted
-        decoder.dateDecodingStrategy = .iso8601
-    }
-    
-    private func getStorageURL() throws -> URL {
-        try fileManager.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent(Constants.storageDirectory)
-    }
-    
-    private func getBackupURL() throws -> URL {
-        try fileManager.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent(Constants.storageDirectory)
-            .appendingPathComponent(Constants.backupDirectory)
-    }
-    
-    private func getURL(for key: StorageKey) -> URL {
-        key.directory.url.appendingPathComponent(key.fileName)
-    }
-    
-    private func createDirectoryIfNeeded(for directory: StorageDirectory) throws {
-        let url = directory.url
-        if !fileManager.fileExists(atPath: url.path) {
-            try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
-        }
-    }
-    
-    private func cleanupCacheIfNeeded() throws {
-        let cacheURL = StorageDirectory.cache.url
-        let contents = try fileManager.contentsOfDirectory(at: cacheURL, includingPropertiesForKeys: [.fileSizeKey])
-        
-        var totalSize = 0
-        for fileURL in contents {
-            let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
-            totalSize += attributes[.size] as? Int ?? 0
-        }
-        
-        if totalSize > config.maxCacheSize {
-            // Remove oldest files until under limit
-            let sortedFiles = contents.sorted { file1, file2 in
-                let date1 = try? fileManager.attributesOfItem(atPath: file1.path)[.creationDate] as? Date
-                let date2 = try? fileManager.attributesOfItem(atPath: file2.path)[.creationDate] as? Date
-                return date1 ?? Date() < date2 ?? Date()
-            }
-            
-            for fileURL in sortedFiles {
-                try fileManager.removeItem(at: fileURL)
-                let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
-                totalSize -= attributes[.size] as? Int ?? 0
-                
-                if totalSize <= config.maxCacheSize {
-                    break
-                }
-            }
-        }
-    }
-    
-    private func cleanupBackupsIfNeeded() throws {
-        let backupsURL = StorageDirectory.backups.url
-        let contents = try fileManager.contentsOfDirectory(at: backupsURL, includingPropertiesForKeys: [.creationDateKey])
-        
-        if contents.count > config.maxBackupCount {
-            let sortedFiles = contents.sorted { file1, file2 in
-                let date1 = try? fileManager.attributesOfItem(atPath: file1.path)[.creationDate] as? Date
-                let date2 = try? fileManager.attributesOfItem(atPath: file2.path)[.creationDate] as? Date
-                return date1 ?? Date() < date2 ?? Date()
-            }
-            
-            for fileURL in sortedFiles.prefix(contents.count - config.maxBackupCount) {
-                try fileManager.removeItem(at: fileURL)
-            }
-        }
+    private func storageURL(for key: String) -> URL {
+        let sanitizedKey = key.replacingOccurrences(of: "/", with: "_")
+        return documentsDirectory.appendingPathComponent("Storage/\(sanitizedKey).json")
     }
 }
 
-// MARK: - Storage Directory Extension
-extension StorageDirectory: CaseIterable {
-    static var allCases: [StorageDirectory] {
-        [.documents, .cache, .logs, .backups]
-    }
+// MARK: - Storage Errors
+
+public enum StorageError: Error {
+    case itemNotFound
+    case collectionNotFound
+    case encodingError
+    case decodingError
 } 

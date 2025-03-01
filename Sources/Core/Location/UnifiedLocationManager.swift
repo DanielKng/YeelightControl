@@ -1,83 +1,160 @@
-import Foundation
 import CoreLocation
+import Foundation
 import Combine
 import SwiftUI
+import OSLog
+
+// Add explicit imports for the types
 
 // MARK: - Location Managing Protocol
-@preconcurrency protocol LocationManaging: Actor {
-    nonisolated var currentLocation: CLLocation? { get }
-    nonisolated var locationUpdates: AnyPublisher<CLLocation, Never> { get }
-    nonisolated var authorizationStatus: CLAuthorizationStatus { get }
-    nonisolated var authorizationUpdates: AnyPublisher<CLAuthorizationStatus, Never> { get }
+public protocol LocationManaging: AnyObject {
+    var currentLocation: CLLocation? { get }
+    var locationUpdates: AnyPublisher<CLLocation, Never> { get }
+    var authorizationStatus: CLAuthorizationStatus { get }
+    var isMonitoringAvailable: Bool { get }
+    var monitoredRegions: Set<CLRegion> { get }
     
-    func requestWhenInUseAuthorization() async
-    func requestAlwaysAuthorization() async
-    func startUpdatingLocation() async
-    func stopUpdatingLocation() async
-    func startMonitoring(region: CLRegion) async
-    func stopMonitoring(region: CLRegion) async
-    func requestLocation() async
+    func requestAuthorization()
+    func startUpdatingLocation()
+    func stopUpdatingLocation()
+    func startMonitoring(for region: CLRegion)
+    func stopMonitoring(for region: CLRegion)
 }
 
-@MainActor
-public final class UnifiedLocationManager: NSObject, LocationManaging, ObservableObject, CLLocationManagerDelegate, Service {
-    // MARK: - Published Properties
-    @Published public private(set) var currentLocation: CLLocation?
-    @Published public private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
-    @Published public private(set) var isMonitoringLocation = false
+// Create a separate delegate class to handle CLLocationManagerDelegate
+private class LocationManagerDelegate: NSObject, CLLocationManagerDelegate {
+    weak var manager: UnifiedLocationManager?
+    
+    init(manager: UnifiedLocationManager) {
+        self.manager = manager
+        super.init()
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        Task { @MainActor in
+            await self.manager?.handleLocationUpdate(location)
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task {
+            await self.manager?.handleLocationError(error)
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        Task {
+            await self.manager?.handleAuthorizationChange(status)
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
+        Task {
+            await self.manager?.handleStartMonitoring(region)
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
+        Task {
+            await self.manager?.handleRegionEnter(region)
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
+        Task {
+            await self.manager?.handleRegionExit(region)
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, monitoringDidFailFor region: CLRegion?, withError error: Error) {
+        Task {
+            await self.manager?.handleMonitoringFailure(region, error: error)
+        }
+    }
+}
+
+public actor UnifiedLocationManager: LocationManaging {
+    public let id = "location.manager"
+    public var isEnabled: Bool = true
+    
+    // Use MainActor for published properties
+    @MainActor @Published public private(set) var currentLocation: CLLocation?
+    @MainActor @Published public private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    @MainActor @Published public private(set) var isMonitoringLocation = false
     
     // MARK: - Publishers
-    nonisolated var locationUpdates: AnyPublisher<CLLocation, Never> {
+    public nonisolated var locationUpdates: AnyPublisher<CLLocation, Never> {
         locationSubject.eraseToAnyPublisher()
     }
     
-    nonisolated var authorizationUpdates: AnyPublisher<CLAuthorizationStatus, Never> {
+    public nonisolated var authorizationUpdates: AnyPublisher<CLAuthorizationStatus, Never> {
         authorizationSubject.eraseToAnyPublisher()
     }
     
+    public nonisolated var isMonitoringAvailable: Bool {
+        CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self)
+    }
+    
+    public nonisolated var monitoredRegions: Set<CLRegion> {
+        locationManager.monitoredRegions
+    }
+    
     // MARK: - Private Properties
-    private let services: ServiceContainer
-    private let locationManager = CLLocationManager()
+    private let services: BaseServiceContainer
+    private let locationManager: CLLocationManager
     private let locationSubject = PassthroughSubject<CLLocation, Never>()
     private let authorizationSubject = PassthroughSubject<CLAuthorizationStatus, Never>()
-    private var monitoredRegions: Set<CLRegion> = []
     private var cancellables = Set<AnyCancellable>()
     private var locationUpdateHandler: ((CLLocation) -> Void)?
+    private var locationDelegate: LocationManagerDelegate!
+    private var isMonitoring: Bool = false
     
     // MARK: - Singleton
     public static let shared = UnifiedLocationManager()
     
     // MARK: - Initialization
-    private override init() {
-        self.services = .shared
-        super.init()
-        setupLocationManager()
-        setupConfigurationObserver()
+    public init(services: BaseServiceContainer = .shared) {
+        self.services = services
+        self.locationManager = CLLocationManager()
+        
+        // Create the delegate and set it
+        self.locationDelegate = LocationManagerDelegate(manager: self)
+        self.locationManager.delegate = self.locationDelegate
+        
+        self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        self.locationManager.distanceFilter = kCLDistanceFilterNone
+        self.locationManager.allowsBackgroundLocationUpdates = true
+        self.locationManager.pausesLocationUpdatesAutomatically = false
+        
+        // Setup configuration observer in a task
+        Task {
+            await setupConfigurationObserver()
+        }
     }
     
     // MARK: - Public Methods
-    public func requestAuthorization() async {
+    public nonisolated func requestAuthorization() {
         locationManager.requestWhenInUseAuthorization()
     }
     
     public func startMonitoringLocation() async {
         guard CLLocationManager.locationServicesEnabled() else {
-            await services.logger.log(.warning, "Location services are disabled")
+            await services.logger.warning("Location services are disabled", category: .location)
             return
         }
         
-        guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
-            await services.logger.log(.warning, "Location authorization not granted")
+        let status = await MainActor.run { authorizationStatus }
+        guard status == .authorizedWhenInUse || status == .authorizedAlways else {
+            await services.logger.warning("Location authorization not granted", category: .location)
             return
         }
         
-        locationManager.startUpdatingLocation()
-        isMonitoringLocation = true
+        await startMonitoring()
     }
     
     public func stopMonitoringLocation() async {
-        locationManager.stopUpdatingLocation()
-        isMonitoringLocation = false
+        await stopMonitoring()
     }
     
     public func getCurrentLocation() async throws -> CLLocation {
@@ -94,63 +171,42 @@ public final class UnifiedLocationManager: NSObject, LocationManaging, Observabl
                 try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
                 if let handler = self.locationUpdateHandler {
                     self.locationUpdateHandler = nil
-                    handler(self.currentLocation ?? CLLocation())
+                    let location = await MainActor.run { self.currentLocation ?? CLLocation() }
+                    handler(location)
                 }
             }
         }
     }
     
-    func requestWhenInUseAuthorization() async {
-        locationManager.requestWhenInUseAuthorization()
-    }
-    
-    func requestAlwaysAuthorization() async {
-        locationManager.requestAlwaysAuthorization()
-    }
-    
-    func startUpdatingLocation() async {
+    public nonisolated func startUpdatingLocation() {
         locationManager.startUpdatingLocation()
-        await services.logger.log(.info, "Started location updates")
     }
     
-    func stopUpdatingLocation() async {
+    public nonisolated func stopUpdatingLocation() {
         locationManager.stopUpdatingLocation()
-        await services.logger.log(.info, "Stopped location updates")
     }
     
-    func startMonitoring(region: CLRegion) async {
+    public nonisolated func startMonitoring(for region: CLRegion) {
         guard CLLocationManager.isMonitoringAvailable(for: type(of: region)) else {
-            await services.logger.log(.warning, "Region monitoring not available for region type")
+            Task {
+                await services.logger.error("Region monitoring is not available for \(type(of: region))", category: .location)
+            }
             return
         }
-        
         locationManager.startMonitoring(for: region)
-        monitoredRegions.insert(region)
-        await services.logger.log(.info, "Started monitoring region: \(region.identifier)")
     }
     
-    func stopMonitoring(region: CLRegion) async {
+    public nonisolated func stopMonitoring(for region: CLRegion) {
         locationManager.stopMonitoring(for: region)
-        monitoredRegions.remove(region)
-        await services.logger.log(.info, "Stopped monitoring region: \(region.identifier)")
     }
     
-    func requestLocation() async {
+    public nonisolated func requestLocation() {
         locationManager.requestLocation()
     }
     
     // MARK: - Private Methods
-    private func setupLocationManager() {
-        locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 10 // meters
-        
-        // Update initial authorization status
-        authorizationStatus = locationManager.authorizationStatus
-    }
-    
-    private func setupConfigurationObserver() {
-        services.config.configurationUpdates
+    private func setupConfigurationObserver() async {
+        await services.config.configurationUpdates
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
                     await self?.updateLocationManagerConfiguration()
@@ -167,87 +223,117 @@ public final class UnifiedLocationManager: NSObject, LocationManaging, Observabl
         locationManager.allowsBackgroundLocationUpdates = await services.config.getValue(for: .allowsBackgroundLocationUpdates) ?? false
     }
     
-    // MARK: - Service Protocol
-    public func start() async throws {
+    // MARK: - Delegate Handler Methods
+    @MainActor
+    func handleLocationUpdate(_ location: CLLocation) async {
+        currentLocation = location
+        locationSubject.send(location)
+        await services.logger.info("Location updated: \(location.coordinate)", category: .location)
+        
+        if let handler = locationUpdateHandler {
+            locationUpdateHandler = nil
+            handler(location)
+        }
+    }
+    
+    func handleLocationError(_ error: Error) async {
+        await services.logger.error("Location update failed: \(error.localizedDescription)", category: .location)
+    }
+    
+    @MainActor
+    func handleAuthorizationChange(_ status: CLAuthorizationStatus) async {
+        authorizationStatus = status
+        authorizationSubject.send(status)
+        
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            if isMonitoringLocation {
+                await startMonitoringLocation()
+            }
+        case .denied, .restricted:
+            await stopMonitoringLocation()
+        case .notDetermined:
+            break
+        @unknown default:
+            break
+        }
+    }
+    
+    func handleStartMonitoring(_ region: CLRegion) async {
+        await services.logger.info("Started monitoring region: \(region.identifier)", category: .location)
+    }
+    
+    func handleRegionEnter(_ region: CLRegion) async {
+        await services.logger.info("Entered region: \(region.identifier)", category: .location)
+    }
+    
+    func handleRegionExit(_ region: CLRegion) async {
+        await services.logger.info("Exited region: \(region.identifier)", category: .location)
+    }
+    
+    func handleMonitoringFailure(_ region: CLRegion?, error: Error) async {
+        if let region = region {
+            await services.logger.error("Monitoring failed for region \(region.identifier): \(error.localizedDescription)", category: .location)
+        } else {
+            await services.logger.error("Monitoring failed: \(error.localizedDescription)", category: .location)
+        }
+        await services.errorHandler.handle(error)
+    }
+    
+    private func startMonitoring() async {
+        guard !isMonitoring else { return }
+        
+        isMonitoring = true
+        await services.logger.info("Started location monitoring", category: .location)
+        
+        locationManager.startUpdatingLocation()
+    }
+    
+    private func stopMonitoring() async {
+        guard isMonitoring else { return }
+        
+        isMonitoring = false
+        await services.logger.info("Stopped location monitoring", category: .location)
+        
+        locationManager.stopUpdatingLocation()
+    }
+}
+
+public enum LocationEvent {
+    case locationUpdated(CLLocation)
+    case permissionGranted
+    case permissionDenied
+    case permissionNotDetermined
+    case error(Error)
+}
+
+public enum LocationError: LocalizedError {
+    case permissionDenied
+    case locationUnavailable
+    case monitoringFailed(Error)
+    
+    public var errorDescription: String? {
+        switch self {
+        case .permissionDenied:
+            return "Location permission denied"
+        case .locationUnavailable:
+            return "Location services unavailable"
+        case .monitoringFailed(let error):
+            return "Location monitoring failed: \(error.localizedDescription)"
+        }
+    }
+}
+
+// MARK: - Service Protocol
+extension UnifiedLocationManager {
+    public func start() async {
         await requestAuthorization()
     }
     
     public func stop() async {
         locationManager.stopUpdatingLocation()
         for region in monitoredRegions {
-            await stopMonitoring(region: region)
-        }
-    }
-    
-    // MARK: - CLLocationManagerDelegate
-    public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
-        currentLocation = location
-        locationUpdateHandler?(location)
-        locationSubject.send(location)
-        Task {
-            await services.logger.log(.debug, "Location updated: \(location.coordinate)")
-        }
-    }
-    
-    public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        Task {
-            await services.logger.log(.error, "Location update failed: \(error.localizedDescription)")
-            await services.errorHandler.handle(error)
-        }
-    }
-    
-    public func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        authorizationStatus = status
-        authorizationSubject.send(status)
-        Task {
-            await services.logger.log(.info, "Location authorization status changed: \(status.rawValue)")
-            
-            switch status {
-            case .authorizedWhenInUse, .authorizedAlways:
-                if isMonitoringLocation {
-                    Task {
-                        await startMonitoringLocation()
-                    }
-                }
-            case .denied, .restricted:
-                Task {
-                    await stopMonitoringLocation()
-                }
-            case .notDetermined:
-                break
-            @unknown default:
-                break
-            }
-        }
-    }
-    
-    public func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
-        Task {
-            await services.logger.log(.info, "Started monitoring region: \(region.identifier)")
-        }
-    }
-    
-    public func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
-        Task {
-            await services.logger.log(.info, "Entered region: \(region.identifier)")
-        }
-    }
-    
-    public func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
-        Task {
-            await services.logger.log(.info, "Exited region: \(region.identifier)")
-        }
-    }
-    
-    public func locationManager(_ manager: CLLocationManager, monitoringDidFailFor region: CLRegion?, withError error: Error) {
-        Task {
-            if let region = region {
-                await services.logger.log(.error, "Region monitoring failed for \(region.identifier): \(error.localizedDescription)")
-            } else {
-                await services.logger.log(.error, "Region monitoring failed: \(error.localizedDescription)")
-            }
-            await services.errorHandler.handle(error)
+            await stopMonitoring(for: region)
         }
     }
 } 

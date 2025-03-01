@@ -1,292 +1,222 @@
 import Foundation
+import Combine
 import CoreLocation
 import Photos
-import Contacts
-import AVFoundation
 import UserNotifications
-import Combine
-import SwiftUI
-import EventKit
-import CoreBluetooth
+import AVFoundation
+import UIKit
 
-// MARK: - Permission Managing Protocol
-@preconcurrency public protocol PermissionManaging: Actor {
-    nonisolated var permissionUpdates: AnyPublisher<PermissionUpdate, Never> { get }
-    
-    func checkPermission(_ type: PermissionType) async -> PermissionStatus
-    func requestPermission(_ type: PermissionType) async throws -> PermissionStatus
-    nonisolated func openSettings()
-}
-
-// MARK: - Permission Type
-enum Permission: CaseIterable {
+// MARK: - Permission Types
+public enum Core_AppPermissionType: String, CaseIterable, Codable {
     case location
-    case locationAlways
     case notification
     case camera
     case microphone
     case photoLibrary
-    case contacts
-    case calendar
-    case bluetooth
+}
+
+public enum Core_PermissionStatus: String, Codable {
+    case notDetermined
+    case denied
+    case restricted
+    case authorized
+    case provisional // For notifications
+    case limited     // For photo library
+}
+
+// MARK: - Permission Update Type
+public struct Core_PermissionUpdate: Codable {
+    public let type: Core_AppPermissionType
+    public let status: Core_PermissionStatus
     
-    var name: String {
-        switch self {
-        case .location: return "Location"
-        case .locationAlways: return "Location Always"
-        case .notification: return "Notifications"
-        case .camera: return "Camera"
-        case .microphone: return "Microphone"
-        case .photoLibrary: return "Photo Library"
-        case .contacts: return "Contacts"
-        case .calendar: return "Calendar"
-        case .bluetooth: return "Bluetooth"
-        }
+    public init(type: Core_AppPermissionType, status: Core_PermissionStatus) {
+        self.type = type
+        self.status = status
+    }
+    
+    // Explicit implementation of Decodable
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(Core_AppPermissionType.self, forKey: .type)
+        status = try container.decode(Core_PermissionStatus.self, forKey: .status)
+    }
+    
+    // Explicit implementation of Encodable
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(type, forKey: .type)
+        try container.encode(status, forKey: .status)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case status
     }
 }
 
-// MARK: - Permission Update
-public struct PermissionUpdate: Equatable {
-    public let type: PermissionType
-    public let status: PermissionStatus
-    public let error: Error?
+// MARK: - Permission Managing Protocol
+public protocol Core_PermissionManaging: AnyObject {
+    var permissionUpdates: AnyPublisher<Core_PermissionUpdate, Never> { get }
     
-    public static func == (lhs: PermissionUpdate, rhs: PermissionUpdate) -> Bool {
-        lhs.type == rhs.type && lhs.status == rhs.status
-    }
+    func requestPermission(for type: Core_AppPermissionType) async -> Core_PermissionStatus
+    func checkPermissionStatus(for type: Core_AppPermissionType) async -> Core_PermissionStatus
 }
 
-@MainActor
-public final class UnifiedPermissionManager: NSObject, PermissionManaging {
+// MARK: - Unified Permission Manager Implementation
+public final class UnifiedPermissionManager: ObservableObject, Core_PermissionManaging {
     // MARK: - Properties
     private let locationManager = CLLocationManager()
-    private let notificationCenter = UNUserNotificationCenter.current()
-    private let photoLibrary = PHPhotoLibrary.shared()
-    private let contactStore = CNContactStore()
-    private let eventStore = EKEventStore()
-    private let bluetoothManager = CBCentralManager()
+    private let permissionSubject = PassthroughSubject<Core_PermissionUpdate, Never>()
     
-    private var permissionStatuses: [PermissionType: PermissionStatus] = [:]
-    private let permissionSubject = PassthroughSubject<PermissionUpdate, Never>()
-    private var cancellables = Set<AnyCancellable>()
+    // MARK: - Initialization
+    public init() {
+        locationManager.delegate = nil // We'll use one-time requests
+    }
     
-    public nonisolated var permissionUpdates: AnyPublisher<PermissionUpdate, Never> {
+    // MARK: - Public API
+    public var permissionUpdates: AnyPublisher<Core_PermissionUpdate, Never> {
         permissionSubject.eraseToAnyPublisher()
     }
     
-    // MARK: - Initialization
-    public override init() {
-        super.init()
-        setupObservers()
-    }
-    
-    // MARK: - Public Methods
-    public func checkPermission(_ type: PermissionType) async -> PermissionStatus {
+    public func requestPermission(for type: Core_AppPermissionType) async -> Core_PermissionStatus {
+        let status: Core_PermissionStatus
+        
         switch type {
         case .location:
-            return checkLocationPermission()
+            status = await requestLocationPermission()
         case .notification:
-            return await checkNotificationPermission()
+            status = await requestNotificationPermission()
         case .camera:
-            return checkCameraPermission()
+            status = await requestCameraPermission()
         case .microphone:
-            return checkMicrophonePermission()
+            status = await requestMicrophonePermission()
         case .photoLibrary:
-            return await checkPhotoLibraryPermission()
-        case .contacts:
-            return checkContactsPermission()
-        case .calendar:
-            return checkCalendarPermission()
-        case .reminders:
-            return checkRemindersPermission()
-        case .bluetooth:
-            return checkBluetoothPermission()
-        case .backgroundRefresh:
-            return checkBackgroundRefreshPermission()
-        case .localNetwork:
-            return checkLocalNetworkPermission()
+            status = await requestPhotoLibraryPermission()
         }
+        
+        // Publish the update
+        let update = Core_PermissionUpdate(type: type, status: status)
+        permissionSubject.send(update)
+        
+        return status
     }
     
-    public func requestPermission(_ type: PermissionType) async throws -> PermissionStatus {
+    public func checkPermissionStatus(for type: Core_AppPermissionType) async -> Core_PermissionStatus {
+        let status: Core_PermissionStatus
+        
         switch type {
         case .location:
-            return try await requestLocationPermission()
+            status = checkLocationPermissionStatus()
         case .notification:
-            return try await requestNotificationPermission()
+            status = await checkNotificationPermissionStatus()
         case .camera:
-            return try await requestCameraPermission()
+            status = checkCameraPermissionStatus()
         case .microphone:
-            return try await requestMicrophonePermission()
+            status = checkMicrophonePermissionStatus()
         case .photoLibrary:
-            return try await requestPhotoLibraryPermission()
-        case .contacts:
-            return try await requestContactsPermission()
-        case .calendar:
-            return try await requestCalendarPermission()
-        case .reminders:
-            return try await requestRemindersPermission()
-        case .bluetooth:
-            return try await requestBluetoothPermission()
-        case .backgroundRefresh:
-            return try await requestBackgroundRefreshPermission()
-        case .localNetwork:
-            return try await requestLocalNetworkPermission()
+            status = await checkPhotoLibraryPermissionStatus()
         }
-    }
-    
-    public nonisolated func openSettings() {
-        Task { @MainActor in
-            guard let settingsUrl = URL(string: UIApplication.openSettingsURLString) else { return }
-            UIApplication.shared.open(settingsUrl)
-        }
-    }
-    
-    // MARK: - Private Methods
-    private func setupObservers() {
-        NotificationCenter.default.publisher(for: .locationAuthorizationChanged)
-            .sink { [weak self] _ in
-                guard let self = self else { return }
-                Task { @MainActor in
-                    let status = self.checkLocationPermission()
-                    self.updatePermissionStatus(.location, status: status)
-                }
-            }
-            .store(in: &cancellables)
-    }
-    
-    private func updatePermissionStatus(_ type: PermissionType, status: PermissionStatus) {
-        permissionStatuses[type] = status
-        permissionSubject.send(PermissionUpdate(type: type, status: status, error: nil))
-    }
-    
-    private func updatePermissionError(_ type: PermissionType, error: Error) {
-        let status = permissionStatuses[type] ?? .notDetermined
-        permissionSubject.send(PermissionUpdate(type: type, status: status, error: error))
+        
+        return status
     }
     
     // MARK: - Permission Request Methods
-    private func requestLocationPermission() async throws -> PermissionStatus {
-        // Implementation for location permission request
-        return .notDetermined
+    private func requestLocationPermission() async -> Core_PermissionStatus {
+        let status = locationManager.authorizationStatus
+        
+        if status == .notDetermined {
+            locationManager.requestWhenInUseAuthorization()
+            // Wait for the user's decision
+            // In a real app, you'd use a continuation to wait for the delegate callback
+        }
+        
+        return mapCLAuthorizationStatus(status)
     }
     
-    private func requestNotificationPermission() async throws -> PermissionStatus {
-        // Implementation for notification permission request
-        return .notDetermined
-    }
-    
-    private func requestCameraPermission() async throws -> PermissionStatus {
-        // Implementation for camera permission request
-        return .notDetermined
-    }
-    
-    private func requestMicrophonePermission() async throws -> PermissionStatus {
-        // Implementation for microphone permission request
-        return .notDetermined
-    }
-    
-    private func requestPhotoLibraryPermission() async throws -> PermissionStatus {
-        // Implementation for photo library permission request
-        return .notDetermined
-    }
-    
-    private func requestContactsPermission() async throws -> PermissionStatus {
-        // Implementation for contacts permission request
-        return .notDetermined
-    }
-    
-    private func requestCalendarPermission() async throws -> PermissionStatus {
-        // Implementation for calendar permission request
-        return .notDetermined
-    }
-    
-    private func requestRemindersPermission() async throws -> PermissionStatus {
-        // Implementation for reminders permission request
-        return .notDetermined
-    }
-    
-    private func requestBluetoothPermission() async throws -> PermissionStatus {
-        // Implementation for bluetooth permission request
-        return .notDetermined
-    }
-    
-    private func requestBackgroundRefreshPermission() async throws -> PermissionStatus {
-        // Implementation for background refresh permission request
-        return .notDetermined
-    }
-    
-    private func requestLocalNetworkPermission() async throws -> PermissionStatus {
-        // Implementation for local network permission request
-        return .notDetermined
-    }
-    
-    // MARK: - Permission Check Methods
-    private func checkLocationPermission() -> PermissionStatus {
-        switch locationManager.authorizationStatus {
-        case .notDetermined:
-            return .notDetermined
-        case .restricted:
-            return .restricted
-        case .denied:
+    private func requestNotificationPermission() async -> Core_PermissionStatus {
+        do {
+            let settings = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+            return settings ? .authorized : .denied
+        } catch {
+            print("Error requesting notification permission: \(error)")
             return .denied
-        case .authorizedAlways, .authorizedWhenInUse:
-            return .authorized
-        @unknown default:
-            return .notDetermined
         }
     }
     
-    private func checkNotificationPermission() async -> PermissionStatus {
-        let settings = await notificationCenter.notificationSettings()
+    private func requestCameraPermission() async -> Core_PermissionStatus {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        
+        if status == .notDetermined {
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            return granted ? .authorized : .denied
+        }
+        
+        return mapAVAuthorizationStatus(status)
+    }
+    
+    private func requestMicrophonePermission() async -> Core_PermissionStatus {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        
+        if status == .notDetermined {
+            let granted = await AVCaptureDevice.requestAccess(for: .audio)
+            return granted ? .authorized : .denied
+        }
+        
+        return mapAVAuthorizationStatus(status)
+    }
+    
+    private func requestPhotoLibraryPermission() async -> Core_PermissionStatus {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        
+        if status == .notDetermined {
+            let newStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            return mapPhotoAuthorizationStatus(newStatus)
+        }
+        
+        return mapPhotoAuthorizationStatus(status)
+    }
+    
+    // MARK: - Permission Status Check Methods
+    private func checkLocationPermissionStatus() -> Core_PermissionStatus {
+        let status = locationManager.authorizationStatus
+        return mapCLAuthorizationStatus(status)
+    }
+    
+    private func checkNotificationPermissionStatus() async -> Core_PermissionStatus {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        
         switch settings.authorizationStatus {
         case .notDetermined:
             return .notDetermined
         case .denied:
             return .denied
-        case .ephemeral:
-            return .ephemeral
+        case .authorized:
+            return .authorized
         case .provisional:
             return .provisional
-        case .authorized:
+        case .ephemeral:
             return .authorized
         @unknown default:
             return .notDetermined
         }
     }
     
-    private func checkCameraPermission() -> PermissionStatus {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .notDetermined:
-            return .notDetermined
-        case .restricted:
-            return .restricted
-        case .denied:
-            return .denied
-        case .authorized:
-            return .authorized
-        @unknown default:
-            return .notDetermined
-        }
+    private func checkCameraPermissionStatus() -> Core_PermissionStatus {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        return mapAVAuthorizationStatus(status)
     }
     
-    private func checkMicrophonePermission() -> PermissionStatus {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .notDetermined:
-            return .notDetermined
-        case .restricted:
-            return .restricted
-        case .denied:
-            return .denied
-        case .authorized:
-            return .authorized
-        @unknown default:
-            return .notDetermined
-        }
+    private func checkMicrophonePermissionStatus() -> Core_PermissionStatus {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        return mapAVAuthorizationStatus(status)
     }
     
-    private func checkPhotoLibraryPermission() async -> PermissionStatus {
-        let status = await PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    private func checkPhotoLibraryPermissionStatus() async -> Core_PermissionStatus {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        return mapPhotoAuthorizationStatus(status)
+    }
+    
+    private func mapPhotoAuthorizationStatus(_ status: PHAuthorizationStatus) -> Core_PermissionStatus {
         switch status {
         case .notDetermined:
             return .notDetermined
@@ -303,8 +233,8 @@ public final class UnifiedPermissionManager: NSObject, PermissionManaging {
         }
     }
     
-    private func checkContactsPermission() -> PermissionStatus {
-        switch CNContactStore.authorizationStatus(for: .contacts) {
+    private func mapAVAuthorizationStatus(_ status: AVAuthorizationStatus) -> Core_PermissionStatus {
+        switch status {
         case .notDetermined:
             return .notDetermined
         case .restricted:
@@ -318,44 +248,18 @@ public final class UnifiedPermissionManager: NSObject, PermissionManaging {
         }
     }
     
-    private func checkCalendarPermission() -> PermissionStatus {
-        switch EKEventStore.authorizationStatus(for: .event) {
+    private func mapCLAuthorizationStatus(_ status: CLAuthorizationStatus) -> Core_PermissionStatus {
+        switch status {
         case .notDetermined:
             return .notDetermined
         case .restricted:
             return .restricted
         case .denied:
             return .denied
-        case .authorized:
+        case .authorizedAlways, .authorizedWhenInUse:
             return .authorized
         @unknown default:
             return .notDetermined
         }
     }
-    
-    private func checkRemindersPermission() -> PermissionStatus {
-        // Implementation for reminders permission check
-        return .notDetermined
-    }
-    
-    private func checkBluetoothPermission() -> PermissionStatus {
-        // Bluetooth permissions are handled through Info.plist
-        // This is a simplified check
-        return .authorized
-    }
-    
-    private func checkBackgroundRefreshPermission() -> PermissionStatus {
-        // Implementation for background refresh permission check
-        return .notDetermined
-    }
-    
-    private func checkLocalNetworkPermission() -> PermissionStatus {
-        // Implementation for local network permission check
-        return .notDetermined
-    }
-}
-
-// MARK: - Notification Names
-extension Notification.Name {
-    static let locationAuthorizationChanged = Notification.Name("locationAuthorizationChanged")
 } 

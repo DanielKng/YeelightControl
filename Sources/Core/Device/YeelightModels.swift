@@ -1,2 +1,0 @@
-// All device types have been moved to CoreTypes.swift
-// This file can be safely deleted 

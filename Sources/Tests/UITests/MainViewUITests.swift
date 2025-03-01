@@ -1,10 +1,14 @@
-import XCTest
-@testable import YeelightControl
+i; mport SwiftUI
+i; ; mport SwiftUI
+i; ; ; mport SwiftUI
+i; ; ; ; mport SwiftUI
+i; ; ; ; mport XCTest
+@; ; ; ; testable import YeelightControl
 
-final class MainViewUITests: XCTestCase {
-    var app: XCUIApplication!
+f; ; ; ; inal class MainViewUITests: XCTestCase {
+ ; ; ; ; var app: XCUIApplication!
     
-    override func setUp() {
+ ; ; ; ; override func setUp() {
         super.setUp()
         continueAfterFailure = false
         app = XCUIApplication()
@@ -12,91 +16,91 @@ final class MainViewUITests: XCTestCase {
         app.launch()
     }
     
-    func testTabNavigation() {
-        // Test Lights tab
+ ; ; ; ; func testTabNavigation() {
+        //; ; ; ; Test Lights tab
         XCTAssertTrue(app.tabBars.buttons["Lights"].exists)
         app.tabBars.buttons["Lights"].tap()
-        XCTAssertTrue(app.navigationBars["My Lights"].exists)
+        XCTAssertTrue(app.navigationBars["; ; ; ; My Lights"].exists)
         
-        // Test Scenes tab
+        //; ; ; ; Test Scenes tab
         app.tabBars.buttons["Scenes"].tap()
         XCTAssertTrue(app.navigationBars["Scenes"].exists)
         
-        // Test Automation tab
+        //; ; ; ; Test Automation tab
         app.tabBars.buttons["Automation"].tap()
         XCTAssertTrue(app.navigationBars["Automations"].exists)
     }
     
-    func testDeviceDiscovery() {
-        // Start discovery
+ ; ; ; ; func testDeviceDiscovery() {
+        //; ; ; ; Start discovery
         app.tabBars.buttons["Lights"].tap()
-        app.buttons["Discover Devices"].tap()
+        app.buttons["; ; ; ; Discover Devices"].tap()
         
-        // Verify discovery progress indicator
-        XCTAssertTrue(app.progressIndicators["Discovering devices..."].exists)
+        //; ; ; ; Verify discovery ; ; ; ; progress indicator
+        XCTAssertTrue(app.progressIndicators["; ; ; ; Discovering devices..."].exists)
         
-        // Wait for discovery to complete
-        let deviceList = app.collectionViews.firstMatch
+        //; ; ; ; Wait for ; ; ; ; discovery to complete
+ ; ; ; ; let deviceList = app.collectionViews.firstMatch
         XCTAssertTrue(deviceList.waitForExistence(timeout: 10))
     }
     
-    func testRoomFiltering() {
+ ; ; ; ; func testRoomFiltering() {
         app.tabBars.buttons["Lights"].tap()
         
-        // Test room selection
-        let roomsScrollView = app.scrollViews["RoomSelector"]
+        //; ; ; ; Test room selection
+ ; ; ; ; let roomsScrollView = app.scrollViews["RoomSelector"]
         XCTAssertTrue(roomsScrollView.exists)
         
-        // Tap "Living Room"
-        let livingRoomButton = roomsScrollView.buttons["Living Room"]
+        // Tap "; ; ; ; Living Room"
+ ; ; ; ; let livingRoomButton = roomsScrollView.buttons["; ; ; ; Living Room"]
         XCTAssertTrue(livingRoomButton.exists)
         livingRoomButton.tap()
         
-        // Verify filtered devices
-        let deviceList = app.collectionViews.firstMatch
+        //; ; ; ; Verify filtered devices
+ ; ; ; ; let deviceList = app.collectionViews.firstMatch
         XCTAssertTrue(deviceList.exists)
     }
     
-    func testDeviceControls() {
+ ; ; ; ; func testDeviceControls() {
         app.tabBars.buttons["Lights"].tap()
         
-        // Find first device card
-        let deviceCard = app.collectionViews.cells.firstMatch
-        guard deviceCard.waitForExistence(timeout: 5) else {
-            XCTFail("No devices found")
+        //; ; ; ; Find first ; ; ; ; device card
+ ; ; ; ; let deviceCard = app.collectionViews.cells.firstMatch
+ ; ; ; ; guard deviceCard.waitForExistence(timeout: 5) else {
+            XCTFail("; ; ; ; No devices found")
             return
         }
         
-        // Test power toggle
-        let powerToggle = deviceCard.switches.firstMatch
+        //; ; ; ; Test power toggle
+ ; ; ; ; let powerToggle = deviceCard.switches.firstMatch
         XCTAssertTrue(powerToggle.exists)
         powerToggle.tap()
         
-        // Test brightness slider
-        let brightnessSlider = deviceCard.sliders.firstMatch
+        //; ; ; ; Test brightness slider
+ ; ; ; ; let brightnessSlider = deviceCard.sliders.firstMatch
         XCTAssertTrue(brightnessSlider.exists)
         brightnessSlider.adjust(toNormalizedSliderPosition: 0.75)
     }
     
-    func testDeviceDetails() {
+ ; ; ; ; func testDeviceDetails() {
         app.tabBars.buttons["Lights"].tap()
         
-        // Open device details
-        let deviceCard = app.collectionViews.cells.firstMatch
-        guard deviceCard.waitForExistence(timeout: 5) else {
-            XCTFail("No devices found")
+        //; ; ; ; Open device details
+ ; ; ; ; let deviceCard = app.collectionViews.cells.firstMatch
+ ; ; ; ; guard deviceCard.waitForExistence(timeout: 5) else {
+            XCTFail("; ; ; ; No devices found")
             return
         }
         deviceCard.tap()
         
-        // Verify device details view
+        //; ; ; ; Verify device ; ; ; ; details view
         XCTAssertTrue(app.navigationBars.firstMatch.exists)
         
-        // Test mode switching
-        let segmentedControl = app.segmentedControls.firstMatch
+        //; ; ; ; Test mode switching
+ ; ; ; ; let segmentedControl = app.segmentedControls.firstMatch
         XCTAssertTrue(segmentedControl.exists)
         
-        // Test each mode
+        //; ; ; ; Test each mode
         segmentedControl.buttons["Color"].tap()
         XCTAssertTrue(app.colorWells.firstMatch.exists)
         
@@ -104,68 +108,68 @@ final class MainViewUITests: XCTestCase {
         XCTAssertTrue(app.sliders["Temperature"].exists)
         
         segmentedControl.buttons["Effects"].tap()
-        XCTAssertTrue(app.buttons["Start Effect"].exists)
+        XCTAssertTrue(app.buttons["; ; ; ; Start Effect"].exists)
     }
     
-    func testSceneCreation() {
+ ; ; ; ; func testSceneCreation() {
         app.tabBars.buttons["Scenes"].tap()
         
-        // Tap create scene button
+        //; ; ; ; Tap create ; ; ; ; scene button
         app.navigationBars.buttons["Add"].tap()
         
-        // Fill scene details
-        let nameField = app.textFields["Scene Name"]
+        //; ; ; ; Fill scene details
+ ; ; ; ; let nameField = app.textFields["; ; ; ; Scene Name"]
         XCTAssertTrue(nameField.exists)
         nameField.tap()
-        nameField.typeText("Test Scene")
+        nameField.typeText("; ; ; ; Test Scene")
         
-        // Select scene type
-        let typePicker = app.pickers["Type"]
+        //; ; ; ; Select scene type
+ ; ; ; ; let typePicker = app.pickers["Type"]
         XCTAssertTrue(typePicker.exists)
         typePicker.pickerWheels.element.adjust(toPickerWheelValue: "Color")
         
-        // Select a device
-        let deviceList = app.tables["DeviceList"]
+        //; ; ; ; Select a device
+ ; ; ; ; let deviceList = app.tables["DeviceList"]
         XCTAssertTrue(deviceList.exists)
         deviceList.cells.firstMatch.switches.firstMatch.tap()
         
-        // Save scene
+        //; ; ; ; Save scene
         app.navigationBars.buttons["Save"].tap()
         
-        // Verify scene was created
-        XCTAssertTrue(app.collectionViews.cells.containing(NSPredicate(format: "label CONTAINS 'Test Scene'")).firstMatch.exists)
+        //; ; ; ; Verify scene ; ; ; ; was created
+        XCTAssertTrue(app.collectionViews.cells.containing(NSPredicate(format: "; ; ; ; label CONTAINS '; ; ; ; Test Scene'")).firstMatch.exists)
     }
     
-    func testAutomationCreation() {
+ ; ; ; ; func testAutomationCreation() {
         app.tabBars.buttons["Automation"].tap()
         
-        // Tap create automation button
+        //; ; ; ; Tap create ; ; ; ; automation button
         app.navigationBars.buttons["Add"].tap()
         
-        // Fill automation details
-        let nameField = app.textFields["Automation Name"]
+        //; ; ; ; Fill automation details
+ ; ; ; ; let nameField = app.textFields["; ; ; ; Automation Name"]
         XCTAssertTrue(nameField.exists)
         nameField.tap()
-        nameField.typeText("Test Automation")
+        nameField.typeText("; ; ; ; Test Automation")
         
-        // Select trigger type
-        let triggerPicker = app.pickers["Trigger"]
+        //; ; ; ; Select trigger type
+ ; ; ; ; let triggerPicker = app.pickers["Trigger"]
         XCTAssertTrue(triggerPicker.exists)
         triggerPicker.pickerWheels.element.adjust(toPickerWheelValue: "Time")
         
-        // Set time
-        let timePicker = app.datePickers["Time"]
+        //; ; ; ; Set time
+ ; ; ; ; let timePicker = app.datePickers["Time"]
         XCTAssertTrue(timePicker.exists)
         
-        // Select action
-        let actionPicker = app.pickers["Action"]
+        //; ; ; ; Select action
+ ; ; ; ; let actionPicker = app.pickers["Action"]
         XCTAssertTrue(actionPicker.exists)
         actionPicker.pickerWheels.element.adjust(toPickerWheelValue: "Power")
         
-        // Save automation
+        //; ; ; ; Save automation
         app.navigationBars.buttons["Save"].tap()
         
-        // Verify automation was created
-        XCTAssertTrue(app.tables.cells.containing(NSPredicate(format: "label CONTAINS 'Test Automation'")).firstMatch.exists)
+        //; ; ; ; Verify automation ; ; ; ; was created
+        XCTAssertTrue(app.tables.cells.containing(NSPredicate(format: "; ; ; ; label CONTAINS '; ; ; ; Test Automation'")).firstMatch.exists)
     }
 } 

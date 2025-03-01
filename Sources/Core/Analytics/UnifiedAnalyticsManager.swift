@@ -3,25 +3,27 @@ import Combine
 import SwiftUI
 
 // MARK: - Analytics Managing Protocol
-protocol AnalyticsManaging {
-    func trackEvent(_ event: AnalyticsEvent)
-    func startSession()
-    func endSession()
-    func logError(_ error: Error, context: [String: Any]?)
-    func setUserProperty(_ value: Any?, forKey key: String)
-    func incrementMetric(_ metric: AnalyticsMetric)
+public protocol Core_AnalyticsManaging: Core_BaseService {
+    var isEnabled: Bool { get set }
+    func trackEvent(_ event: Core_AnalyticsEvent)
+    func startSession() async
+    func endSession() async
+    func logError(_ error: Error, context: [String: Any]?) async
+    func setUserProperty(_ value: Any?, forKey key: String) async
+    func incrementMetric(_ metric: Core_AnalyticsMetric) async
 }
 
 // MARK: - Analytics Event
-public struct AnalyticsEvent: Codable {
+public struct Core_AnalyticsEvent: Codable, Identifiable {
+    public var id: String { UUID().uuidString }
     public let name: String
-    public let category: AnalyticsCategory
+    public let category: Core_AnalyticsCategory
     public let parameters: [String: String]
     public let timestamp: Date
     
     public init(
         name: String,
-        category: AnalyticsCategory,
+        category: Core_AnalyticsCategory,
         parameters: [String: String] = [:],
         timestamp: Date = Date()
     ) {
@@ -33,7 +35,7 @@ public struct AnalyticsEvent: Codable {
 }
 
 // MARK: - Analytics Category
-enum AnalyticsCategory: String, Codable {
+public enum Core_AnalyticsCategory: String, Codable {
     case device
     case room
     case scene
@@ -43,10 +45,11 @@ enum AnalyticsCategory: String, Codable {
     case error
     case performance
     case user
+    case analytics
 }
 
 // MARK: - Analytics Metric
-enum AnalyticsMetric: String {
+public enum Core_AnalyticsMetric: String {
     case deviceCount
     case roomCount
     case sceneCount
@@ -60,76 +63,99 @@ enum AnalyticsMetric: String {
 }
 
 @MainActor
-public final class UnifiedAnalyticsManager: ObservableObject {
+public final class UnifiedAnalyticsManager: ObservableObject, Core_AnalyticsManaging {
     // MARK: - Published Properties
-    @Published public private(set) var isEnabled = false
-    @Published public private(set) var events: [AnalyticsEvent] = []
+    @Published public var isEnabled = false
+    @Published public private(set) var events: [Core_AnalyticsEvent] = []
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
     private let queue = DispatchQueue(label: "com.yeelight.analytics", qos: .utility)
-    private let storage: UnifiedStorageManager
+    private let storage: any Core_StorageManaging
     private var sessionStartTime: Date?
-    private var eventBuffer: [AnalyticsEvent] = []
+    private var eventBuffer: [Core_AnalyticsEvent] = []
     private let maxBufferSize = 100
     
     // MARK: - Constants
     private enum Constants {
         static let maxEventCount = 1000
-        static let storageKey = "analytics_events"
+        static let storageKey = "analytics"
+        static let settingsKey = "analytics.settings"
         static let batchSize = 50
     }
     
-    // MARK: - Singleton
-    public static let shared = UnifiedAnalyticsManager()
-    
-    private init() {
-        self.storage = .shared
-        loadEvents()
-        setupPeriodicUpload()
-        loadSettings()
+    // MARK: - Initialization
+    public init(storageManager: any Core_StorageManaging) {
+        self.storage = storageManager
+        
+        Task {
+            await loadSettings()
+            await loadEvents()
+            setupPeriodicUpload()
+        }
     }
     
     // MARK: - Public Methods
-    public func setEnabled(_ enabled: Bool) {
+    public func setEnabled(_ enabled: Bool) async {
         isEnabled = enabled
         if !enabled {
-            clearEvents()
+            await clearEvents()
         }
-        saveSettings()
+        await saveSettings()
     }
     
-    public func trackEvent(_ event: AnalyticsEvent) {
-        guard isEnabled, sessionStartTime != nil else { return }
-        
-        eventBuffer.append(event)
-        
-        if eventBuffer.count >= maxBufferSize {
-            flushEvents()
-        }
+    public func trackEvent(_ event: Core_AnalyticsEvent) {
+        // TODO: Implement analytics tracking
+        print("Analytics event tracked: \(event.name) with parameters: \(event.parameters)")
     }
     
-    public func clearEvents() {
+    public func startSession() async {
+        sessionStartTime = Date()
+    }
+    
+    public func endSession() async {
+        guard let startTime = sessionStartTime else { return }
+        let duration = Date().timeIntervalSince(startTime)
+        print("Session ended with duration: \(duration) seconds")
+        sessionStartTime = nil
+    }
+    
+    public func logError(_ error: Error, context: [String: Any]?) async {
+        print("Analytics error logged: \(error.localizedDescription) with context: \(context ?? [:])")
+    }
+    
+    public func setUserProperty(_ value: Any?, forKey key: String) async {
+        print("Setting user property \(key) to \(String(describing: value))")
+    }
+    
+    public func incrementMetric(_ metric: Core_AnalyticsMetric) async {
+        print("Incrementing metric: \(metric.rawValue)")
+    }
+    
+    public func clearEvents() async {
         events.removeAll()
-        try? storage.remove(forKey: Constants.storageKey)
+        do {
+            try await storage.delete(forKey: Constants.storageKey)
+        } catch {
+            print("Failed to clear analytics events: \(error)")
+        }
     }
     
     // MARK: - Private Methods
-    private func loadEvents() {
+    private func loadEvents() async {
         do {
-            let data = try storage.load(forKey: Constants.storageKey)
-            let decoder = JSONDecoder()
-            events = try decoder.decode([AnalyticsEvent].self, from: data)
+            let loadedEvents: [Core_AnalyticsEvent] = try await storage.load(forKey: Constants.storageKey)
+            await MainActor.run {
+                events = loadedEvents
+            }
         } catch {
             print("Failed to load analytics events: \(error)")
         }
     }
     
-    private func saveEvents() {
+    private func saveEvents() async {
         do {
-            let encoder = JSONEncoder()
-            let data = try encoder.encode(events)
-            try storage.save(data, forKey: Constants.storageKey)
+            try await storage.save(events, forKey: Constants.storageKey)
         } catch {
             print("Failed to save analytics events: \(error)")
         }
@@ -139,50 +165,53 @@ public final class UnifiedAnalyticsManager: ObservableObject {
         Timer.publish(every: 300, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                self?.uploadEvents()
+                Task {
+                    await self?.uploadEvents()
+                }
             }
             .store(in: &cancellables)
     }
     
-    private func uploadEvents() {
+    private func uploadEvents() async {
         guard !events.isEmpty else { return }
         
         let eventsToUpload = Array(events.prefix(Constants.batchSize))
         
-        queue.async { [weak self] in
-            // Here you would implement the actual upload logic
-            // For example, sending to a analytics service
-            
-            DispatchQueue.main.async {
-                self?.events.removeFirst(min(eventsToUpload.count, self?.events.count ?? 0))
-                self?.saveEvents()
-            }
-        }
+        // Here you would implement the actual upload logic
+        // For example, sending to a analytics service
+        
+        events.removeFirst(min(eventsToUpload.count, events.count))
+        await saveEvents()
     }
     
-    private func flushEvents() {
+    private func flushEvents() async {
         guard !eventBuffer.isEmpty else { return }
         
         do {
-            try storage.save(eventBuffer, forKey: "analytics_events")
+            try await storage.save(eventBuffer, forKey: Constants.storageKey)
             eventBuffer.removeAll()
         } catch {
             print("Failed to flush analytics events: \(error)")
         }
     }
     
-    private func loadSettings() {
+    private func loadSettings() async {
         do {
-            isEnabled = try storage.load(Bool.self, forKey: "analytics_enabled")
+            let enabled: Bool = try await storage.load(forKey: Constants.settingsKey)
+            await MainActor.run {
+                isEnabled = enabled
+            }
         } catch {
             print("Failed to load analytics settings: \(error)")
-            isEnabled = true // Default to enabled
+            await MainActor.run {
+                isEnabled = true // Default to enabled
+            }
         }
     }
     
-    private func saveSettings() {
+    private func saveSettings() async {
         do {
-            try storage.save(isEnabled, forKey: "analytics_enabled")
+            try await storage.save(isEnabled, forKey: Constants.settingsKey)
         } catch {
             print("Failed to save analytics settings: \(error)")
         }
@@ -190,7 +219,7 @@ public final class UnifiedAnalyticsManager: ObservableObject {
 }
 
 // MARK: - Analytics Event Names
-public enum AnalyticsEventName {
+public enum Core_AnalyticsEventName {
     public static let appLaunch = "app_launch"
     public static let deviceDiscovered = "device_discovered"
     public static let deviceConnected = "device_connected"
@@ -206,7 +235,7 @@ extension Notification.Name {
     static let networkRequestCompleted = Notification.Name("NetworkRequestCompleted")
 }
 
-// MARK: - Logger Category Extension
-extension LogCategory {
-    static let analytics: LogCategory = "analytics"
+// MARK: - Constants
+extension UnifiedAnalyticsManager {
+    public static let logCategory = Core_AnalyticsCategory.analytics
 } 
