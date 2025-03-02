@@ -3,21 +3,13 @@ import Combine
 import SwiftUI
 
 // MARK: - Effect Types
-// Core_Effect is defined in Effect.swift
-// Removing duplicate definition to resolve ambiguity errors
-
+// Core_Effect is defined as a typealias in Effect.swift
 // Core_EffectType is defined in EffectType.swift
-// Removing duplicate definition to resolve ambiguity errors
-
 // Core_EffectParameters is defined in EffectParameters.swift
-// Removing duplicate definition to resolve ambiguity errors
-
 // Core_EffectUpdate is defined in EffectUpdate.swift
-// Removing duplicate definition to resolve ambiguity errors
 
 // MARK: - Effect Protocols
 // Core_EffectManaging protocol is defined in ServiceProtocols.swift
-// Removing duplicate definition to resolve ambiguity errors 
 
 // MARK: - Effect Type
 
@@ -103,31 +95,6 @@ public struct Core_EffectParameters: Codable, Hashable {
         try container.encodeIfPresent(duration, forKey: .duration)
         try container.encodeIfPresent(speed, forKey: .speed)
         try container.encodeIfPresent(custom, forKey: .custom)
-    }
-}
-
-// MARK: - Effect
-
-/// Represents an effect that can be applied to a device
-public struct Core_Effect: Identifiable, Codable, Hashable {
-    public let id: String
-    public let name: String
-    public let type: Core_EffectType
-    public let parameters: Core_EffectParameters
-    public let isBuiltIn: Bool
-    
-    public init(
-        id: String = UUID().uuidString,
-        name: String,
-        type: Core_EffectType,
-        parameters: Core_EffectParameters,
-        isBuiltIn: Bool = false
-    ) {
-        self.id = id
-        self.name = name
-        self.type = type
-        self.parameters = parameters
-        self.isBuiltIn = isBuiltIn
     }
 }
 

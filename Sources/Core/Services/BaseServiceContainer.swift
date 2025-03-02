@@ -32,25 +32,31 @@ open class BaseServiceContainer {
     // MARK: - Async property creation methods
     
     private func createStateManager() async -> UnifiedStateManager {
-        return UnifiedStateManager(services: self as! ServiceContainer)
+        // Use Task to handle the async call
+        let task = Task {
+            return await UnifiedStateManager(services: self as! ServiceContainer)
+        }
+        return await task.value
     }
     
     private func createSecurityManager() async -> UnifiedSecurityManager {
-        // Make this method synchronous to avoid the async error
+        // Check if manager already exists
         if let manager = _securityManager {
             return manager
         }
-        let manager = UnifiedSecurityManager(services: self)
+        // Create a new manager with await since it's an async expression
+        let manager = await UnifiedSecurityManager(services: self)
         _securityManager = manager
         return manager
     }
     
     private func createNotificationManager() async -> UnifiedNotificationManager {
-        // Make this method synchronous to avoid the async error
+        // Check if manager already exists
         if let manager = _notificationManager {
             return manager
         }
-        let manager = UnifiedNotificationManager()
+        // Create a new manager with await since it's an async expression
+        let manager = await UnifiedNotificationManager()
         _notificationManager = manager
         return manager
     }

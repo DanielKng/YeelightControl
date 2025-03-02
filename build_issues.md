@@ -28,6 +28,7 @@
     - Updated `ScenePreview.swift` to use `YeelightDevice` instead of `UnifiedYeelightDevice`
     - Fixed `DeviceStateRow`, `MultiLightPreview`, and `StripEffectPreview` components
     - Updated `LightsView.swift` to properly handle `YeelightDevice` type
+    - Updated `DetailContentView.swift` to use centralized components
 14. ✅ Fixed type alias for `YeelightDevice` in `UIEnvironment.swift`
 15. ✅ Fixed background manager issues in `UnifiedBackgroundManager.swift`
 16. ✅ Fixed circular reference in `UIEnvironment.swift` for `YeelightDevice` typealias
@@ -92,14 +93,16 @@
     - Corrected the method name from `unTrigger` to `unNotificationTrigger` to match `Core_AppNotificationTrigger` enum
     - Updated `AnalyticsEvent` reference to `Core_AnalyticsEvent` with correct parameters
     - Simplified string conversion logic to only check for the key being a string
-44. ✅ Partially fixed actor isolation issues in `UnifiedLogger.swift`:
+44. ✅ Fixed actor isolation issues in `UnifiedLogger.swift`:
     - Updated the `log` method to be nonisolated and properly delegate to an internal method
     - Fixed the `clearLogs` method to be properly async
     - Added missing protocol requirements for `Core_LoggingService`
-45. ✅ Partially fixed actor isolation issues in `UnifiedEffectManager.swift`:
+    - Updated storage method calls to use correct argument labels
+45. ✅ Fixed actor isolation issues in `UnifiedEffectManager.swift`:
     - Changed the class to an actor to properly handle isolation
     - Fixed the `isEnabled` property to properly handle async access
     - Updated method signatures to match the protocol requirements
+    - Updated storage method calls to use correct argument labels
 46. ✅ Fixed storage method calls in `UnifiedLogger.swift`:
     - Updated `loadLogs` method to use `storageManager.load` instead of `get`
     - Updated `saveLogs` method to use correct argument labels (`forKey` instead of `key:value:`)
@@ -121,54 +124,51 @@
     - Updated the `sourceLocation` property to use a computed property based on the case
     - Updated the `with(sourceLocation:)` method to create a new enum instance with the source location
     - Updated the `id` and `errorDescription` methods to handle the updated `unknown` case
+52. ✅ Added `isConnected` property to `Device` struct:
+    - Updated the `Device` struct to include the `isConnected` property
+    - Updated the initializer to accept the `isConnected` parameter
+    - Updated the `yeelight` initializer to set `isConnected` based on `isOnline`
+53. ✅ Added missing members to `DeviceType` enum:
+    - Added `bulb` and `strip` cases to the `DeviceType` enum
+    - Updated the `displayName` computed property to handle the new cases
+54. ✅ Fixed protocol conformance issues in `UnifiedDeviceManager`:
+    - Updated the `deviceUpdates` publisher to match the protocol requirement
+    - Fixed the `isEnabled` property to use `task.value` instead of `task.result.get()`
+55. ✅ Fixed protocol conformance issues in `UnifiedEffectManager`:
+    - Updated the `getAvailableEffects` method to match the protocol requirement
+    - Fixed the `isEnabled` property to use `task.value` instead of `task.result.get()`
+56. ✅ Fixed protocol conformance issues in `UnifiedLogger`:
+    - Added the required `log(_:level:category:file:function:line:)` method
+    - Updated the `clearLogs` method to be nonisolated
+    - Updated the `getAllLogs` method to be nonisolated and non-async
+    - Fixed the `isEnabled` property to use `task.value` instead of `task.result.get()`
 
 ## Remaining Issues
 
-Based on the build output, we still have several issues to fix:
+Based on the build output, we still have a few issues to fix:
 
-1. **Device Type Issues**:
-   - The `Device` struct is missing the `isConnected` property
-   - The `DeviceType` enum is missing the `bulb` and `strip` members
-   - The `DeviceColor` type has issues with the `red` property
-
-2. **Type Conversion Issues**:
+1. **Type Conversion Issues**:
    - Cannot convert between types like `Device` and `Core_Device`
    - Cannot convert between types like `Effect` and `Core_Effect`
 
-3. **Protocol Conformance Issues**:
-   - `UnifiedDeviceManager` does not conform to `Core_DeviceManaging`
-   - `UnifiedEffectManager` does not conform to `Core_EffectManaging`
-   - `UnifiedLogger` does not conform to `Core_LoggingService`
+2. **Protocol Conformance Issues**:
+   - Ensure all manager classes properly conform to their respective protocols
+   - Verify that all required methods are implemented with the correct signatures
 
 ## Updated Approach
 
-1. **Fix Device Type Issues**:
-   - Add the `isConnected` property to the `Device` struct
-   - Add the missing members to the `DeviceType` enum
-   - Fix the `DeviceColor` type issues
-
-2. **Fix Storage Method Call Issues**:
-   - Update all storage method calls to use the correct argument labels
-   - Ensure the `storageManager` interface is consistent across all files
-
-3. **Fix Type Conversion Issues**:
+1. **Fix Type Conversion Issues**:
    - Implement proper type conversion between Core types and implementation types
    - Ensure all types properly conform to their Core counterparts
 
-4. **Fix Protocol Conformance Issues**:
+2. **Fix Protocol Conformance Issues**:
    - Implement all required methods and properties for each protocol
    - Ensure the method signatures match the protocol requirements
 
-5. **Fix Error Handling Issues**:
-   - Update the `Core_AppError` type to include the required properties
-   - Fix the `unknown` case to properly handle associated values
-
 ## Specific Files Needing Attention
 
-- `UnifiedDeviceManager.swift`: Fix device type issues, storage method calls, and protocol conformance
-- `UnifiedEffectManager.swift`: Fix storage method calls and protocol conformance
-- `UnifiedErrorHandler.swift`: Fix error handling issues
-- `UnifiedLogger.swift`: Fix storage method calls and protocol conformance
-- `TypeDefinitions.swift`: Ensure all required types are properly defined
+- `UnifiedDeviceManager.swift`: Verify protocol conformance and type conversion
+- `UnifiedEffectManager.swift`: Verify protocol conformance and type conversion
+- `UnifiedLogger.swift`: Verify protocol conformance and method signatures
 
 More about potential fixing, [HERE](docs/guides/fixing_build_issues.md)

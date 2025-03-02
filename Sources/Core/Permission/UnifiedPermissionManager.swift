@@ -4,7 +4,9 @@ import CoreLocation
 import Photos
 import UserNotifications
 import AVFoundation
+#if canImport(UIKit)
 import UIKit
+#endif
 
 // MARK: - Permission Types
 public enum Core_AppPermissionType: String, CaseIterable, Codable {

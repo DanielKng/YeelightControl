@@ -1,6 +1,11 @@
 import SwiftUI
 import Foundation
 
+// MARK: - Device Type
+
+// Make Device the implementation of Core_Device
+public typealias Core_Device = Device
+
 public struct Device: Identifiable, Codable, Hashable {
     public let id: String
     public let name: String
@@ -8,6 +13,14 @@ public struct Device: Identifiable, Codable, Hashable {
     public var state: DeviceState
     public var isOnline: Bool
     public var lastSeen: Date
+    public var isConnected: Bool
+    
+    // Additional properties required by Core_Device
+    public let manufacturer: String
+    public let model: String
+    public let firmwareVersion: String?
+    public let ipAddress: String?
+    public let macAddress: String?
     
     public init(
         id: String = UUID().uuidString,
@@ -15,7 +28,13 @@ public struct Device: Identifiable, Codable, Hashable {
         type: DeviceType,
         state: DeviceState = .init(),
         isOnline: Bool = false,
-        lastSeen: Date = Date()
+        lastSeen: Date = Date(),
+        isConnected: Bool = false,
+        manufacturer: String = "Yeelight",
+        model: String = "Unknown",
+        firmwareVersion: String? = nil,
+        ipAddress: String? = nil,
+        macAddress: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -23,6 +42,12 @@ public struct Device: Identifiable, Codable, Hashable {
         self.state = state
         self.isOnline = isOnline
         self.lastSeen = lastSeen
+        self.isConnected = isConnected
+        self.manufacturer = manufacturer
+        self.model = model
+        self.firmwareVersion = firmwareVersion
+        self.ipAddress = ipAddress
+        self.macAddress = macAddress
     }
     
     public init(yeelight: Yeelight) {
@@ -32,16 +57,80 @@ public struct Device: Identifiable, Codable, Hashable {
         self.state = yeelight.state
         self.isOnline = yeelight.isOnline
         self.lastSeen = yeelight.lastSeen
+        self.isConnected = yeelight.isOnline
+        self.manufacturer = "Yeelight"
+        self.model = yeelight.model.rawValue
+        self.firmwareVersion = yeelight.firmwareVersion
+        self.ipAddress = yeelight.ipAddress
+        self.macAddress = nil
+    }
+    
+    // Initialize from Core_DeviceType
+    public init(
+        id: String = UUID().uuidString,
+        name: String,
+        type: Core_DeviceType,
+        manufacturer: String,
+        model: String,
+        firmwareVersion: String? = nil,
+        ipAddress: String? = nil,
+        macAddress: String? = nil,
+        state: Core_DeviceState = .unknown,
+        isConnected: Bool = false,
+        lastSeen: Date = Date()
+    ) {
+        self.id = id
+        self.name = name
+        self.type = DeviceType.from(coreType: type)
+        self.manufacturer = manufacturer
+        self.model = model
+        self.firmwareVersion = firmwareVersion
+        self.ipAddress = ipAddress
+        self.macAddress = macAddress
+        self.state = DeviceState.from(coreState: state)
+        self.isConnected = isConnected
+        self.isOnline = isConnected
+        self.lastSeen = lastSeen
     }
 }
 
 public enum DeviceType: Codable, Hashable {
+    case bulb
+    case strip
     case yeelight(Yeelight)
     
     public var displayName: String {
         switch self {
         case .yeelight:
             return "Yeelight"
+        case .bulb:
+            return "Bulb"
+        case .strip:
+            return "Strip"
+        }
+    }
+    
+    // Convert from Core_DeviceType
+    public static func from(coreType: Core_DeviceType) -> DeviceType {
+        switch coreType {
+        case .bulb:
+            return .bulb
+        case .strip:
+            return .strip
+        case .lamp, .ceiling, .ambient, .unknown:
+            return .bulb // Default mapping
+        }
+    }
+    
+    // Convert to Core_DeviceType
+    public var coreType: Core_DeviceType {
+        switch self {
+        case .bulb:
+            return .bulb
+        case .strip:
+            return .strip
+        case .yeelight:
+            return .bulb // Default mapping
         }
     }
 }
@@ -66,6 +155,41 @@ public struct DeviceState: Codable, Hashable {
         self.color = color
         self.effect = effect
     }
+    
+    // Convert from Core_DeviceState
+    public static func from(coreState: Core_DeviceState) -> DeviceState {
+        switch coreState {
+        case .on(let brightness, let color):
+            return DeviceState(
+                power: true,
+                brightness: brightness,
+                colorTemperature: 4000, // Default
+                color: DeviceColor(
+                    red: Int(color.red * 255),
+                    green: Int(color.green * 255),
+                    blue: Int(color.blue * 255)
+                )
+            )
+        case .off:
+            return DeviceState(power: false)
+        case .unknown:
+            return DeviceState()
+        }
+    }
+    
+    // Convert to Core_DeviceState
+    public var coreState: Core_DeviceState {
+        if power {
+            let coreColor = Core_Color(
+                red: Double(color.red) / 255.0,
+                green: Double(color.green) / 255.0,
+                blue: Double(color.blue) / 255.0
+            )
+            return .on(brightness: brightness, color: coreColor)
+        } else {
+            return .off
+        }
+    }
 }
 
 public struct DeviceColor: Codable, Hashable {
@@ -74,6 +198,9 @@ public struct DeviceColor: Codable, Hashable {
     public var blue: Int
     
     public static let white = DeviceColor(red: 255, green: 255, blue: 255)
+    public static let red = DeviceColor(red: 255, green: 0, blue: 0)
+    public static let green = DeviceColor(red: 0, green: 255, blue: 0)
+    public static let blue = DeviceColor(red: 0, green: 0, blue: 255)
     
     public init(red: Int = 255, green: Int = 255, blue: Int = 255) {
         self.red = red

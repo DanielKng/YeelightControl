@@ -93,7 +93,7 @@ public actor UnifiedLogger: Core_LoggingService {
     public nonisolated var isEnabled: Bool {
         get {
             let task = Task { await _isEnabled }
-            return (try? task.result.get()) ?? false
+            return (try? task.value) ?? false
         }
     }
     
@@ -111,6 +111,12 @@ public actor UnifiedLogger: Core_LoggingService {
     }
     
     // MARK: - Core_LoggingService Protocol Implementation
+    
+    public nonisolated func log(_ message: String, level: Core_LogLevel, category: Core_LogCategory, file: String, function: String, line: Int) {
+        Task {
+            await logInternal(message, level: level, category: category.rawValue, file: file, function: function, line: line)
+        }
+    }
     
     public nonisolated func log(message: String, level: String, category: String, file: String = #file, function: String = #function, line: Int = #line) async {
         await logWithStringLevel(message: message, level: level, category: category, file: file, function: function, line: line)
@@ -206,8 +212,10 @@ public actor UnifiedLogger: Core_LoggingService {
         }
     }
     
-    public nonisolated func clearLogs() async {
-        await clearLogsInternal()
+    public nonisolated func clearLogs() {
+        Task {
+            await clearLogsInternal()
+        }
     }
     
     private func clearLogsInternal() async {
@@ -219,7 +227,7 @@ public actor UnifiedLogger: Core_LoggingService {
     
     private func loadLogs() async {
         do {
-            if let storedLogs: [Core_LogEntry] = try await storageManager.load(Core_LogEntry.self, forKey: "logs") {
+            if let storedLogs: [Core_LogEntry] = try await storageManager.load(forKey: "logs") {
                 logs = storedLogs
             }
         } catch {
@@ -236,8 +244,9 @@ public actor UnifiedLogger: Core_LoggingService {
     }
     
     // Required by Core_LoggingService protocol
-    public nonisolated func getAllLogs() async -> [Core_LogEntry] {
-        return await getLogsInternal(filter: nil)
+    public nonisolated func getAllLogs() -> [Core_LogEntry] {
+        let task = Task { await getLogsInternal(filter: nil) }
+        return (try? task.value) ?? []
     }
     
     // Required by Core_LoggingService protocol

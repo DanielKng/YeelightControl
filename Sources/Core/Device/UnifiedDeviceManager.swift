@@ -21,8 +21,10 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     private var _isEnabled: Bool = true
     
     private let storageManager: any Core_StorageManaging
-    private let deviceSubject = PassthroughSubject<Device, Never>()
+    private let deviceSubject = PassthroughSubject<[Device], Never>()
     private var discoveryTask: Task<Void, Never>?
+    private var yeelightManager: UnifiedYeelightManager?
+    private var deviceConnections: [String: DeviceConnection] = [:]
     
     // MARK: - Initialization
     
@@ -31,6 +33,7 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
         
         Task {
             await loadDevices()
+            await setupYeelightManager()
         }
     }
     
@@ -50,74 +53,227 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     // MARK: - Core_DeviceManaging
     
     nonisolated public var devices: [Core_Device] {
-        get {
-            let task = Task { await _devices.map { $0 as Core_Device } }
-            return (try? task.result.get()) ?? []
-        }
+        let task = Task { await _devices }
+        return (try? task.value) ?? []
     }
     
-    nonisolated public var deviceUpdates: AnyPublisher<Core_Device, Never> {
-        deviceSubject.map { $0 as Core_Device }.eraseToAnyPublisher()
+    nonisolated public var deviceUpdates: AnyPublisher<[Core_Device], Never> {
+        deviceSubject.eraseToAnyPublisher()
     }
     
     public func discoverDevices() async throws {
-        await startDiscoveryInternal()
+        // Start real device discovery
+        _isDiscovering = true
+        
+        // First, load any stored devices
+        let storedDevices: [Device]? = try await storageManager.load(forKey: "devices")
+        if let storedDevices = storedDevices {
+            _devices = storedDevices
+            deviceSubject.send(_devices)
+        }
+        
+        // Then, discover Yeelight devices
+        if let yeelightManager = self.yeelightManager {
+            do {
+                let yeelightDevices = try await yeelightManager.discover()
+                
+                // Convert YeelightDevices to Devices and add them
+                for yeelightDevice in yeelightDevices {
+                    let device = Device(yeelight: yeelightDevice)
+                    await addDeviceInternal(device)
+                }
+            } catch {
+                print("Error discovering Yeelight devices: \(error.localizedDescription)")
+            }
+        }
+        
+        _isDiscovering = false
     }
     
     public func connectToDevice(_ device: Core_Device) async throws {
-        guard let device = device as? Device else {
-            throw NSError(domain: "DeviceError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid device type"])
+        guard let index = _devices.firstIndex(where: { $0.id == device.id }) else {
+            throw Core_DeviceError.deviceNotFound
         }
         
-        // Implementation for connecting to device
-        print("Connecting to device: \(device.id)")
+        var updatedDevice = _devices[index]
         
-        var updatedDevice = device
+        // Connect to the physical device based on its type
+        switch updatedDevice.type {
+        case .yeelight(let yeelight):
+            if let yeelightManager = self.yeelightManager {
+                // Create a YeelightDevice from the Yeelight struct
+                let yeelightDevice = YeelightDevice(
+                    id: yeelight.id,
+                    name: yeelight.name,
+                    model: yeelight.model,
+                    firmwareVersion: yeelight.firmwareVersion,
+                    ipAddress: yeelight.ipAddress,
+                    port: yeelight.port,
+                    state: yeelight.state,
+                    isOnline: yeelight.isOnline,
+                    lastSeen: yeelight.lastSeen
+                )
+                
+                try await yeelightManager.connect(to: yeelightDevice)
+                
+                // Create a device connection if it doesn't exist
+                if deviceConnections[device.id] == nil {
+                    let connection = DeviceConnection(device: yeelightDevice)
+                    deviceConnections[device.id] = connection
+                    
+                    // Start monitoring the device state
+                    await connection.connect()
+                }
+            }
+        case .bulb, .strip:
+            // For generic devices, we might have different connection logic
+            // For now, we'll just update the connection state
+            print("Connecting to generic device: \(device.id)")
+        }
+        
         updatedDevice.isConnected = true
-        
-        if let index = _devices.firstIndex(where: { $0.id == device.id }) {
-            _devices[index] = updatedDevice
-            deviceSubject.send(updatedDevice)
-        }
+        await updateDeviceInternal(updatedDevice)
     }
     
     public func disconnectFromDevice(_ device: Core_Device) async throws {
-        guard let device = device as? Device else {
-            throw NSError(domain: "DeviceError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid device type"])
+        guard let index = _devices.firstIndex(where: { $0.id == device.id }) else {
+            throw Core_DeviceError.deviceNotFound
         }
         
-        // Implementation for disconnecting from device
-        print("Disconnecting from device: \(device.id)")
+        var updatedDevice = _devices[index]
         
-        var updatedDevice = device
+        // Disconnect from the physical device based on its type
+        switch updatedDevice.type {
+        case .yeelight(let yeelight):
+            if let yeelightManager = self.yeelightManager {
+                // Create a YeelightDevice from the Yeelight struct
+                let yeelightDevice = YeelightDevice(
+                    id: yeelight.id,
+                    name: yeelight.name,
+                    model: yeelight.model,
+                    firmwareVersion: yeelight.firmwareVersion,
+                    ipAddress: yeelight.ipAddress,
+                    port: yeelight.port,
+                    state: yeelight.state,
+                    isOnline: yeelight.isOnline,
+                    lastSeen: yeelight.lastSeen
+                )
+                
+                await yeelightManager.disconnect(from: yeelightDevice)
+                
+                // Remove the device connection
+                if let connection = deviceConnections[device.id] {
+                    connection.disconnect()
+                    deviceConnections.removeValue(forKey: device.id)
+                }
+            }
+        case .bulb, .strip:
+            // For generic devices, we might have different disconnection logic
+            // For now, we'll just update the connection state
+            print("Disconnecting from generic device: \(device.id)")
+        }
+        
         updatedDevice.isConnected = false
-        
-        if let index = _devices.firstIndex(where: { $0.id == device.id }) {
-            _devices[index] = updatedDevice
-            deviceSubject.send(updatedDevice)
-        }
+        await updateDeviceInternal(updatedDevice)
     }
     
     public func updateDevice(_ device: Core_Device) async throws {
-        guard let device = device as? Device else {
-            throw NSError(domain: "DeviceError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid device type"])
+        guard let index = _devices.firstIndex(where: { $0.id == device.id }) else {
+            throw Core_DeviceError.deviceNotFound
         }
         
-        await updateDeviceInternal(device)
+        await updateDeviceInternal(device as Device)
     }
+    
+    // MARK: - Additional Methods
     
     public nonisolated func getDevice(byId id: String) async -> Core_Device? {
-        let device = await getDeviceInternal(byId: id)
-        return device as Core_Device?
-    }
-    
-    private func getDeviceInternal(byId id: String) -> Device? {
-        return _devices.first { $0.id == id }
+        let devices = await _devices
+        return devices.first { $0.id == id }
     }
     
     public nonisolated func getAllDevices() async -> [Core_Device] {
-        let allDevices = await _devices
-        return allDevices.map { $0 as Core_Device }
+        await _devices
+    }
+    
+    public func updateDeviceState(_ deviceId: String, newState: DeviceState) async throws {
+        guard let index = _devices.firstIndex(where: { $0.id == deviceId }) else {
+            throw Core_DeviceError.deviceNotFound
+        }
+        
+        var updatedDevice = _devices[index]
+        let oldState = updatedDevice.state
+        updatedDevice.state = newState
+        
+        // Send commands to the physical device based on its type
+        switch updatedDevice.type {
+        case .yeelight(let yeelight):
+            if let yeelightManager = self.yeelightManager {
+                // Create a YeelightDevice from the Yeelight struct
+                let yeelightDevice = YeelightDevice(
+                    id: yeelight.id,
+                    name: yeelight.name,
+                    model: yeelight.model,
+                    firmwareVersion: yeelight.firmwareVersion,
+                    ipAddress: yeelight.ipAddress,
+                    port: yeelight.port,
+                    state: oldState, // Use old state as the current device state
+                    isOnline: yeelight.isOnline,
+                    lastSeen: yeelight.lastSeen
+                )
+                
+                // Send commands to update the device state
+                if oldState.power != newState.power {
+                    // Power state changed
+                    let command = YeelightCommand(
+                        id: Int.random(in: 1...1000),
+                        method: newState.power ? "set_power" : "set_power",
+                        params: [newState.power ? "on" : "off", "smooth", 500]
+                    )
+                    try await yeelightManager.send(command, to: yeelightDevice)
+                }
+                
+                if oldState.brightness != newState.brightness {
+                    // Brightness changed
+                    let command = YeelightCommand(
+                        id: Int.random(in: 1...1000),
+                        method: "set_bright",
+                        params: [newState.brightness, "smooth", 500]
+                    )
+                    try await yeelightManager.send(command, to: yeelightDevice)
+                }
+                
+                if oldState.colorTemperature != newState.colorTemperature {
+                    // Color temperature changed
+                    let command = YeelightCommand(
+                        id: Int.random(in: 1...1000),
+                        method: "set_ct_abx",
+                        params: [newState.colorTemperature, "smooth", 500]
+                    )
+                    try await yeelightManager.send(command, to: yeelightDevice)
+                }
+                
+                if oldState.color != newState.color {
+                    // Color changed
+                    let command = YeelightCommand(
+                        id: Int.random(in: 1...1000),
+                        method: "set_rgb",
+                        params: [
+                            (newState.color.red << 16) | (newState.color.green << 8) | newState.color.blue,
+                            "smooth",
+                            500
+                        ]
+                    )
+                    try await yeelightManager.send(command, to: yeelightDevice)
+                }
+            }
+        case .bulb, .strip:
+            // For generic devices, we might have different state update logic
+            // For now, we'll just log the state change
+            print("Updating state for generic device: \(deviceId)")
+        }
+        
+        await updateDeviceInternal(updatedDevice)
     }
     
     public nonisolated func startDiscovery() async {
@@ -130,21 +286,8 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
         _isDiscovering = true
         
         discoveryTask = Task {
-            // Simulate discovery process
             do {
-                // In a real implementation, this would use network discovery
-                // For now, we'll simulate finding devices after a delay
-                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-                
-                // Create sample devices if none exist
-                if _devices.isEmpty {
-                    let sampleDevices = createSampleDevices()
-                    for device in sampleDevices {
-                        _devices.append(device)
-                        try? await storageManager.save(device, forKey: "device.\(device.id)")
-                        deviceSubject.send(device)
-                    }
-                }
+                try await discoverDevices()
             } catch {
                 print("Discovery error: \(error)")
             }
@@ -180,21 +323,47 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
         _devices.append(device)
         
         try? await storageManager.save(device, forKey: "device.\(device.id)")
-        deviceSubject.send(device)
+        deviceSubject.send(_devices)
     }
     
-    public nonisolated func updateDeviceState(_ device: Device, newState: DeviceState) async throws {
-        var updatedDevice = device
-        updatedDevice.state = newState
-        
-        // In a real implementation, this would send commands to the physical device
-        // For now, we'll just update our local state
-        
-        await updateDeviceInternal(updatedDevice)
+    public nonisolated func removeDevice(_ device: Device) async {
+        await removeDeviceInternal(device)
     }
     
-    public nonisolated func updateDevice(_ device: Device) async {
-        await updateDeviceInternal(device)
+    private func removeDeviceInternal(_ device: Device) async {
+        // Disconnect from the device if it's connected
+        if device.isConnected {
+            try? await disconnectFromDevice(device)
+        }
+        
+        _devices.removeAll { $0.id == device.id }
+        
+        try? await storageManager.remove(forKey: "device.\(device.id)")
+        deviceSubject.send(_devices)
+    }
+    
+    // MARK: - Private Methods
+    
+    private func setupYeelightManager() async {
+        // Get the network manager from the service container
+        if let serviceContainer = ServiceContainer.shared as? BaseServiceContainer {
+            self.yeelightManager = serviceContainer.yeelightManager
+        }
+    }
+    
+    private func loadDevices() async {
+        do {
+            // Load devices from storage
+            let deviceDict = try await storageManager.getAll(Device.self, withPrefix: "device.")
+            let loadedDevices = deviceDict
+            
+            if !loadedDevices.isEmpty {
+                _devices = loadedDevices
+                deviceSubject.send(_devices)
+            }
+        } catch {
+            print("Failed to load devices: \(error.localizedDescription)")
+        }
     }
     
     private func updateDeviceInternal(_ device: Device) async {
@@ -203,108 +372,7 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
         }
         
         try? await storageManager.save(device, forKey: "device.\(device.id)")
-        deviceSubject.send(device)
-    }
-    
-    public nonisolated func removeDevice(_ device: Device) async {
-        await removeDeviceInternal(device)
-    }
-    
-    private func removeDeviceInternal(_ device: Device) async {
-        _devices.removeAll { $0.id == device.id }
-        
-        try? await storageManager.remove(forKey: "device.\(device.id)")
-        deviceSubject.send(device)
-    }
-    
-    // MARK: - Private Methods
-    
-    private func loadDevices() async {
-        do {
-            // Load devices from storage
-            let deviceDict: [String: Device] = try await storageManager.getAll(withPrefix: "device.")
-            let loadedDevices = Array(deviceDict.values)
-            
-            // In a real implementation, we would load all devices from storage
-            // For now, we'll just create sample devices
-            if loadedDevices.isEmpty {
-                let sampleDevices = createSampleDevices()
-                for device in sampleDevices {
-                    await addDeviceInternal(device)
-                }
-            } else {
-                _devices = loadedDevices
-            }
-        } catch {
-            print("Failed to load devices: \(error.localizedDescription)")
-            
-            // Create sample devices if none were loaded
-            if _devices.isEmpty {
-                let sampleDevices = createSampleDevices()
-                for device in sampleDevices {
-                    await addDeviceInternal(device)
-                }
-            }
-        }
-    }
-    
-    private func createSampleDevices() -> [Device] {
-        return [
-            Device(
-                id: "device1",
-                name: "Living Room Light",
-                type: .bulb,
-                manufacturer: "Yeelight",
-                model: "Color Bulb",
-                firmwareVersion: "1.5.2",
-                ipAddress: "192.168.1.100",
-                macAddress: "AA:BB:CC:DD:EE:FF",
-                state: DeviceState(
-                    isOn: true,
-                    brightness: 80,
-                    color: .white,
-                    colorTemperature: 4000,
-                    isOnline: true
-                ),
-                isConnected: true
-            ),
-            Device(
-                id: "device2",
-                name: "Bedroom Light",
-                type: .bulb,
-                manufacturer: "Yeelight",
-                model: "White Bulb",
-                firmwareVersion: "1.4.0",
-                ipAddress: "192.168.1.101",
-                macAddress: "AA:BB:CC:DD:EE:00",
-                state: DeviceState(
-                    isOn: false,
-                    brightness: 50,
-                    color: .white,
-                    colorTemperature: 3000,
-                    isOnline: true
-                ),
-                isConnected: false
-            ),
-            Device(
-                id: "device3",
-                name: "Kitchen Strip",
-                type: .strip,
-                manufacturer: "Yeelight",
-                model: "Light Strip",
-                firmwareVersion: "1.6.1",
-                ipAddress: "192.168.1.102",
-                macAddress: "AA:BB:CC:DD:EE:11",
-                state: DeviceState(
-                    isOn: true,
-                    brightness: 100,
-                    color: .red,
-                    colorTemperature: 2700,
-                    isOnline: true
-                ),
-                isConnected: true
-            )
-        ]
+        deviceSubject.send(_devices)
     }
 }
 
@@ -323,6 +391,36 @@ private class DeviceConnection {
     
     func connect() async {
         // Implementation for device connection
+        // This would typically involve setting up a connection to the device
+        // and monitoring its state
+        
+        // Start a task to periodically check the device's state
+        reconnectTask = Task {
+            while !Task.isCancelled {
+                do {
+                    // Check the device's state
+                    // This would typically involve sending a command to the device
+                    // and processing the response
+                    
+                    // For now, we'll just simulate a successful connection
+                    reconnectAttempts = 0
+                    
+                    // Wait for a while before checking again
+                    try await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                } catch {
+                    // If there's an error, increment the reconnect attempts
+                    reconnectAttempts += 1
+                    
+                    // If we've tried too many times, give up
+                    if reconnectAttempts > 5 {
+                        break
+                    }
+                    
+                    // Wait for a while before trying again
+                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                }
+            }
+        }
     }
     
     func disconnect() {

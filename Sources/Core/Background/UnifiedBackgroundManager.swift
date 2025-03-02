@@ -1,5 +1,7 @@
 import Foundation
+#if os(iOS)
 import BackgroundTasks
+#endif
 import Combine
 import SwiftUI
 
@@ -47,25 +49,33 @@ public final class UnifiedBackgroundManager: ObservableObject {
     private init() {
         self.services = .shared
         setupObservers()
+        #if os(iOS)
         registerBackgroundTasks()
+        #endif
     }
     
     // MARK: - Public Methods
     public func enableBackgroundRefresh() {
         backgroundConfig.appSettings.backgroundRefreshEnabled = true
+        #if os(iOS)
         scheduleBackgroundRefresh()
+        #endif
     }
     
     public func disableBackgroundRefresh() {
         backgroundConfig.appSettings.backgroundRefreshEnabled = false
+        #if os(iOS)
         cancelBackgroundRefresh()
+        #endif
     }
     
     public func setBackgroundRefreshInterval(_ interval: TimeInterval) {
         backgroundConfig.appSettings.backgroundRefreshInterval = interval
+        #if os(iOS)
         if backgroundConfig.appSettings.backgroundRefreshEnabled {
             scheduleBackgroundRefresh()
         }
+        #endif
     }
     
     public func performBackgroundRefresh() async throws {
@@ -81,7 +91,9 @@ public final class UnifiedBackgroundManager: ObservableObject {
         }
         
         // Schedule next refresh
+        #if os(iOS)
         scheduleBackgroundRefresh()
+        #endif
     }
     
     // MARK: - Private Methods
@@ -89,12 +101,13 @@ public final class UnifiedBackgroundManager: ObservableObject {
         // Add any necessary observers here
     }
     
+    #if os(iOS)
     private func registerBackgroundTasks() {
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: BackgroundConstants.appRefreshTaskIdentifier,
             using: nil
         ) { [weak self] task in
-            self?.handleAppRefresh(task as! BGAppRefreshTask)
+            self?.handleBackgroundTask(task)
         }
     }
     
@@ -119,6 +132,14 @@ public final class UnifiedBackgroundManager: ObservableObject {
         nextScheduledRefresh = nil
     }
     
+    private func handleBackgroundTask(_ task: Any) {
+        if let refreshTask = task as? BGAppRefreshTask {
+            handleAppRefresh(refreshTask)
+        } else if let processingTask = task as? BGProcessingTask {
+            handleProcessingTask(processingTask)
+        }
+    }
+    
     private func handleAppRefresh(_ task: BGAppRefreshTask) {
         if backgroundConfig.appSettings.backgroundRefreshEnabled {
             Task {
@@ -130,6 +151,12 @@ public final class UnifiedBackgroundManager: ObservableObject {
             task.setTaskCompleted(success: false)
         }
     }
+    
+    private func handleProcessingTask(_ task: BGProcessingTask) {
+        // Implementation for processing task
+        task.setTaskCompleted(success: true)
+    }
+    #endif
     
     private func refreshDevices() async {
         // Implement device refresh logic here

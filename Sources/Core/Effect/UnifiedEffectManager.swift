@@ -31,10 +31,8 @@ public actor UnifiedEffectManager: Core_EffectManaging, Core_BaseService {
     // MARK: - Core_BaseService
     
     public nonisolated var isEnabled: Bool {
-        get {
-            let task = Task { await _isEnabled }
-            return (try? task.result.get()) ?? true
-        }
+        let task = Task { await _isEnabled }
+        return (try? task.value) ?? false
     }
     
     public var serviceIdentifier: String {
@@ -44,14 +42,13 @@ public actor UnifiedEffectManager: Core_EffectManaging, Core_BaseService {
     // MARK: - Core_EffectManaging
     
     public nonisolated var effects: [Core_Effect] {
-        get {
-            let task = Task { await _effects.map { $0 as Core_Effect } }
-            return (try? task.result.get()) ?? []
+        get async {
+            await _effects
         }
     }
     
     public nonisolated var effectUpdates: AnyPublisher<Core_Effect, Never> {
-        effectSubject.map { $0 as Core_Effect }.eraseToAnyPublisher()
+        effectSubject.eraseToAnyPublisher()
     }
     
     private func startEffectTimer(_ effect: Effect) {
@@ -76,18 +73,17 @@ public actor UnifiedEffectManager: Core_EffectManaging, Core_BaseService {
         await applyEffect(localEffect, to: [device.id])
     }
     
-    public nonisolated func getAvailableEffects() async -> [Core_Effect] {
-        let allEffects = await _effects
-        return allEffects.map { $0 as Core_Effect }
+    public nonisolated func getAvailableEffects() -> [Core_Effect] {
+        let task = Task { await _effects }
+        return (try? task.value) ?? []
     }
     
     public func createEffect(name: String, type: Core_EffectType, parameters: Core_EffectParameters) async throws -> Core_Effect {
-        guard let effectType = type as? EffectType,
-              let effectParams = parameters as? EffectParameters else {
-            throw NSError(domain: "EffectError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid effect type or parameters"])
-        }
-        
-        let effect = Effect(name: name, type: effectType, parameters: effectParams)
+        let effect = Effect(
+            name: name,
+            type: type,
+            parameters: parameters
+        )
         _effects.append(effect)
         
         try await storageManager.save(effect, forKey: "effects.\(effect.id)")
@@ -174,8 +170,8 @@ public actor UnifiedEffectManager: Core_EffectManaging, Core_BaseService {
     
     private func loadEffects() async {
         do {
-            let effectsDict: [String: Effect] = try await storageManager.getAll(withPrefix: "effects.")
-            _effects = Array(effectsDict.values)
+            let effects = try await storageManager.getAll(Effect.self, withPrefix: "effects.")
+            _effects = effects
         } catch {
             print("Failed to load effects: \(error.localizedDescription)")
         }

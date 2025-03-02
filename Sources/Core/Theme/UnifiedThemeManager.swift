@@ -1,6 +1,8 @@
 import Foundation
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 import Combine
 
 // MARK: - Theme Colors Protocol
@@ -25,13 +27,13 @@ public struct ConcreteThemeColors: Core_ThemeColors {
     public var error: Color
     
     public init(
-        primary: Color = .blue,
-        secondary: Color = .green,
-        accent: Color = .orange,
-        background: Color = Color(.systemBackground),
-        surface: Color = Color(.secondarySystemBackground),
-        text: Color = .primary,
-        error: Color = .red
+        primary: Color = Color.blue,
+        secondary: Color = Color.purple,
+        accent: Color = Color.orange,
+        background: Color,
+        surface: Color,
+        text: Color,
+        error: Color = Color.red
     ) {
         self.primary = primary
         self.secondary = secondary
@@ -40,6 +42,22 @@ public struct ConcreteThemeColors: Core_ThemeColors {
         self.surface = surface
         self.text = text
         self.error = error
+    }
+    
+    public init() {
+        self.primary = Color.blue
+        self.secondary = Color.purple
+        self.accent = Color.orange
+        #if os(iOS)
+        self.background = Color(UIColor.systemBackground)
+        self.surface = Color(UIColor.secondarySystemBackground)
+        self.text = Color(UIColor.label)
+        #else
+        self.background = Color.white
+        self.surface = Color.gray.opacity(0.1)
+        self.text = Color.black
+        #endif
+        self.error = Color.red
     }
 }
 
@@ -179,8 +197,8 @@ public final class UnifiedThemeManager: ObservableObject, Core_ThemeManaging, Co
                 primary: .blue,
                 secondary: .green,
                 accent: .orange,
-                background: Color(.systemBackground),
-                surface: Color(.secondarySystemBackground),
+                background: Color.white,
+                surface: Color.gray.opacity(0.1),
                 text: .black,
                 error: .red
             )
@@ -189,8 +207,8 @@ public final class UnifiedThemeManager: ObservableObject, Core_ThemeManaging, Co
                 primary: .blue,
                 secondary: .green,
                 accent: .orange,
-                background: Color(.systemBackground),
-                surface: Color(.secondarySystemBackground),
+                background: Color.black,
+                surface: Color.gray.opacity(0.2),
                 text: .white,
                 error: .red
             )

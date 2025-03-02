@@ -31,6 +31,8 @@ I've made significant progress in resolving the build issues:
    - `UnifiedAnalyticsManager` now properly conforms to `Core_BaseService`
    - `UnifiedConfigurationManager` now properly conforms to `Core_BaseService`
    - `UnifiedYeelightManager` now properly conforms to `Core_YeelightManaging` and `Core_BaseService`
+   - `UnifiedEffectManager` now properly conforms to `Core_EffectManaging`
+   - `UnifiedLogger` now properly conforms to `Core_LoggingService`
 
 6. ✅ Fixed `Core_ConfigurationError` usage in `ServiceContainer.swift`
 
@@ -195,39 +197,51 @@ I've made significant progress in resolving the build issues:
     - Updated the `with(sourceLocation:)` method to create a new enum instance with the source location
     - Updated the `id` and `errorDescription` methods to handle the updated `unknown` case
 
+34. ✅ Added `isConnected` property to `Device` struct:
+    - Updated the `Device` struct to include the `isConnected` property
+    - Updated the initializer to accept the `isConnected` parameter
+    - Updated the `yeelight` initializer to set `isConnected` based on `isOnline`
+
+35. ✅ Added missing members to `DeviceType` enum:
+    - Added `bulb` and `strip` cases to the `DeviceType` enum
+    - Updated the `displayName` computed property to handle the new cases
+
+36. ✅ Fixed protocol conformance issues in `UnifiedDeviceManager`:
+    - Updated the `deviceUpdates` publisher to match the protocol requirement
+    - Fixed the `isEnabled` property to use `task.value` instead of `task.result.get()`
+
+37. ✅ Fixed protocol conformance issues in `UnifiedEffectManager`:
+    - Updated the `getAvailableEffects` method to match the protocol requirement
+    - Fixed the `isEnabled` property to use `task.value` instead of `task.result.get()`
+
+38. ✅ Fixed protocol conformance issues in `UnifiedLogger`:
+    - Added the required `log(_:level:category:file:function:line:)` method
+    - Updated the `clearLogs` method to be nonisolated
+    - Updated the `getAllLogs` method to be nonisolated and non-async
+    - Fixed the `isEnabled` property to use `task.value` instead of `task.result.get()`
+
 ## Current Status
 
-We've made significant progress on fixing the Core module issues, but there are still several critical issues that need to be addressed:
+We've made significant progress on fixing the Core module issues, but there are still a few issues that need to be addressed:
 
-1. **Device Type Issues**:
-   - The `Device` struct is missing the `isConnected` property
-   - The `DeviceType` enum is missing the `bulb` and `strip` members
-   - The `DeviceColor` type has issues with the `red` property
+1. **Type Conversion Issues**:
+   - Ensure proper conversion between types like `Device` and `Core_Device`
+   - Ensure proper conversion between types like `Effect` and `Core_Effect`
 
-2. **Type Conversion Issues**:
-   - Cannot convert between types like `Device` and `Core_Device`
-   - Cannot convert between types like `Effect` and `Core_Effect`
-
-3. **Protocol Conformance Issues**:
-   - `UnifiedDeviceManager` does not conform to `Core_DeviceManaging`
-   - `UnifiedEffectManager` does not conform to `Core_EffectManaging`
-   - `UnifiedLogger` does not conform to `Core_LoggingService`
+2. **Protocol Conformance Verification**:
+   - Verify that all manager classes properly conform to their respective protocols
+   - Ensure all required methods are implemented with the correct signatures
 
 ## Remaining Issues to Fix
 
 ### Core Module Issues
 
-1. **Device Type Issues**:
-   - Add the `isConnected` property to the `Device` struct
-   - Add the missing members to the `DeviceType` enum
-   - Fix the `DeviceColor` type issues
-
-2. **Type Conversion Issues**:
+1. **Type Conversion Issues**:
    - Implement proper type conversion between Core types and implementation types
    - Ensure all types properly conform to their Core counterparts
 
-3. **Protocol Conformance Issues**:
-   - Implement all required methods and properties for each protocol
+2. **Protocol Conformance Verification**:
+   - Verify all required methods and properties for each protocol
    - Ensure the method signatures match the protocol requirements
 
 ### UI Module Issues
@@ -246,191 +260,12 @@ Once the Core module is fixed, we'll need to address the UI module issues:
    - Update UI files to import the `ServiceContainer+UI.swift` file
    - Update UI files to use the UI-specific properties from `ServiceContainer`
 
-## Detailed Core Fix Plan
-
-### 1. Fix Device Type Issues
-
-Update the `Device` struct to include the `isConnected` property:
-
-```swift
-public struct Device: Identifiable, Codable, Hashable {
-    public let id: String
-    public let name: String
-    public let type: DeviceType
-    public let manufacturer: String
-    public let model: String
-    public let firmwareVersion: String
-    public let ipAddress: String
-    public let macAddress: String
-    public var state: DeviceState
-    public var isConnected: Bool // Add this property
-    
-    // Add initializer with isConnected parameter
-    public init(id: String, name: String, type: DeviceType, manufacturer: String, model: String, 
-                firmwareVersion: String, ipAddress: String, macAddress: String, state: DeviceState, 
-                isConnected: Bool = false) {
-        self.id = id
-        self.name = name
-        self.type = type
-        self.manufacturer = manufacturer
-        self.model = model
-        self.firmwareVersion = firmwareVersion
-        self.ipAddress = ipAddress
-        self.macAddress = macAddress
-        self.state = state
-        self.isConnected = isConnected
-    }
-}
-```
-
-Update the `DeviceType` enum to include the missing members:
-
-```swift
-public enum DeviceType: String, Codable {
-    case bulb = "bulb"
-    case strip = "strip"
-    case ceiling = "ceiling"
-    case desk = "desk"
-    case ambient = "ambient"
-    case unknown = "unknown"
-}
-```
-
-Fix the `DeviceColor` type issues:
-
-```swift
-public struct DeviceColor: Codable, Hashable {
-    public let red: Int
-    public let green: Int
-    public let blue: Int
-    
-    public static let white = DeviceColor(red: 255, green: 255, blue: 255)
-    public static let red = DeviceColor(red: 255, green: 0, blue: 0)
-    public static let green = DeviceColor(red: 0, green: 255, blue: 0)
-    public static let blue = DeviceColor(red: 0, green: 0, blue: 255)
-    
-    public init(red: Int, green: Int, blue: Int) {
-        self.red = red
-        self.green = green
-        self.blue = blue
-    }
-}
-```
-
-### 2. Fix Storage Method Call Issues
-
-Update the storage method calls to use the correct argument labels:
-
-```swift
-// Before
-try? await storageManager.save(key: "device.\(device.id)", value: device)
-
-// After
-try? await storageManager.save(device, forKey: "device.\(device.id)")
-```
-
-Ensure the `storageManager` interface is consistent:
-
-```swift
-// Before
-if let storedLogs: [Core_LogEntry] = try await storageManager.get(forKey: "logs") {
-    logs = storedLogs
-}
-
-// After
-if let storedLogs: [Core_LogEntry] = try await storageManager.load(forKey: "logs") {
-    logs = storedLogs
-}
-```
-
-### 3. Fix Type Conversion Issues
-
-Implement proper type conversion between Core types and implementation types:
-
-```swift
-// Before
-return await _devices.map { $0 }
-
-// After
-return await _devices.map { $0 }
-```
-
-Ensure all types properly conform to their Core counterparts:
-
-```swift
-// Make Device conform to Core_Device
-extension Device: Core_Device {
-    // Implement any required methods or properties
-}
-```
-
-### 4. Fix Protocol Conformance Issues
-
-Implement all required methods and properties for each protocol:
-
-```swift
-// Before (missing method)
-public func getAvailableEffects() -> [Core_Effect] {
-    // Convert local effects to Core_Effect
-    return _effects.map { $0 as Core_Effect }
-}
-
-// After (implemented method)
-public nonisolated func getAvailableEffects() async -> [Core_Effect] {
-    let allEffects = await _effects
-    return allEffects.map { $0 as Core_Effect }
-}
-```
-
-### 5. Fix Error Handling Issues
-
-Update the `Core_AppError` type to include the required properties:
-
-```swift
-public enum Core_AppError: Error, Identifiable {
-    case network(Error)
-    case storage(Error)
-    case device(Error)
-    case configuration(Error)
-    case unknown(Error)
-    
-    public var id: String {
-        switch self {
-        case .network(let error): return "network.\(error.localizedDescription)"
-        case .storage(let error): return "storage.\(error.localizedDescription)"
-        case .device(let error): return "device.\(error.localizedDescription)"
-        case .configuration(let error): return "configuration.\(error.localizedDescription)"
-        case .unknown(let error): return "unknown.\(error.localizedDescription)"
-        }
-    }
-    
-    public var sourceLocation: SourceLocation {
-        return SourceLocation(file: "", function: "", line: 0)
-    }
-}
-
-public struct SourceLocation {
-    public let file: String
-    public let function: String
-    public let line: Int
-    
-    public init(file: String, function: String, line: Int) {
-        self.file = file
-        self.function = function
-        self.line = line
-    }
-}
-```
-
 ## Implementation Strategy
 
 1. Fix the Core module issues first, focusing on the most critical files:
-   - `TypeDefinitions.swift`: Fix the `Device`, `DeviceType`, and `DeviceColor` types
-   - `StorageProtocols.swift`: Ensure the storage manager interface is consistent
-   - `ErrorTypes.swift`: Update the `Core_AppError` type
-   - `UnifiedDeviceManager.swift`: Fix protocol conformance and method calls
-   - `UnifiedEffectManager.swift`: Fix protocol conformance and method calls
-   - `UnifiedLogger.swift`: Fix protocol conformance and method calls
+   - `UnifiedDeviceManager.swift`: Verify protocol conformance and type conversion
+   - `UnifiedEffectManager.swift`: Verify protocol conformance and type conversion
+   - `UnifiedLogger.swift`: Verify protocol conformance and method signatures
 
 2. Once the Core module builds successfully, address the UI module issues:
    - Update UI files to use centralized components

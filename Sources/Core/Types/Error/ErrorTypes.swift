@@ -46,6 +46,7 @@ public enum Core_LocationError: LocalizedError, Hashable {
 
 public enum Core_DeviceError: LocalizedError, Hashable {
     case notFound
+    case deviceNotFound
     case connectionFailed
     case commandFailed
     case invalidState
@@ -56,6 +57,7 @@ public enum Core_DeviceError: LocalizedError, Hashable {
     public var errorDescription: String? {
         switch self {
         case .notFound: return "Device not found"
+        case .deviceNotFound: return "Device not found"
         case .connectionFailed: return "Device connection failed"
         case .commandFailed: return "Device command failed"
         case .invalidState: return "Invalid device state"

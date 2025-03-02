@@ -303,4 +303,13 @@ public actor UnifiedStorageManager: Core_StorageManaging, Core_BaseService {
             throw Core_StorageError.fileSystemError
         }
     }
+    
+    public nonisolated func load<T: Codable>(forKey key: String) async throws -> T? {
+        return try await load(T.self, forKey: key)
+    }
+    
+    public nonisolated func getAll<T: Codable>(_ type: T.Type, withPrefix prefix: String) async throws -> [T] {
+        let dict = try await getAll(withPrefix: prefix) as [String: T]
+        return Array(dict.values)
+    }
 } 

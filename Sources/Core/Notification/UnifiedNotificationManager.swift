@@ -157,8 +157,15 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
     
     // MARK: - Core_BaseService Conformance
     private var _isEnabled: Bool = true
-    nonisolated public var isEnabled: Bool {
-        _isEnabled
+    public nonisolated var isEnabled: Bool {
+        get {
+            Task { await _isEnabled }.result.value ?? true
+        }
+        set {
+            Task { @MainActor in
+                self._isEnabled = newValue
+            }
+        }
     }
     
     // MARK: - Core_NotificationManaging Protocol Properties
@@ -169,7 +176,7 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
     
     // MARK: - Private Properties
     private let notificationCenter = UNUserNotificationCenter.current()
-    private let analytics: UnifiedAnalyticsManager
+    private let analytics: any Core_AnalyticsManaging
     private let services: BaseServiceContainer
     private var cancellables = Set<AnyCancellable>()
     
@@ -189,7 +196,7 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
     
     // MARK: - Initialization
     public override init() {
-        self.analytics = .shared
+        self.analytics = ServiceContainer.shared.analyticsManager
         self.services = .shared
         super.init()
         
@@ -215,7 +222,7 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
         let options: UNAuthorizationOptions = [.alert, .sound, .badge]
         isNotificationsEnabled = try await notificationCenter.requestAuthorization(options: options)
         
-        analytics.trackEvent(Core_AnalyticsEvent(
+        await analytics.trackEvent(Core_AnalyticsEvent(
             type: .custom,
             parameters: ["authorized": String(isNotificationsEnabled)]
         ))
