@@ -4,7 +4,7 @@ import Core
 // MARK: - Device
 
 /// Device type for UI components
-public struct Device: Identifiable, Equatable {
+public struct Device: Identifiable, Equatable, Hashable {
     public let id: String
     public let name: String
     public let type: DeviceType
@@ -38,6 +38,11 @@ public struct Device: Identifiable, Equatable {
         self.lastSeen = lastSeen
         self.capabilities = capabilities
         self.state = state
+    }
+    
+    // Hashable conformance
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
     
     // Convert from Core_Device
@@ -130,7 +135,7 @@ public enum DeviceType: String, CaseIterable {
     }
 }
 
-public enum DeviceCapability: String, CaseIterable {
+public enum DeviceCapability: String, CaseIterable, Hashable {
     case onOff
     case brightness
     case color

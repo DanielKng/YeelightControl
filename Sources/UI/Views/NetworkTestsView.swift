@@ -2,7 +2,7 @@ import SwiftUI
 import Core
 
 struct NetworkTestsView: View {
-    @StateObject private var networkMonitor = NetworkMonitor.shared
+    @StateObject private var networkMonitor = ServiceContainer.shared.observableNetworkManager
     @EnvironmentObject private var networkManager: ObservableNetworkManager
     @State private var testResults: [TestResult] = []
     @State private var isRunningTests = false
@@ -15,9 +15,13 @@ struct NetworkTestsView: View {
     struct TestResult: Identifiable {
         let id = UUID()
         let name: String
-        let status: StatusRow.Status
+        let status: TestStatus
         let message: String
         let timestamp = Date()
+    }
+    
+    enum TestStatus {
+        case success, warning, error, info
     }
     
     enum DNSStatus {
@@ -73,7 +77,7 @@ struct NetworkTestsView: View {
                                     title: result.name,
                                     value: result.message,
                                     icon: statusIcon(for: result.status),
-                                    status: result.status
+                                    status: convertStatus(result.status)
                                 )
                             }
                         }
@@ -221,7 +225,7 @@ struct NetworkTestsView: View {
         try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         
         let avgLatency = Double.random(in: 10...200) // ms
-        let status: TestResult.Status
+        let status: TestStatus
         let message: String
         
         if avgLatency < 50 {
@@ -250,7 +254,7 @@ struct NetworkTestsView: View {
         try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
         
         let speed = Double.random(in: 1_000_000...50_000_000) // bps
-        let status: TestResult.Status
+        let status: TestStatus
         let message: String
         
         if speed > 10_000_000 { // 10 Mbps
@@ -274,16 +278,25 @@ struct NetworkTestsView: View {
         }
     }
     
-    private func addTestResult(name: String, status: TestResult.Status, message: String) {
+    private func addTestResult(name: String, status: TestStatus, message: String) {
         testResults.append(TestResult(name: name, status: status, message: message))
     }
     
-    private func statusIcon(for status: StatusRow.Status) -> String {
+    private func statusIcon(for status: TestStatus) -> String {
         switch status {
         case .success: return "checkmark.circle.fill"
         case .warning: return "exclamationmark.triangle.fill"
         case .error: return "xmark.circle.fill"
         case .info: return "info.circle.fill"
+        }
+    }
+    
+    private func convertStatus(_ status: TestStatus) -> StatusRow.Status {
+        switch status {
+        case .success: return .success
+        case .warning: return .warning
+        case .error: return .error
+        case .info: return .info
         }
     }
     

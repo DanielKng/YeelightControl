@@ -1,6 +1,34 @@
 import SwiftUI
 import Core
 
+// MARK: - UI Observable Storage
+
+/// Storage class for observable wrappers
+public class UIObservableStorage {
+    // Singleton instance
+    public static let shared = UIObservableStorage()
+    
+    // Observable wrappers
+    public var yeelightManager: ObservableYeelightManager?
+    public var deviceManager: ObservableDeviceManager?
+    public var sceneManager: ObservableSceneManager?
+    public var effectManager: ObservableEffectManager?
+    public var networkManager: ObservableNetworkManager?
+    public var storageManager: ObservableStorageManager?
+    public var locationManager: ObservableLocationManager?
+    public var permissionManager: ObservablePermissionManager?
+    public var analyticsManager: ObservableAnalyticsManager?
+    public var configurationManager: ObservableConfigurationManager?
+    public var stateManager: ObservableStateManager?
+    public var securityManager: ObservableSecurityManager?
+    public var errorManager: ObservableErrorManager?
+    public var themeManager: ObservableThemeManager?
+    public var logger: ObservableLogger?
+    
+    // Private constructor to enforce singleton pattern
+    private init() {}
+}
+
 // MARK: - ServiceContainer UI Extensions
 
 /// Extension to add UI-specific properties to ServiceContainer
@@ -8,14 +36,14 @@ extension ServiceContainer {
     // MARK: - Observable Wrappers
     
     /// Observable wrapper for YeelightManager
-    public var yeelightManager: ObservableYeelightManager {
-        if let manager = _yeelightManager {
+    public var observableYeelightManager: ObservableYeelightManager {
+        if let manager = UIObservableStorage.shared.yeelightManager {
             return manager
         }
         
         if let unifiedManager = self.yeelightManager as? UnifiedYeelightManager {
             let manager = ObservableYeelightManager(manager: unifiedManager)
-            _yeelightManager = manager
+            UIObservableStorage.shared.yeelightManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
@@ -23,261 +51,275 @@ extension ServiceContainer {
             let networkManager = self.networkManager as? UnifiedNetworkManager ?? UnifiedNetworkManager()
             let unifiedManager = UnifiedYeelightManager(storageManager: storageManager, networkManager: networkManager)
             let manager = ObservableYeelightManager(manager: unifiedManager)
-            _yeelightManager = manager
+            UIObservableStorage.shared.yeelightManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for DeviceManager
-    public var deviceManager: ObservableDeviceManager {
-        if let manager = _deviceManager {
+    public var observableDeviceManager: ObservableDeviceManager {
+        if let manager = UIObservableStorage.shared.deviceManager {
             return manager
         }
         
         if let unifiedManager = self.deviceManager as? UnifiedDeviceManager {
             let manager = ObservableDeviceManager(manager: unifiedManager)
-            _deviceManager = manager
+            UIObservableStorage.shared.deviceManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedDeviceManager()
             let manager = ObservableDeviceManager(manager: unifiedManager)
-            _deviceManager = manager
+            UIObservableStorage.shared.deviceManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for SceneManager
-    public var sceneManager: ObservableSceneManager {
-        if let manager = _sceneManager {
+    public var observableSceneManager: ObservableSceneManager {
+        if let manager = UIObservableStorage.shared.sceneManager {
             return manager
         }
         
         if let unifiedManager = self.sceneManager as? UnifiedSceneManager {
             let manager = ObservableSceneManager(manager: unifiedManager)
-            _sceneManager = manager
+            UIObservableStorage.shared.sceneManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedSceneManager()
             let manager = ObservableSceneManager(manager: unifiedManager)
-            _sceneManager = manager
+            UIObservableStorage.shared.sceneManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for EffectManager
-    public var effectManager: ObservableEffectManager {
-        if let manager = _effectManager {
+    public var observableEffectManager: ObservableEffectManager {
+        if let manager = UIObservableStorage.shared.effectManager {
             return manager
         }
         
         if let unifiedManager = self.effectManager as? UnifiedEffectManager {
             let manager = ObservableEffectManager(manager: unifiedManager)
-            _effectManager = manager
+            UIObservableStorage.shared.effectManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedEffectManager()
             let manager = ObservableEffectManager(manager: unifiedManager)
-            _effectManager = manager
+            UIObservableStorage.shared.effectManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for NetworkManager
-    public var networkManager: ObservableNetworkManager {
-        if let manager = _networkManager {
+    public var observableNetworkManager: ObservableNetworkManager {
+        if let manager = UIObservableStorage.shared.networkManager {
             return manager
         }
         
         if let unifiedManager = self.networkManager as? UnifiedNetworkManager {
             let manager = ObservableNetworkManager(manager: unifiedManager)
-            _networkManager = manager
+            UIObservableStorage.shared.networkManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedNetworkManager()
             let manager = ObservableNetworkManager(manager: unifiedManager)
-            _networkManager = manager
+            UIObservableStorage.shared.networkManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for StorageManager
-    public var storageManager: ObservableStorageManager {
-        if let manager = _storageManager {
+    public var observableStorageManager: ObservableStorageManager {
+        if let manager = UIObservableStorage.shared.storageManager {
             return manager
         }
         
         if let unifiedManager = self.storageManager as? UnifiedStorageManager {
             let manager = ObservableStorageManager(manager: unifiedManager)
-            _storageManager = manager
+            UIObservableStorage.shared.storageManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedStorageManager()
             let manager = ObservableStorageManager(manager: unifiedManager)
-            _storageManager = manager
+            UIObservableStorage.shared.storageManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for LocationManager
-    public var locationManager: ObservableLocationManager {
-        if let manager = _locationManager {
+    public var observableLocationManager: ObservableLocationManager {
+        if let manager = UIObservableStorage.shared.locationManager {
             return manager
         }
         
         if let unifiedManager = self.locationManager as? UnifiedLocationManager {
             let manager = ObservableLocationManager(manager: unifiedManager)
-            _locationManager = manager
+            UIObservableStorage.shared.locationManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedLocationManager()
             let manager = ObservableLocationManager(manager: unifiedManager)
-            _locationManager = manager
+            UIObservableStorage.shared.locationManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for PermissionManager
-    public var permissionManager: ObservablePermissionManager {
-        if let manager = _permissionManager {
+    public var observablePermissionManager: ObservablePermissionManager {
+        if let manager = UIObservableStorage.shared.permissionManager {
             return manager
         }
         
         if let unifiedManager = self.permissionManager as? UnifiedPermissionManager {
             let manager = ObservablePermissionManager(manager: unifiedManager)
-            _permissionManager = manager
+            UIObservableStorage.shared.permissionManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedPermissionManager()
             let manager = ObservablePermissionManager(manager: unifiedManager)
-            _permissionManager = manager
+            UIObservableStorage.shared.permissionManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for AnalyticsManager
-    public var analyticsManager: ObservableAnalyticsManager {
-        if let manager = _analyticsManager {
+    public var observableAnalyticsManager: ObservableAnalyticsManager {
+        if let manager = UIObservableStorage.shared.analyticsManager {
             return manager
         }
         
         if let unifiedManager = self.analyticsManager as? UnifiedAnalyticsManager {
             let manager = ObservableAnalyticsManager(manager: unifiedManager)
-            _analyticsManager = manager
+            UIObservableStorage.shared.analyticsManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedAnalyticsManager()
             let manager = ObservableAnalyticsManager(manager: unifiedManager)
-            _analyticsManager = manager
+            UIObservableStorage.shared.analyticsManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for ConfigurationManager
-    public var configurationManager: ObservableConfigurationManager {
-        if let manager = _configurationManager {
+    public var observableConfigurationManager: ObservableConfigurationManager {
+        if let manager = UIObservableStorage.shared.configurationManager {
             return manager
         }
         
         if let unifiedManager = self.configurationManager as? UnifiedConfigurationManager {
             let manager = ObservableConfigurationManager(manager: unifiedManager)
-            _configurationManager = manager
+            UIObservableStorage.shared.configurationManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedConfigurationManager()
             let manager = ObservableConfigurationManager(manager: unifiedManager)
-            _configurationManager = manager
+            UIObservableStorage.shared.configurationManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for StateManager
-    public var stateManager: ObservableStateManager {
-        if let manager = _stateManager {
+    public var observableStateManager: ObservableStateManager {
+        if let manager = UIObservableStorage.shared.stateManager {
             return manager
         }
         
         if let unifiedManager = self.stateManager as? UnifiedStateManager {
             let manager = ObservableStateManager(manager: unifiedManager)
-            _stateManager = manager
+            UIObservableStorage.shared.stateManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedStateManager()
             let manager = ObservableStateManager(manager: unifiedManager)
-            _stateManager = manager
+            UIObservableStorage.shared.stateManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for SecurityManager
-    public var securityManager: ObservableSecurityManager {
-        if let manager = _securityManager {
+    public var observableSecurityManager: ObservableSecurityManager {
+        if let manager = UIObservableStorage.shared.securityManager {
             return manager
         }
         
         if let unifiedManager = self.securityManager as? UnifiedSecurityManager {
             let manager = ObservableSecurityManager(manager: unifiedManager)
-            _securityManager = manager
+            UIObservableStorage.shared.securityManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedSecurityManager()
             let manager = ObservableSecurityManager(manager: unifiedManager)
-            _securityManager = manager
+            UIObservableStorage.shared.securityManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for ErrorManager
-    public var errorManager: ObservableErrorManager {
-        if let manager = _errorManager {
+    public var observableErrorManager: ObservableErrorManager {
+        if let manager = UIObservableStorage.shared.errorManager {
             return manager
         }
         
-        if let unifiedManager = self.errorHandler as? UnifiedErrorManager {
+        if let unifiedManager = self.errorHandler as? UnifiedErrorHandler {
             let manager = ObservableErrorManager(manager: unifiedManager)
-            _errorManager = manager
+            UIObservableStorage.shared.errorManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
-            let unifiedManager = UnifiedErrorManager()
+            let unifiedManager = UnifiedErrorHandler()
             let manager = ObservableErrorManager(manager: unifiedManager)
-            _errorManager = manager
+            UIObservableStorage.shared.errorManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for ThemeManager
-    public var themeManager: ObservableThemeManager {
-        if let manager = _themeManager {
+    public var observableThemeManager: ObservableThemeManager {
+        if let manager = UIObservableStorage.shared.themeManager {
             return manager
         }
         
         if let unifiedManager = self.themeManager as? UnifiedThemeManager {
             let manager = ObservableThemeManager(manager: unifiedManager)
-            _themeManager = manager
+            UIObservableStorage.shared.themeManager = manager
             return manager
         } else {
             // Create a new manager if the cast fails
             let unifiedManager = UnifiedThemeManager()
             let manager = ObservableThemeManager(manager: unifiedManager)
-            _themeManager = manager
+            UIObservableStorage.shared.themeManager = manager
             return manager
         }
     }
     
     /// Observable wrapper for Logger
-    public var logger: ObservableLogger {
-        return ObservableLogger.shared
+    public var observableLogger: ObservableLogger {
+        if let logger = UIObservableStorage.shared.logger {
+            return logger
+        }
+        
+        if let unifiedLogger = self.logger as? UnifiedLogger {
+            let logger = ObservableLogger(logger: unifiedLogger)
+            UIObservableStorage.shared.logger = logger
+            return logger
+        } else {
+            // Create a new logger if the cast fails
+            let unifiedLogger = UnifiedLogger()
+            let logger = ObservableLogger(logger: unifiedLogger)
+            UIObservableStorage.shared.logger = logger
+            return logger
+        }
     }
     
     /// Observable wrapper for AutomationManager
@@ -338,4 +380,25 @@ extension UnifiedConnectionManager {
 }
 
 // MARK: - View Extension
-// ... existing code ... 
+
+extension View {
+    /// Injects all observable managers into the environment
+    public func withObservableManagers(container: ServiceContainer = ServiceContainer.shared) -> some View {
+        self
+            .environmentObject(container.observableYeelightManager)
+            .environmentObject(container.observableDeviceManager)
+            .environmentObject(container.observableSceneManager)
+            .environmentObject(container.observableEffectManager)
+            .environmentObject(container.observableNetworkManager)
+            .environmentObject(container.observableStorageManager)
+            .environmentObject(container.observableLocationManager)
+            .environmentObject(container.observablePermissionManager)
+            .environmentObject(container.observableAnalyticsManager)
+            .environmentObject(container.observableConfigurationManager)
+            .environmentObject(container.observableStateManager)
+            .environmentObject(container.observableSecurityManager)
+            .environmentObject(container.observableErrorManager)
+            .environmentObject(container.observableThemeManager)
+            .environmentObject(container.observableLogger)
+    }
+} 
