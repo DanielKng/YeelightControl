@@ -1,6 +1,5 @@
 import SwiftUI
 import Core
-import UI.Components
 
 struct NetworkTestsView: View {
     @StateObject private var networkMonitor = NetworkMonitor.shared

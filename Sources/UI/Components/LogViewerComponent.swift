@@ -12,7 +12,7 @@ public struct LogViewerView: View {
     public init() {}
 
     public var body: some View {
-        NavigationStack {
+        NavigationView {
             VStack(spacing: 0) {
                 // Filters
                 ScrollView(.horizontal, showsIndicators: false) {

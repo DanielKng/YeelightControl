@@ -237,6 +237,11 @@ I've made significant progress in resolving the build issues:
     - Updated the `applyScene` method to work with the Core `Scene` struct
     - Fixed the type mismatch in `updateCoreDevice` method by using `device.state.coreState`
 
+42. ✅ Fixed circular dependency issues in UI module:
+    - Removed `import UI.Components` from `DetailContentView.swift`
+    - Removed `import UI.Components` from `NetworkTestsView.swift`
+    - Fixed import statements to avoid circular dependencies
+
 ## Current Status
 
 The Core module now builds successfully! All critical issues have been resolved, including:
@@ -245,15 +250,16 @@ The Core module now builds successfully! All critical issues have been resolved,
 2. ✅ Type conversion between `DeviceState` and `Core_DeviceState`
 3. ✅ Protocol conformance for all manager classes
 4. ✅ Proper implementation of nonisolated properties and methods
+5. ✅ Circular dependencies in UI module imports
 
 ## Next Steps
 
 Now that the Core module is fixed, we can focus on the UI module issues:
 
 1. **UI Module Fixes**:
-   - Update UI files to use centralized components
-   - Update UI files to use observable wrapper classes
-   - Fix ServiceContainer access issues
+   - Continue updating UI files to use centralized components
+   - Continue updating UI files to use observable wrapper classes
+   - Fix any remaining ServiceContainer access issues
 
 2. **Testing**:
    - Test the application to ensure all functionality works as expected

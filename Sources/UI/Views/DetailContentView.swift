@@ -1,6 +1,5 @@
 import SwiftUI
 import Core
-import UI.Components
 
 // This file contains the detailed content view for the Yeelight Control app
 

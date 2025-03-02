@@ -222,14 +222,14 @@ public class ObservableSecurityManager: ObservableObject {
 
 // MARK: - ObservableErrorManager
 
-/// Observable wrapper for UnifiedErrorManager
-@MainActor
+/// Observable wrapper for UnifiedErrorHandler
 public class ObservableErrorManager: ObservableObject {
-    private let manager: UnifiedErrorManager
     @Published public private(set) var currentError: Error?
     @Published public private(set) var errorHistory: [Error] = []
     
-    public init(manager: UnifiedErrorManager) {
+    private let manager: UnifiedErrorHandler
+    
+    public init(manager: UnifiedErrorHandler) {
         self.manager = manager
     }
     
@@ -281,46 +281,28 @@ public class ObservableThemeManager: ObservableObject {
 
 // MARK: - ObservableConnectionManager
 
-/// Observable wrapper for UnifiedConnectionManager
-@MainActor
+/// Observable wrapper for UnifiedNetworkManager
 public class ObservableConnectionManager: ObservableObject {
-    private let manager: UnifiedConnectionManager
-    @Published public private(set) var connectionStatus: [String: Bool] = [:]
+    @Published public private(set) var isConnected: Bool = true
+    @Published public private(set) var connectionType: ConnectionType = .wifi
     
-    public init(manager: UnifiedConnectionManager) {
+    private let manager: UnifiedNetworkManager
+    
+    public init(manager: UnifiedNetworkManager) {
         self.manager = manager
-        Task {
-            await updateConnectionStatus()
-        }
-    }
-    
-    private func updateConnectionStatus() async {
-        // Get real connection status from the manager
-        let wifiStatus = await manager.checkConnection(type: .wifi)
-        let bluetoothStatus = await manager.checkConnection(type: .bluetooth)
-        let internetStatus = await manager.checkConnection(type: .internet)
-        
-        self.connectionStatus = [
-            "wifi": wifiStatus,
-            "bluetooth": bluetoothStatus,
-            "internet": internetStatus
-        ]
     }
     
     public func initialize() async throws {
         try await manager.initialize()
-        await updateConnectionStatus()
     }
     
     public func testConnection() async -> Bool {
         let result = await manager.testConnection()
-        await updateConnectionStatus()
         return result
     }
     
     public func checkConnection(type: ConnectionType) async -> Bool {
         let result = await manager.checkConnection(type: type)
-        await updateConnectionStatus()
         return result
     }
 } 

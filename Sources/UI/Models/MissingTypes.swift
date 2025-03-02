@@ -44,18 +44,30 @@ public struct Device: Identifiable, Equatable {
     public static func from(coreDevice: Core_Device) -> Device {
         let deviceType: DeviceType
         switch coreDevice.type {
-        case .light:
+        case .bulb:
             deviceType = .light
-        case .sensor:
-            deviceType = .sensor
-        case .switch_:
-            deviceType = .switch
-        default:
+        case .strip:
+            deviceType = .light
+        case .lamp:
+            deviceType = .light
+        case .ceiling:
+            deviceType = .light
+        case .ambient:
+            deviceType = .light
+        case .unknown:
             deviceType = .other
         }
         
-        let capabilities: [DeviceCapability] = []
-        // In a real implementation, we would map capabilities based on device type
+        let state = UI_DeviceState(
+            isOn: coreDevice.state.power,
+            brightness: Double(coreDevice.state.brightness),
+            colorTemperature: Double(coreDevice.state.colorTemperature),
+            color: Color(red: Double(coreDevice.state.color.red) / 255.0,
+                         green: Double(coreDevice.state.color.green) / 255.0,
+                         blue: Double(coreDevice.state.color.blue) / 255.0),
+            mode: coreDevice.state.mode?.rawValue ?? "normal",
+            activeEffect: coreDevice.state.effect?.name
+        )
         
         return Device(
             id: coreDevice.id,
@@ -63,17 +75,17 @@ public struct Device: Identifiable, Equatable {
             type: deviceType,
             manufacturer: coreDevice.manufacturer,
             model: coreDevice.model,
-            firmwareVersion: coreDevice.firmwareVersion ?? "unknown",
-            isConnected: coreDevice.isConnected ?? false,
-            lastSeen: coreDevice.lastSeen ?? Date(),
-            capabilities: capabilities,
-            state: coreDevice.state?.uiState ?? UI_DeviceState()
+            firmwareVersion: coreDevice.firmwareVersion,
+            isConnected: coreDevice.state.isOnline,
+            lastSeen: coreDevice.state.lastSeen,
+            capabilities: [], // Would need to map capabilities from Core_Device
+            state: state
         )
     }
     
     // Convert from YeelightDevice
     public static func from(yeelightDevice: YeelightDevice) -> Device {
-        let capabilities: [DeviceCapability] = [.onOff, .brightness]
+        var capabilities: [DeviceCapability] = [.onOff, .brightness]
         
         // Add color capabilities based on model
         if yeelightDevice.model == .colorLEDBulb || yeelightDevice.model == .colorLEDStrip {
@@ -101,7 +113,7 @@ public struct Device: Identifiable, Equatable {
 public enum DeviceType: String, CaseIterable {
     case light
     case sensor
-    case switch
+    case switchDevice
     case other
     
     public var displayName: String {
@@ -110,7 +122,7 @@ public enum DeviceType: String, CaseIterable {
             return "Light"
         case .sensor:
             return "Sensor"
-        case .switch:
+        case .switchDevice:
             return "Switch"
         case .other:
             return "Other"
@@ -230,11 +242,20 @@ public struct EffectParameters: Codable, Equatable {
         self.intensity = intensity
         self.customData = customData
     }
+    
+    public static func == (lhs: EffectParameters, rhs: EffectParameters) -> Bool {
+        return lhs.duration == rhs.duration &&
+               lhs.speed == rhs.speed &&
+               lhs.intensity == rhs.intensity &&
+               lhs.colors == rhs.colors
+        // Note: customData is not compared for equality as AnyCodable may not conform to Equatable
+    }
 }
 
 // MARK: - Scene
 
-/// Scene type for UI components
+// Commented out to avoid duplicate definition with UIEnvironment.swift
+/*
 public protocol YeelightScene: Identifiable, Equatable {
     var id: String { get }
     var name: String { get }
@@ -247,8 +268,9 @@ public protocol YeelightScene: Identifiable, Equatable {
     var createdAt: Date { get }
     var updatedAt: Date { get }
 }
+*/
 
-public struct Scene: YeelightScene {
+public struct Scene: Identifiable, Equatable {
     public let id: String
     public let name: String
     public let description: String
@@ -346,7 +368,8 @@ public struct Room: Identifiable, Equatable {
 
 // MARK: - Theme
 
-/// Theme type for UI components
+// Commented out to avoid duplicate definition with UIEnvironment.swift
+/*
 public struct Theme: Equatable {
     public let primaryColor: Color
     public let secondaryColor: Color
@@ -373,6 +396,7 @@ public struct Theme: Equatable {
         isDark: true
     )
 }
+*/
 
 // MARK: - Connection Type
 
@@ -524,7 +548,7 @@ public struct DeviceGroup: Identifiable, Equatable, Codable {
 // MARK: - MultiLightScene
 
 /// Multi-light scene type for UI components
-public struct MultiLightScene: YeelightScene {
+public struct MultiLightScene: Identifiable, Equatable {
     public let id: String
     public let name: String
     public let description: String?
@@ -593,5 +617,4 @@ public struct StripEffect: Identifiable, Equatable {
     public enum Pattern: String, Codable {
         case solid, gradient, chase, pulse, rainbow, fire, water
     }
-} 
 } 

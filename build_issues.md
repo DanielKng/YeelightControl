@@ -156,6 +156,10 @@
     - Corrected the reference to `Core_DeviceType.light` to use a valid case
     - Updated the `applyScene` method to work with the Core `Scene` struct
     - Fixed the type mismatch in `updateCoreDevice` method by using `device.state.coreState`
+60. ✅ Fixed circular dependency issues in UI module:
+    - Removed `import UI.Components` from `DetailContentView.swift`
+    - Removed `import UI.Components` from `NetworkTestsView.swift`
+    - Fixed import statements to avoid circular dependencies
 
 ## Recently Resolved Issues
 
@@ -163,6 +167,7 @@
 2. ✅ **Actor Isolation**: Resolved all actor isolation issues by properly implementing nonisolated properties and methods.
 3. ✅ **Type Conversion**: Fixed type conversion between Core types and implementation types.
 4. ✅ **Protocol Conformance**: Ensured all manager classes properly conform to their respective protocols.
+5. ✅ **Circular Dependencies**: Fixed circular import dependencies in UI module files.
 
 ## Current Status
 
@@ -172,10 +177,11 @@ The Core module now builds successfully! All critical issues have been resolved,
 2. ✅ Type conversion between `DeviceState` and `Core_DeviceState`
 3. ✅ Protocol conformance for all manager classes
 4. ✅ Proper implementation of nonisolated properties and methods
+5. ✅ Circular dependencies in UI module imports
 
 ## Next Steps
 
-1. **UI Module**: Now that the Core module is fixed, we can focus on the UI module issues.
+1. **UI Module**: Continue fixing the UI module issues.
 2. **Testing**: Thoroughly test the application to ensure all functionality works as expected.
 3. **Code Cleanup**: Remove any remaining debug code or temporary workarounds.
 4. **Documentation**: Update documentation to reflect the changes made.
