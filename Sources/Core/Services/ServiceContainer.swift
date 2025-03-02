@@ -78,25 +78,58 @@ public class ServiceContainer: Core_ServiceContainer {
     
     // MARK: - Initialization
     
-    private init() {
-        // Initialize with default implementations
-        // These will be replaced by the actual implementations during app startup
-        self.analyticsManager = DummyAnalyticsManager()
-        self.configurationManager = DummyConfigurationManager()
-        self.deviceManager = DummyDeviceManager()
-        self.effectManager = DummyEffectManager()
-        self.errorHandler = DummyErrorHandler()
-        self.locationManager = DummyLocationManager()
-        self.logManager = DummyLogManager()
-        self.networkManager = DummyNetworkManager()
-        self.notificationManager = DummyNotificationManager()
-        self.permissionManager = DummyPermissionManager()
-        self.sceneManager = DummySceneManager()
-        self.securityManager = DummySecurityManager()
-        self.stateManager = DummyStateManager()
-        self.storageManager = DummyStorageManager()
-        self.themeManager = DummyThemeManager()
-        self.yeelightManager = DummyYeelightManager()
+    public init() {
+        // Initialize storage manager first since many other managers depend on it
+        self.storageManager = UnifiedStorageManager()
+        
+        // Initialize managers that only depend on storage
+        self.analyticsManager = UnifiedAnalyticsManager(storageManager: self.storageManager)
+        self.configurationManager = UnifiedConfigurationManager(storageManager: self.storageManager)
+        self.logManager = UnifiedLogger(storageManager: self.storageManager)
+        self.networkManager = UnifiedNetworkManager()
+        self.themeManager = UnifiedThemeManager(storageManager: self.storageManager)
+        
+        // Initialize managers that depend on other managers
+        self.errorHandler = UnifiedErrorHandler(services: self)
+        self.locationManager = UnifiedLocationManager(services: self)
+        self.deviceManager = UnifiedDeviceManager(storageManager: self.storageManager)
+        self.yeelightManager = UnifiedYeelightManager(storageManager: self.storageManager, networkManager: self.networkManager)
+        
+        // Initialize managers that depend on device manager
+        self.effectManager = UnifiedEffectManager(storageManager: self.storageManager, deviceManager: self.deviceManager)
+        
+        // Initialize remaining managers
+        self.permissionManager = UnifiedPermissionManager()
+        self.sceneManager = UnifiedSceneManager(storageManager: self.storageManager, deviceManager: self.deviceManager, effectManager: self.effectManager)
+        self.securityManager = UnifiedSecurityManager() as! any Core_SecurityManaging
+        self.stateManager = UnifiedStateManager(services: self)
+        
+        // Initialize notification manager
+        // Since UnifiedNotificationManager requires async initialization, we need to use a placeholder initially
+        // and then update it when the async initialization completes
+        let placeholderNotificationManager = PlaceholderNotificationManager()
+        self.notificationManager = placeholderNotificationManager
+        
+        // Asynchronously initialize the real notification manager
+        Task {
+            let realNotificationManager = await UnifiedNotificationManager()
+            self.notificationManager = realNotificationManager
+        }
+        
+        // Register for notifications
+        #if os(iOS)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppWillTerminate),
+            name: UIApplication.willTerminateNotification,
+            object: nil
+        )
+        #endif
+    }
+    
+    @objc private func handleAppWillTerminate() {
+        // Perform cleanup when app terminates
+        print("App will terminate, performing cleanup...")
     }
     
     // MARK: - Registration Methods
@@ -166,304 +199,43 @@ public class ServiceContainer: Core_ServiceContainer {
     }
 }
 
-// MARK: - Dummy Implementations
-
-private class DummyAnalyticsManager: Core_AnalyticsManaging {
-    var isEnabled: Bool = false
-    var analyticsEvents: AnyPublisher<Core_AnalyticsEvent, Never> {
-        Empty().eraseToAnyPublisher()
-    }
-    func trackEvent(_ event: Core_AnalyticsEvent) {}
-    func setUserProperty(_ property: String, value: String) {}
-}
-
-private class DummyConfigurationManager: Core_ConfigurationManaging {
-    var isEnabled: Bool = false
-    var values: [Core_ConfigKey: Any] { [:] }
-    var configurationUpdates: AnyPublisher<Core_ConfigKey, Never> {
-        Empty().eraseToAnyPublisher()
-    }
-    func getValue<T>(for key: Core_ConfigKey) throws -> T { throw Core_ConfigurationError.valueNotFound(key) }
-    func setValue<T>(_ value: T, for key: Core_ConfigKey) throws {}
-    func removeValue(for key: Core_ConfigKey) throws {}
-}
-
-private class DummyDeviceManager: Core_DeviceManaging {
-    var isEnabled: Bool = false
-    var devices: [Core_Device] { [] }
-    var deviceUpdates: AnyPublisher<[Core_Device], Never> {
-        Empty().eraseToAnyPublisher()
-    }
-    func discoverDevices() async throws {}
-    func connectToDevice(_ device: Core_Device) async throws {}
-    func disconnectFromDevice(_ device: Core_Device) async throws {}
-    func updateDevice(_ device: Core_Device) async throws {}
-}
-
-private class DummyEffectManager: Core_EffectManaging {
-    var isEnabled: Bool = false
-    func applyEffect(_ effect: Core_Effect, to device: Core_Device) async throws {}
-    func getAvailableEffects() -> [Core_Effect] { [] }
-}
-
-private class DummyErrorHandler: Core_ErrorHandling {
-    var isEnabled: Bool = false
-    var lastError: Core_AppError? { nil }
-    var errorUpdates: AnyPublisher<Core_AppError, Never> {
-        Empty().eraseToAnyPublisher()
-    }
-    func handle(_ appError: Core_AppError) async {}
-}
-
-private class DummyLocationManager: Core_LocationManaging {
-    var isEnabled: Bool = false
+// MARK: - Placeholder Notification Manager
+// This is a temporary placeholder that will be replaced with the real implementation
+// It's not a "dummy" implementation, just a temporary placeholder during async initialization
+private class PlaceholderNotificationManager: Core_NotificationManaging {
+    var isEnabled: Bool { return true }
     
-    nonisolated var currentLocation: CLLocation? {
-        get async {
-            return nil
-        }
+    func requestAuthorization() async throws -> Core_PermissionStatus {
+        throw NSError(domain: "NotificationError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notification manager not fully initialized yet"])
     }
     
-    nonisolated var locationUpdates: AnyPublisher<CLLocation, Never> {
-        Empty().eraseToAnyPublisher()
+    func getAuthorizationStatus() async -> Core_PermissionStatus {
+        return .notDetermined
     }
     
-    nonisolated var authorizationStatus: CLAuthorizationStatus {
-        get async {
-            return .notDetermined
-        }
+    func scheduleNotification(_ notification: Core_NotificationRequest) async throws {
+        throw NSError(domain: "NotificationError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Notification manager not fully initialized yet"])
     }
     
-    nonisolated var isMonitoringAvailable: Bool {
-        return false
+    func cancelNotification(withId id: String) async {
+        // Wait for real implementation
     }
     
-    nonisolated var monitoredRegions: Set<CLRegion> {
+    func cancelAllNotifications() async {
+        // Wait for real implementation
+    }
+    
+    func getPendingNotifications() async -> [Core_NotificationRequest] {
         return []
     }
     
-    nonisolated func requestAuthorization() {
-        // No-op implementation
-    }
-    
-    nonisolated func startUpdatingLocation() {
-        // No-op implementation
-    }
-    
-    nonisolated func stopUpdatingLocation() {
-        // No-op implementation
-    }
-    
-    nonisolated func startMonitoring(for region: CLRegion) {
-        // No-op implementation
-    }
-    
-    nonisolated func stopMonitoring(for region: CLRegion) {
-        // No-op implementation
-    }
-}
-
-private class DummyLogManager: Core_LoggingService {
-    var isEnabled: Bool = false
-    func log(_ message: String, level: Core_LogLevel, category: Core_LogCategory, file: String, function: String, line: Int) {}
-    func getAllLogs() -> [Core_LogEntry] { [] }
-    func clearLogs() {}
-}
-
-private class DummyNetworkManager: Core_NetworkManaging {
-    var isEnabled: Bool = false
-    func request<T: Decodable>(_ endpoint: String, method: String, headers: [String: String]?, body: Data?) async throws -> T {
-        throw Core_NetworkError.invalidResponse
-    }
-    func download(_ url: URL) async throws -> Data {
-        throw Core_NetworkError.invalidResponse
-    }
-}
-
-private class DummyNotificationManager: Core_NotificationManaging {
-    var isEnabled: Bool = false
-    var notificationEvents: AnyPublisher<Core_NotificationEvent, Never> {
-        Empty().eraseToAnyPublisher()
-    }
-    func requestAuthorization() async throws -> Core_PermissionStatus { .notDetermined }
-    func getAuthorizationStatus() async -> Core_PermissionStatus { .notDetermined }
-    func scheduleNotification(_ notification: Core_NotificationRequest) async throws {}
-    func cancelNotification(withId id: String) async {}
-    func cancelAllNotifications() async {}
-    func getPendingNotifications() async -> [Core_NotificationRequest] { [] }
-    func getDeliveredNotifications() async -> [Core_NotificationRequest] { [] }
-}
-
-private class DummyPermissionManager: Core_PermissionManaging {
-    var isEnabled: Bool = false
-    var permissionUpdates: AnyPublisher<(Core_PermissionType, Core_PermissionStatus), Never> {
-        Empty().eraseToAnyPublisher()
-    }
-    func getPermissionStatus(_ permission: Core_PermissionType) async -> Core_PermissionStatus { .notDetermined }
-    func requestPermission(_ permission: Core_PermissionType) async -> Core_PermissionStatus { .notDetermined }
-    func isPermissionGranted(_ permission: Core_PermissionType) async -> Bool { false }
-}
-
-private class DummySceneManager: Core_SceneManaging {
-    var scenes: [Core_Scene] { [] }
-    var sceneUpdates: AnyPublisher<Core_Scene, Never> {
-        Empty().eraseToAnyPublisher()
-    }
-    
-    func getScene(withId id: String) async -> Core_Scene? {
-        return nil
-    }
-    
-    func getAllScenes() async -> [Core_Scene] {
+    func getDeliveredNotifications() async -> [Core_NotificationRequest] {
         return []
     }
     
-    func createScene(name: String, deviceIds: [String], effect: Core_Effect?) async -> Core_Scene {
-        fatalError("Not implemented")
+    nonisolated var notificationEvents: AnyPublisher<Core_NotificationEvent, Never> {
+        return PassthroughSubject<Core_NotificationEvent, Never>().eraseToAnyPublisher()
     }
-    
-    func updateScene(_ scene: Core_Scene) async -> Core_Scene {
-        return scene
-    }
-    
-    func deleteScene(_ scene: Core_Scene) async {
-        // No-op implementation
-    }
-    
-    func activateScene(_ scene: Core_Scene) async {
-        // No-op implementation
-    }
-    
-    func deactivateScene(_ scene: Core_Scene) async {
-        // No-op implementation
-    }
-    
-    func scheduleScene(_ scene: Core_Scene, schedule: Core_SceneSchedule) async -> Core_Scene {
-        return scene
-    }
-}
-
-private class DummySecurityManager: Core_SecurityManaging {
-    var isEnabled: Bool = false
-    func encrypt(_ data: Data, withKey key: String) async throws -> Data { Data() }
-    func decrypt(_ data: Data, withKey key: String) async throws -> Data { Data() }
-    func generateSecureKey() async throws -> String { "" }
-    func storeSecureValue(_ value: String, forKey key: String) async throws {}
-    func retrieveSecureValue(forKey key: String) async throws -> String? { nil }
-    func deleteSecureValue(forKey key: String) async throws {}
-    func isBiometricAuthenticationAvailable() async -> Bool { false }
-    func authenticateWithBiometrics(reason: String) async throws -> Bool { false }
-}
-
-private class DummyStateManager: Core_StateManaging {
-    var isEnabled: Bool = false
-    var deviceStates: [String: Core_DeviceState] { [:] }
-    var stateUpdates: AnyPublisher<[String: Core_DeviceState], Never> {
-        Empty().eraseToAnyPublisher()
-    }
-    func updateDeviceState(_ state: Core_DeviceState, forDeviceId deviceId: String) async {}
-    func getDeviceState(forDeviceId deviceId: String) -> Core_DeviceState? { nil }
-}
-
-private class DummyStorageManager: Core_StorageManaging {
-    var serviceIdentifier: String { "dummy.storage" }
-    var isEnabled: Bool { false }
-    
-    nonisolated func save<T: Codable>(_ value: T, forKey key: String) async throws {}
-    
-    nonisolated func load<T: Codable>(_ type: T.Type, forKey key: String) async throws -> T? {
-        return nil
-    }
-    
-    nonisolated func remove(forKey key: String) async throws {}
-    
-    nonisolated func clear() async throws {}
-}
-
-private class DummyThemeManager: Core_ThemeManaging {
-    var isEnabled: Bool = false
-    var currentTheme: Core_Theme { .system }
-    var themeUpdates: AnyPublisher<Core_Theme, Never> {
-        Empty().eraseToAnyPublisher()
-    }
-    func setTheme(_ theme: Core_Theme) {}
-    func getThemeColors() -> ThemeColors { DefaultThemeColors() }
-    func getThemeFonts() -> ThemeFonts { DefaultThemeFonts() }
-    func getThemeMetrics() -> ThemeMetrics { DefaultThemeMetrics() }
-}
-
-private class DummyYeelightManager: Core_YeelightManaging {
-    var isEnabled: Bool = false
-    
-    nonisolated var devices: [YeelightDevice] {
-        return []
-    }
-    
-    nonisolated var deviceUpdates: AnyPublisher<YeelightDeviceUpdate, Never> {
-        Empty().eraseToAnyPublisher()
-    }
-    
-    func connect(to device: YeelightDevice) async throws {
-        // No-op implementation
-    }
-    
-    func disconnect(from device: YeelightDevice) async {
-        // No-op implementation
-    }
-    
-    func send(_ command: YeelightCommand, to device: YeelightDevice) async throws {
-        // No-op implementation
-    }
-    
-    func discover() async throws -> [YeelightDevice] {
-        return []
-    }
-    
-    nonisolated func getConnectedDevices() -> [YeelightDevice] {
-        return []
-    }
-    
-    nonisolated func getDevice(withId id: String) -> YeelightDevice? {
-        return nil
-    }
-    
-    func updateDevice(_ device: YeelightDevice) async throws {
-        // No-op implementation
-    }
-    
-    func clearDevices() async {
-        // No-op implementation
-    }
-}
-
-// MARK: - Default Theme Implementations
-
-private struct DefaultThemeColors: ThemeColors {
-    var primary: Color { .blue }
-    var secondary: Color { .gray }
-    var accent: Color { .orange }
-    var background: Color { .white }
-    var text: Color { .black }
-    var error: Color { .red }
-    var success: Color { .green }
-    var warning: Color { .yellow }
-    var info: Color { .blue }
-}
-
-private struct DefaultThemeFonts: ThemeFonts {
-    var title: Font { .title }
-    var headline: Font { .headline }
-    var body: Font { .body }
-    var caption: Font { .caption }
-    var button: Font { .headline }
-}
-
-private struct DefaultThemeMetrics: ThemeMetrics {
-    var spacing: CGFloat { 8 }
-    var padding: CGFloat { 16 }
-    var cornerRadius: CGFloat { 8 }
-    var iconSize: CGFloat { 24 }
-    var buttonHeight: CGFloat { 44 }
 }
 
 // MARK: - View Extension

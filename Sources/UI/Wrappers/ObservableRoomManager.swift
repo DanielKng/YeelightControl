@@ -9,35 +9,52 @@ public class ObservableRoomManager: ObservableObject {
     
     public init(manager: UnifiedRoomManager) {
         self.manager = manager
+        setupSubscriptions()
         Task {
             await updateRooms()
         }
     }
     
+    private func setupSubscriptions() {
+        // Subscribe to room updates from the manager
+        // This would be implemented in a real application
+    }
+    
     private func updateRooms() async {
-        // In a real implementation, this would get the rooms from the manager
-        // For now, we'll just use sample rooms
-        self.rooms = [
-            Room(name: "Living Room", deviceIds: ["device1", "device2"], icon: "sofa"),
-            Room(name: "Bedroom", deviceIds: ["device3"], icon: "bed.double"),
-            Room(name: "Kitchen", deviceIds: ["device4", "device5"], icon: "refrigerator"),
-            Room(name: "Office", deviceIds: ["device6"], icon: "desktopcomputer")
-        ]
+        do {
+            let managerRooms = try await manager.getAllRooms()
+            self.rooms = managerRooms
+        } catch {
+            print("Error fetching rooms: \(error)")
+            self.rooms = []
+        }
     }
     
     public func addRoom(_ room: Room) async {
-        // In a real implementation, this would add the room to the manager
-        await updateRooms()
+        do {
+            try await manager.createRoom(room)
+            await updateRooms()
+        } catch {
+            print("Error adding room: \(error)")
+        }
     }
     
     public func removeRoom(_ room: Room) async {
-        // In a real implementation, this would remove the room from the manager
-        await updateRooms()
+        do {
+            try await manager.deleteRoom(room.id)
+            await updateRooms()
+        } catch {
+            print("Error removing room: \(error)")
+        }
     }
     
     public func updateRoom(_ room: Room) async {
-        // In a real implementation, this would update the room in the manager
-        await updateRooms()
+        do {
+            try await manager.updateRoom(room)
+            await updateRooms()
+        } catch {
+            print("Error updating room: \(error)")
+        }
     }
     
     public func getRoom(withId id: String) -> Room? {
@@ -45,12 +62,20 @@ public class ObservableRoomManager: ObservableObject {
     }
     
     public func addDeviceToRoom(_ deviceId: String, roomId: String) async {
-        // In a real implementation, this would add the device to the room
-        await updateRooms()
+        do {
+            try await manager.addDevice(deviceId, to: roomId)
+            await updateRooms()
+        } catch {
+            print("Error adding device to room: \(error)")
+        }
     }
     
     public func removeDeviceFromRoom(_ deviceId: String, roomId: String) async {
-        // In a real implementation, this would remove the device from the room
-        await updateRooms()
+        do {
+            try await manager.removeDevice(deviceId, from: roomId)
+            await updateRooms()
+        } catch {
+            print("Error removing device from room: \(error)")
+        }
     }
 } 

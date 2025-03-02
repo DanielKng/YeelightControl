@@ -295,12 +295,15 @@ public class ObservableConnectionManager: ObservableObject {
     }
     
     private func updateConnectionStatus() async {
-        // In a real implementation, this would get the connection status from the manager
-        // For now, we'll just use a sample status
+        // Get real connection status from the manager
+        let wifiStatus = await manager.checkConnection(type: .wifi)
+        let bluetoothStatus = await manager.checkConnection(type: .bluetooth)
+        let internetStatus = await manager.checkConnection(type: .internet)
+        
         self.connectionStatus = [
-            "wifi": true,
-            "bluetooth": false,
-            "internet": true
+            "wifi": wifiStatus,
+            "bluetooth": bluetoothStatus,
+            "internet": internetStatus
         ]
     }
     
@@ -311,6 +314,12 @@ public class ObservableConnectionManager: ObservableObject {
     
     public func testConnection() async -> Bool {
         let result = await manager.testConnection()
+        await updateConnectionStatus()
+        return result
+    }
+    
+    public func checkConnection(type: ConnectionType) async -> Bool {
+        let result = await manager.checkConnection(type: type)
         await updateConnectionStatus()
         return result
     }

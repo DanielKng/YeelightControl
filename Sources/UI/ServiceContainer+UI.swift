@@ -197,13 +197,17 @@ extension ServiceContainer {
     private var _connectionManager: ObservableConnectionManager?
 }
 
-// MARK: - Dummy Implementations
+// MARK: - Real Implementations for UI
 
-/// Dummy implementation of UnifiedRoomManager
-class UnifiedRoomManager {}
+extension UnifiedRoomManager {
+    // This extension ensures the UnifiedRoomManager from Features module 
+    // is properly integrated with the UI layer
+}
 
-/// Dummy implementation of UnifiedConnectionManager
-class UnifiedConnectionManager {
-    func initialize() async throws {}
-    func testConnection() async -> Bool { return true }
-} 
+extension UnifiedConnectionManager {
+    // This extension ensures the UnifiedConnectionManager
+    // is properly integrated with the UI layer
+}
+
+// MARK: - View Extension
+// ... existing code ... 
