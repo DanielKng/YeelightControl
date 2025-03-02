@@ -207,7 +207,7 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
         self.pendingNotifications = []
         self.deliveredNotifications = []
         
-        // Request authorization if needed
+        // Request authorization if needed, but don't wait for it
         Task {
             do {
                 _ = try await requestAuthorization()

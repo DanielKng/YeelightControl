@@ -102,19 +102,20 @@ public class ServiceContainer: Core_ServiceContainer {
         self.permissionManager = UnifiedPermissionManager()
         self.sceneManager = UnifiedSceneManager(storageManager: self.storageManager, deviceManager: self.deviceManager, effectManager: self.effectManager)
         self.securityManager = UnifiedSecurityManager() as! any Core_SecurityManaging
-        self.stateManager = UnifiedStateManager(services: self)
         
-        // Initialize notification manager
-        // Since UnifiedNotificationManager requires async initialization, we need to use a placeholder initially
-        // and then update it when the async initialization completes
-        let placeholderNotificationManager = PlaceholderNotificationManager()
-        self.notificationManager = placeholderNotificationManager
+        // Use a placeholder for state manager initially
+        let placeholderStateManager = PlaceholderStateManager()
+        self.stateManager = placeholderStateManager
         
-        // Asynchronously initialize the real notification manager
+        // Initialize state manager asynchronously
         Task {
-            let realNotificationManager = await UnifiedNotificationManager()
-            self.notificationManager = realNotificationManager
+            // Fix actor isolation issue by using nonisolated async function
+            let realStateManager = await createStateManager()
+            self.stateManager = realStateManager
         }
+        
+        // Initialize notification manager directly
+        self.notificationManager = UnifiedNotificationManager()
         
         // Register for notifications
         #if os(iOS)
@@ -125,6 +126,13 @@ public class ServiceContainer: Core_ServiceContainer {
             object: nil
         )
         #endif
+    }
+    
+    // Helper method to create state manager without actor isolation issues
+    private nonisolated func createStateManager() async -> any Core_StateManaging {
+        return await MainActor.run {
+            UnifiedStateManager(services: self)
+        }
     }
     
     @objc private func handleAppWillTerminate() {
@@ -199,42 +207,28 @@ public class ServiceContainer: Core_ServiceContainer {
     }
 }
 
-// MARK: - Placeholder Notification Manager
-// This is a temporary placeholder that will be replaced with the real implementation
-// It's not a "dummy" implementation, just a temporary placeholder during async initialization
-private class PlaceholderNotificationManager: Core_NotificationManaging {
-    var isEnabled: Bool { return true }
-    
-    func requestAuthorization() async throws -> Core_PermissionStatus {
-        throw NSError(domain: "NotificationError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notification manager not fully initialized yet"])
+// MARK: - Placeholder Managers
+
+/// A placeholder state manager that does nothing
+private class PlaceholderStateManager: Core_StateManaging {
+    public var isEnabled: Bool {
+        return true
     }
     
-    func getAuthorizationStatus() async -> Core_PermissionStatus {
-        return .notDetermined
+    public var deviceStates: [String: Core_DeviceState] {
+        return [:]
     }
     
-    func scheduleNotification(_ notification: Core_NotificationRequest) async throws {
-        throw NSError(domain: "NotificationError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Notification manager not fully initialized yet"])
+    public var stateUpdates: AnyPublisher<[String: Core_DeviceState], Never> {
+        return PassthroughSubject<[String: Core_DeviceState], Never>().eraseToAnyPublisher()
     }
     
-    func cancelNotification(withId id: String) async {
-        // Wait for real implementation
+    public func updateDeviceState(_ state: Core_DeviceState, forDeviceId deviceId: String) async {
+        // Do nothing
     }
     
-    func cancelAllNotifications() async {
-        // Wait for real implementation
-    }
-    
-    func getPendingNotifications() async -> [Core_NotificationRequest] {
-        return []
-    }
-    
-    func getDeliveredNotifications() async -> [Core_NotificationRequest] {
-        return []
-    }
-    
-    nonisolated var notificationEvents: AnyPublisher<Core_NotificationEvent, Never> {
-        return PassthroughSubject<Core_NotificationEvent, Never>().eraseToAnyPublisher()
+    public func getDeviceState(forDeviceId deviceId: String) async -> Core_DeviceState? {
+        return nil
     }
 }
 
