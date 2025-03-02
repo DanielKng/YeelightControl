@@ -9,7 +9,7 @@ import SwiftUI
 public final class UnifiedStateManager: ObservableObject, Core_StateManaging {
     private let services: ServiceContainer
     @Published public private(set) var _deviceStates: [String: DeviceState] = [:]
-    private let stateSubject = PassthroughSubject<DeviceStateUpdate, Never>()
+    private let stateSubject = PassthroughSubject<[String: Core_DeviceState], Never>()
     private var _isEnabled: Bool = true
     
     // MARK: - Core_BaseService
@@ -25,29 +25,32 @@ public final class UnifiedStateManager: ObservableObject, Core_StateManaging {
     public nonisolated var deviceStates: [String: Core_DeviceState] {
         let value: [String: Core_DeviceState] = [:] // Default empty dictionary
         let task = Task { @MainActor in
-            return _deviceStates as [String: Core_DeviceState]
+            var result: [String: Core_DeviceState] = [:]
+            for (key, state) in _deviceStates {
+                result[key] = state.coreState
+            }
+            return result
         }
         return (try? task.value) ?? value
     }
     
     public nonisolated var stateUpdates: AnyPublisher<[String: Core_DeviceState], Never> {
-        return stateSubject.map { update in
-            // Create a dictionary with just the updated device state
-            return [update.deviceId: update.newState as Core_DeviceState]
-        }.eraseToAnyPublisher()
+        return stateSubject.eraseToAnyPublisher()
     }
     
     public func updateDeviceState(_ state: Core_DeviceState, forDeviceId deviceId: String) async {
-        if let deviceState = state as? DeviceState {
+        if let deviceState = DeviceState.from(coreState: state) {
             _deviceStates[deviceId] = deviceState
+            // Publish the update
+            let updates = [deviceId: state]
+            stateSubject.send(updates)
         }
     }
     
-    public nonisolated func getDeviceState(forDeviceId deviceId: String) -> Core_DeviceState? {
-        let task = Task { @MainActor in
-            return _deviceStates[deviceId]
+    public nonisolated func getDeviceState(forDeviceId deviceId: String) async -> Core_DeviceState? {
+        return await MainActor.run {
+            return _deviceStates[deviceId]?.coreState
         }
-        return try? task.value
     }
     
     public init(services: ServiceContainer) {
@@ -60,14 +63,15 @@ public final class UnifiedStateManager: ObservableObject, Core_StateManaging {
         }
         
         _deviceStates[deviceId] = newState
-        let update = DeviceStateUpdate(deviceId: deviceId, oldState: oldState, newState: newState)
-        stateSubject.send(update)
+        // Publish the update
+        let updates = [deviceId: newState.coreState]
+        stateSubject.send(updates)
     }
     
-    public nonisolated func getState(for deviceId: String) -> DeviceState? {
-        Task { @MainActor in
+    public nonisolated func getState(for deviceId: String) async -> DeviceState? {
+        return await MainActor.run {
             return _deviceStates[deviceId]
-        }.result.value
+        }
     }
     
     public nonisolated func setState(_ state: DeviceState, for deviceId: String) async throws {
@@ -76,8 +80,8 @@ public final class UnifiedStateManager: ObservableObject, Core_StateManaging {
         }
     }
     
-    public nonisolated func removeState(for deviceId: String) {
-        Task { @MainActor in
+    public nonisolated func removeState(for deviceId: String) async {
+        await MainActor.run {
             _deviceStates.removeValue(forKey: deviceId)
         }
     }

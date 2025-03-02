@@ -1,7 +1,7 @@
 import Foundation
 import CoreLocation
 
-public enum SecurityEvent {
+public enum Core_SecurityEvent {
     case authenticationRequired
     case authenticationSucceeded
     case authenticationFailed(Error)
@@ -9,36 +9,36 @@ public enum SecurityEvent {
     case biometricAuthenticationUnavailable
 }
 
-public enum NotificationEvent {
-    case received(NotificationRequest)
-    case scheduled(NotificationRequest)
-    case delivered(NotificationRequest)
-    case failed(NotificationRequest, Error)
+public enum Core_NotificationEvent {
+    case received(Core_NotificationRequest)
+    case scheduled(Core_NotificationRequest)
+    case delivered(Core_NotificationRequest)
+    case failed(Core_NotificationRequest, Error)
     case permissionGranted
     case permissionDenied
 }
 
-public enum SceneEvent {
-    case activated(Scene)
-    case deactivated(Scene)
-    case failed(Scene, Error)
+public enum Core_SceneEvent {
+    case activated(Core_Scene)
+    case deactivated(Core_Scene)
+    case failed(Core_Scene, Error)
 }
 
-public enum DeviceEvent {
-    case added(YeelightDevice)
-    case removed(YeelightDevice)
-    case updated(YeelightDevice)
-    case stateChanged(YeelightDevice, DeviceState)
-    case error(YeelightDevice, Error)
+public enum Core_DeviceEvent {
+    case added(Core_Device)
+    case removed(Core_Device)
+    case updated(Core_Device)
+    case stateChanged(Core_Device, Core_DeviceState)
+    case error(Core_Device, Error)
 }
 
-public enum EffectEvent {
-    case started(Effect, YeelightDevice)
-    case stopped(Effect, YeelightDevice)
-    case failed(Effect, YeelightDevice, Error)
+public enum Core_EffectEvent {
+    case started(Core_Effect, Core_Device)
+    case stopped(Core_Effect, Core_Device)
+    case failed(Core_Effect, Core_Device, Error)
 }
 
-public enum PermissionEvent {
+public enum Core_PermissionEvent {
     case granted(Core_PermissionType)
     case denied(Core_PermissionType)
     case restricted(Core_PermissionType)

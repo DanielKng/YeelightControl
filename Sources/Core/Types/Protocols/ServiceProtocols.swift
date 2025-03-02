@@ -25,10 +25,10 @@ import Combine
     func log(_ message: String, level: Core_LogLevel, category: Core_LogCategory, file: String, function: String, line: Int)
     
     /// Get all logs
-    func getAllLogs() -> [Core_LogEntry]
+    func getAllLogs() async -> [Core_LogEntry]
     
     /// Clear all logs
-    func clearLogs()
+    func clearLogs() async
 }
 
 /// Protocol for network services
@@ -67,5 +67,5 @@ import Combine
     func applyEffect(_ effect: Core_Effect, to device: Core_Device) async throws
     
     /// Get available effects
-    func getAvailableEffects() -> [Core_Effect]
+    func getAvailableEffects() async -> [Core_Effect]
 } 

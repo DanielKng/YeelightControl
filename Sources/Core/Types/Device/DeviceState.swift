@@ -344,4 +344,22 @@ public struct UI_DeviceState: Equatable, Codable {
             lastSeen: Date()
         )
     }
+}
+
+// MARK: - Core Device State
+public enum Core_DeviceState {
+    case on(brightness: Int, color: Core_Color)
+    case off
+}
+
+public struct Core_Color {
+    public var red: Double
+    public var green: Double
+    public var blue: Double
+    
+    public init(red: Double, green: Double, blue: Double) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
 } 
