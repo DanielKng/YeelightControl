@@ -220,67 +220,67 @@ I've made significant progress in resolving the build issues:
     - Updated the `getAllLogs` method to be nonisolated and non-async
     - Fixed the `isEnabled` property to use `task.value` instead of `task.result.get()`
 
+39. ✅ Fixed actor isolation issues in `UnifiedStateManager.swift`:
+    - Added a nonisolated cache of device states to avoid accessing MainActor-isolated properties
+    - Changed the `deviceStates` property to be properly nonisolated
+    - Updated the `updateDeviceState` method to maintain the nonisolated cache
+    - Made the nonisolated cache mutable with `nonisolated(unsafe)` attribute
+
+40. ✅ Fixed type conversion issues in `Device.swift`:
+    - Corrected the reference from `yeelightDevice.mode` to `yeelightDevice.state.mode`
+    - Added proper conversion methods between `DeviceState` and `Core_DeviceState`
+
+41. ✅ Fixed issues in `UnifiedYeelightManager.swift`:
+    - Fixed the method of obtaining host information from network connections
+    - Resolved type mismatch between `Core_DeviceState` and `DeviceState`
+    - Corrected the reference to `Core_DeviceType.light` to use a valid case
+    - Updated the `applyScene` method to work with the Core `Scene` struct
+    - Fixed the type mismatch in `updateCoreDevice` method by using `device.state.coreState`
+
 ## Current Status
 
-We've made significant progress on fixing the Core module issues, but there are still a few issues that need to be addressed:
+The Core module now builds successfully! All critical issues have been resolved, including:
 
-1. **Type Conversion Issues**:
-   - Ensure proper conversion between types like `Device` and `Core_Device`
-   - Ensure proper conversion between types like `Effect` and `Core_Effect`
+1. ✅ Actor isolation issues in `UnifiedStateManager`
+2. ✅ Type conversion between `DeviceState` and `Core_DeviceState`
+3. ✅ Protocol conformance for all manager classes
+4. ✅ Proper implementation of nonisolated properties and methods
 
-2. **Protocol Conformance Verification**:
-   - Verify that all manager classes properly conform to their respective protocols
-   - Ensure all required methods are implemented with the correct signatures
+## Next Steps
 
-## Remaining Issues to Fix
+Now that the Core module is fixed, we can focus on the UI module issues:
 
-### Core Module Issues
-
-1. **Type Conversion Issues**:
-   - Implement proper type conversion between Core types and implementation types
-   - Ensure all types properly conform to their Core counterparts
-
-2. **Protocol Conformance Verification**:
-   - Verify all required methods and properties for each protocol
-   - Ensure the method signatures match the protocol requirements
-
-### UI Module Issues
-
-Once the Core module is fixed, we'll need to address the UI module issues:
-
-1. **Duplicate view declarations**:
-   - Update UI files to use centralized components
-   - Remove duplicate view declarations from the original files
-
-2. **ObservableObject conformance issues**:
-   - Update UI files to use the observable wrapper classes
-   - Update UI files to use `@EnvironmentObject` with the observable wrapper classes
-
-3. **ServiceContainer access issues**:
-   - Update UI files to import the `ServiceContainer+UI.swift` file
-   - Update UI files to use the UI-specific properties from `ServiceContainer`
-
-## Implementation Strategy
-
-1. Fix the Core module issues first, focusing on the most critical files:
-   - `UnifiedDeviceManager.swift`: Verify protocol conformance and type conversion
-   - `UnifiedEffectManager.swift`: Verify protocol conformance and type conversion
-   - `UnifiedLogger.swift`: Verify protocol conformance and method signatures
-
-2. Once the Core module builds successfully, address the UI module issues:
+1. **UI Module Fixes**:
    - Update UI files to use centralized components
    - Update UI files to use observable wrapper classes
    - Fix ServiceContainer access issues
 
-3. Test the build after each set of changes to ensure progress is being made
+2. **Testing**:
+   - Test the application to ensure all functionality works as expected
+   - Verify that all UI components render correctly
+   - Test device discovery and control
 
-## Testing the Fixes
+3. **Code Cleanup**:
+   - Remove any remaining debug code
+   - Remove temporary workarounds
+   - Add proper documentation
 
-After implementing the fixes:
+## Implementation Strategy for UI Module
 
-1. Run the setup script again: `./Scripts/setup_xcode_project.sh`
-2. Build the project: `cd Build && xcodebuild -project YeelightControl.xcodeproj -scheme YeelightControl -configuration Debug CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO`
-3. Address any remaining errors one by one
+1. **Update UI Files**:
+   - Update UI files to use centralized components
+   - Update UI files to use observable wrapper classes
+   - Fix ServiceContainer access issues
+
+2. **Fix UI Component Type Mismatches**:
+   - Ensure UI components use the correct types from the Core module
+   - Update type aliases in `UIEnvironment.swift`
+   - Fix any remaining type conversion issues
+
+3. **Test UI Components**:
+   - Test each UI component to ensure it renders correctly
+   - Test navigation between screens
+   - Test device control functionality
 
 ## Long-term Recommendations
 

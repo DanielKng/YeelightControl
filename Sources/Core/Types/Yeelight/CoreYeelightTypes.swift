@@ -2,6 +2,8 @@ import Foundation
 import Combine
 
 // MARK: - Yeelight Types
+// Commented out to avoid ambiguity
+// Commented out to avoid ambiguity
 public struct Core_Yeelight: Identifiable, Codable, Hashable {
     public let id: String
     public let name: String
@@ -21,7 +23,7 @@ public struct Core_Yeelight: Identifiable, Codable, Hashable {
         firmwareVersion: String? = nil,
         ipAddress: String,
         port: Int = 55443,
-        state: Core_DeviceState = .off,
+        state: Core_DeviceState = Core_DeviceState(),
         isConnected: Bool = false,
         lastSeen: Date = Date(),
         supportedFeatures: [Core_YeelightFeature] = []

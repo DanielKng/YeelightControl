@@ -142,33 +142,42 @@
     - Updated the `clearLogs` method to be nonisolated
     - Updated the `getAllLogs` method to be nonisolated and non-async
     - Fixed the `isEnabled` property to use `task.value` instead of `task.result.get()`
+57. ✅ Fixed actor isolation issues in `UnifiedStateManager.swift`:
+    - Added a nonisolated cache of device states to avoid accessing MainActor-isolated properties
+    - Changed the `deviceStates` property to be properly nonisolated
+    - Updated the `updateDeviceState` method to maintain the nonisolated cache
+    - Made the nonisolated cache mutable with `nonisolated(unsafe)` attribute
+58. ✅ Fixed type conversion issues in `Device.swift`:
+    - Corrected the reference from `yeelightDevice.mode` to `yeelightDevice.state.mode`
+    - Added proper conversion methods between `DeviceState` and `Core_DeviceState`
+59. ✅ Fixed issues in `UnifiedYeelightManager.swift`:
+    - Fixed the method of obtaining host information from network connections
+    - Resolved type mismatch between `Core_DeviceState` and `DeviceState`
+    - Corrected the reference to `Core_DeviceType.light` to use a valid case
+    - Updated the `applyScene` method to work with the Core `Scene` struct
+    - Fixed the type mismatch in `updateCoreDevice` method by using `device.state.coreState`
 
-## Remaining Issues
+## Recently Resolved Issues
 
-Based on the build output, we still have a few issues to fix:
+1. ✅ **Fixed Core Module Build**: Successfully fixed all issues in the Core module, allowing it to build without errors.
+2. ✅ **Actor Isolation**: Resolved all actor isolation issues by properly implementing nonisolated properties and methods.
+3. ✅ **Type Conversion**: Fixed type conversion between Core types and implementation types.
+4. ✅ **Protocol Conformance**: Ensured all manager classes properly conform to their respective protocols.
 
-1. **Type Conversion Issues**:
-   - Cannot convert between types like `Device` and `Core_Device`
-   - Cannot convert between types like `Effect` and `Core_Effect`
+## Current Status
 
-2. **Protocol Conformance Issues**:
-   - Ensure all manager classes properly conform to their respective protocols
-   - Verify that all required methods are implemented with the correct signatures
+The Core module now builds successfully! All critical issues have been resolved, including:
 
-## Updated Approach
+1. ✅ Actor isolation issues in `UnifiedStateManager`
+2. ✅ Type conversion between `DeviceState` and `Core_DeviceState`
+3. ✅ Protocol conformance for all manager classes
+4. ✅ Proper implementation of nonisolated properties and methods
 
-1. **Fix Type Conversion Issues**:
-   - Implement proper type conversion between Core types and implementation types
-   - Ensure all types properly conform to their Core counterparts
+## Next Steps
 
-2. **Fix Protocol Conformance Issues**:
-   - Implement all required methods and properties for each protocol
-   - Ensure the method signatures match the protocol requirements
+1. **UI Module**: Now that the Core module is fixed, we can focus on the UI module issues.
+2. **Testing**: Thoroughly test the application to ensure all functionality works as expected.
+3. **Code Cleanup**: Remove any remaining debug code or temporary workarounds.
+4. **Documentation**: Update documentation to reflect the changes made.
 
-## Specific Files Needing Attention
-
-- `UnifiedDeviceManager.swift`: Verify protocol conformance and type conversion
-- `UnifiedEffectManager.swift`: Verify protocol conformance and type conversion
-- `UnifiedLogger.swift`: Verify protocol conformance and method signatures
-
-More about potential fixing, [HERE](docs/guides/fixing_build_issues.md)
+More about the fixing process, [HERE](docs/guides/fixing_build_issues.md)

@@ -1,8 +1,12 @@
 import SwiftUI
 import Foundation
+// Remove the import for YeelightTypes since it's in the same module (Core)
+// import YeelightTypes
 
 // MARK: - Core Device
 
+// Commented out to avoid ambiguity
+// Commented out to avoid ambiguity
 public struct Core_Device: Identifiable, Codable, Hashable {
     public let id: String
     public let name: String
@@ -12,7 +16,7 @@ public struct Core_Device: Identifiable, Codable, Hashable {
     public let firmwareVersion: String?
     public let ipAddress: String?
     public let macAddress: String?
-    public var state: DeviceState?
+    public var state: Core_DeviceState?
     public var isConnected: Bool?
     public var lastSeen: Date?
     
@@ -25,7 +29,7 @@ public struct Core_Device: Identifiable, Codable, Hashable {
         firmwareVersion: String? = nil,
         ipAddress: String? = nil,
         macAddress: String? = nil,
-        state: DeviceState? = nil,
+        state: Core_DeviceState? = nil,
         isConnected: Bool? = nil,
         lastSeen: Date? = nil
     ) {
@@ -46,7 +50,7 @@ public struct Core_Device: Identifiable, Codable, Hashable {
 // MARK: - Device Type
 
 // Make Device the implementation of Core_Device
-public typealias Core_Device = Device
+// // // public typealias Core_Device = Device
 
 public struct Device: Identifiable, Codable, Hashable {
     public let id: String
@@ -112,14 +116,14 @@ public struct Device: Identifiable, Codable, Hashable {
         id: String = UUID().uuidString,
         name: String,
         type: Core_DeviceType,
-        manufacturer: String,
-        model: String,
+        manufacturer: String = "Unknown",
+        model: String = "Unknown",
         firmwareVersion: String? = nil,
         ipAddress: String? = nil,
         macAddress: String? = nil,
-        state: Core_DeviceState = .unknown,
-        isConnected: Bool = false,
-        lastSeen: Date = Date()
+        state: Core_DeviceState? = nil,
+        isConnected: Bool? = nil,
+        lastSeen: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -129,10 +133,33 @@ public struct Device: Identifiable, Codable, Hashable {
         self.firmwareVersion = firmwareVersion
         self.ipAddress = ipAddress
         self.macAddress = macAddress
-        self.state = DeviceState.from(coreState: state)
-        self.isConnected = isConnected
-        self.isOnline = isConnected
-        self.lastSeen = lastSeen
+        
+        // Create a default state if none is provided
+        let defaultState = DeviceState()
+        
+        // Use the provided state if available, otherwise use default
+        if let coreState = state {
+            self.state = DeviceState(
+                power: coreState.power,
+                brightness: coreState.brightness,
+                colorTemperature: coreState.colorTemperature,
+                color: DeviceColor(
+                    red: coreState.color.red,
+                    green: coreState.color.green,
+                    blue: coreState.color.blue
+                ),
+                effect: coreState.effect,
+                isOnline: coreState.isOnline,
+                lastSeen: coreState.lastSeen,
+                mode: coreState.mode
+            )
+        } else {
+            self.state = defaultState
+        }
+        
+        self.isConnected = isConnected ?? false
+        self.lastSeen = lastSeen ?? Date()
+        self.isOnline = isConnected ?? false  // Initialize isOnline based on isConnected
     }
 }
 
@@ -183,54 +210,64 @@ public struct DeviceState: Codable, Hashable {
     public var colorTemperature: Int
     public var color: DeviceColor
     public var effect: Effect?
+    public var isOnline: Bool
+    public var lastSeen: Date
+    public var mode: YeelightMode?
     
     public init(
         power: Bool = false,
         brightness: Int = 100,
         colorTemperature: Int = 4000,
         color: DeviceColor = .white,
-        effect: Effect? = nil
+        effect: Effect? = nil,
+        isOnline: Bool = false,
+        lastSeen: Date = Date(),
+        mode: YeelightMode? = .normal
     ) {
         self.power = power
         self.brightness = brightness
         self.colorTemperature = colorTemperature
         self.color = color
         self.effect = effect
+        self.isOnline = isOnline
+        self.lastSeen = lastSeen
+        self.mode = mode
     }
     
     // Convert from Core_DeviceState
     public static func from(coreState: Core_DeviceState) -> DeviceState {
-        switch coreState {
-        case .on(let brightness, let color):
-            return DeviceState(
-                power: true,
-                brightness: brightness,
-                colorTemperature: 4000, // Default
-                color: DeviceColor(
-                    red: Int(color.red * 255),
-                    green: Int(color.green * 255),
-                    blue: Int(color.blue * 255)
-                )
-            )
-        case .off:
-            return DeviceState(power: false)
-        case .unknown:
-            return DeviceState()
-        }
+        return DeviceState(
+            power: coreState.power,
+            brightness: coreState.brightness,
+            colorTemperature: coreState.colorTemperature,
+            color: DeviceColor(
+                red: coreState.color.red,
+                green: coreState.color.green,
+                blue: coreState.color.blue
+            ),
+            effect: coreState.effect,
+            isOnline: coreState.isOnline,
+            lastSeen: coreState.lastSeen,
+            mode: coreState.mode
+        )
     }
     
     // Convert to Core_DeviceState
     public var coreState: Core_DeviceState {
-        if power {
-            let coreColor = Core_Color(
-                red: Double(color.red) / 255.0,
-                green: Double(color.green) / 255.0,
-                blue: Double(color.blue) / 255.0
-            )
-            return .on(brightness: brightness, color: coreColor)
-        } else {
-            return .off
-        }
+        return Core_DeviceState(
+            power: power,
+            brightness: brightness,
+            colorTemperature: colorTemperature,
+            color: Core_DeviceColor(
+                red: color.red,
+                green: color.green,
+                blue: color.blue
+            ),
+            effect: effect,
+            isOnline: isOnline,
+            lastSeen: lastSeen,
+            mode: mode
+        )
     }
 }
 
@@ -299,7 +336,7 @@ extension Device {
         return Device(
             id: yeelightDevice.id,
             name: yeelightDevice.name,
-            type: .light,
+            type: .bulb,
             state: DeviceState(
                 power: yeelightDevice.state.power,
                 brightness: yeelightDevice.state.brightness,
@@ -309,6 +346,9 @@ extension Device {
                     green: yeelightDevice.state.color.green,
                     blue: yeelightDevice.state.color.blue
                 ),
+                effect: yeelightDevice.state.effect,
+                isOnline: yeelightDevice.isOnline,
+                lastSeen: yeelightDevice.lastSeen,
                 mode: yeelightDevice.state.mode
             ),
             isOnline: yeelightDevice.isOnline,

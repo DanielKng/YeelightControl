@@ -5,11 +5,11 @@ import CoreLocation
 // MARK: - Unified Device State
 
 /// The main device state struct used throughout the app
-public struct DeviceState: Codable, Equatable, Hashable {
+public struct Core_DeviceState: Codable, Equatable, Hashable {
     public var power: Bool
     public var brightness: Int
     public var colorTemperature: Int
-    public var color: DeviceColor
+    public var color: Core_DeviceColor
     public var effect: Effect?
     public var isOnline: Bool
     public var lastSeen: Date
@@ -19,7 +19,7 @@ public struct DeviceState: Codable, Equatable, Hashable {
         power: Bool = false,
         brightness: Int = 100,
         colorTemperature: Int = 4000,
-        color: DeviceColor = .white,
+        color: Core_DeviceColor = .white,
         effect: Effect? = nil,
         isOnline: Bool = false,
         lastSeen: Date = Date(),
@@ -69,10 +69,7 @@ public struct DeviceState: Codable, Equatable, Hashable {
                 red: coreState.rgb.red,
                 green: coreState.rgb.green,
                 blue: coreState.rgb.blue
-            ),
-            isOnline: coreState.isOnline,
-            lastSeen: coreState.lastSeen,
-            mode: mode
+            )
         )
     }
     
@@ -116,31 +113,32 @@ public struct DeviceState: Codable, Equatable, Hashable {
     
     // Convert to Core_DeviceState
     public var coreDeviceState: Core_DeviceState {
-        if power {
-            let coreColor = Core_Color(
-                red: Double(color.red) / 255.0,
-                green: Double(color.green) / 255.0,
-                blue: Double(color.blue) / 255.0
-            )
-            return .on(brightness: brightness, color: coreColor)
-        } else {
-            return .off
-        }
+        return Core_DeviceState(
+            power: power,
+            brightness: brightness,
+            colorTemperature: colorTemperature,
+            color: Core_DeviceColor(
+                red: color.red,
+                green: color.green,
+                blue: color.blue
+            ),
+            effect: effect
+        )
     }
 }
 
 // MARK: - Device Color
 
-public struct DeviceColor: Codable, Hashable {
+public struct Core_DeviceColor: Codable, Hashable {
     public var red: Int
     public var green: Int
     public var blue: Int
     
-    public static let white = DeviceColor(red: 255, green: 255, blue: 255)
-    public static let black = DeviceColor(red: 0, green: 0, blue: 0)
-    public static let red = DeviceColor(red: 255, green: 0, blue: 0)
-    public static let green = DeviceColor(red: 0, green: 255, blue: 0)
-    public static let blue = DeviceColor(red: 0, green: 0, blue: 255)
+    public static let white = Core_DeviceColor(red: 255, green: 255, blue: 255)
+    public static let black = Core_DeviceColor(red: 0, green: 0, blue: 0)
+    public static let red = Core_DeviceColor(red: 255, green: 0, blue: 0)
+    public static let green = Core_DeviceColor(red: 0, green: 255, blue: 0)
+    public static let blue = Core_DeviceColor(red: 0, green: 0, blue: 255)
     
     public init(red: Int = 255, green: Int = 255, blue: Int = 255) {
         self.red = red
@@ -156,7 +154,7 @@ public struct DeviceColor: Codable, Hashable {
     }
     
     // Convert from SwiftUI Color
-    public static func from(uiColor: Color) -> DeviceColor {
+    public static func from(uiColor: Color) -> Core_DeviceColor {
         // Extract RGB components from SwiftUI Color
         // This is a simplified implementation that works for basic colors
         
@@ -177,7 +175,7 @@ public struct DeviceColor: Codable, Hashable {
         
         uiColorRepresentation.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
         
-        return DeviceColor(
+        return Core_DeviceColor(
             red: Int(red * 255),
             green: Int(green * 255),
             blue: Int(blue * 255)
@@ -191,14 +189,14 @@ public struct DeviceColor: Codable, Hashable {
         
         nsColorRepresentation.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
         
-        return DeviceColor(
+        return Core_DeviceColor(
             red: Int(red * 255),
             green: Int(green * 255),
             blue: Int(blue * 255)
         )
         #else
         // Fallback for other platforms
-        return DeviceColor(red: 255, green: 255, blue: 255)
+        return Core_DeviceColor(red: 255, green: 255, blue: 255)
         #endif
     }
 }
@@ -305,23 +303,23 @@ public struct Core_YeelightDeviceStateUpdate: Codable, Equatable {
     }
 }
 
-// MARK: - UI Device State (for UI layer)
+// MARK: - UI Device State
 
-/// Device state for UI components
+/// A simplified device state for UI components
 public struct UI_DeviceState: Equatable, Codable {
     public var isOn: Bool
-    public var brightness: Double?
-    public var colorTemperature: Double?
-    public var color: Color?
-    public var mode: String?
+    public var brightness: Double
+    public var colorTemperature: Double
+    public var color: Color
+    public var mode: String
     public var activeEffect: String?
     
     public init(
-        isOn: Bool = true,
-        brightness: Double? = nil,
-        colorTemperature: Double? = nil,
-        color: Color? = nil,
-        mode: String? = nil,
+        isOn: Bool = false,
+        brightness: Double = 100.0,
+        colorTemperature: Double = 4000.0,
+        color: Color = .white,
+        mode: String = "normal",
         activeEffect: String? = nil
     ) {
         self.isOn = isOn
@@ -332,27 +330,135 @@ public struct UI_DeviceState: Equatable, Codable {
         self.activeEffect = activeEffect
     }
     
-    // Convert to DeviceState
-    public func toDeviceState() -> DeviceState {
-        DeviceState(
-            power: isOn,
-            brightness: Int(brightness ?? 100),
-            colorTemperature: Int(colorTemperature ?? 4000),
-            color: DeviceColor.white, // Default
-            effect: nil,
-            isOnline: true,
-            lastSeen: Date()
-        )
+    // Codable conformance for Color
+    enum CodingKeys: String, CodingKey {
+        case isOn, brightness, colorTemperature, mode, activeEffect
+        case colorRed, colorGreen, colorBlue, colorOpacity
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isOn = try container.decode(Bool.self, forKey: .isOn)
+        brightness = try container.decode(Double.self, forKey: .brightness)
+        colorTemperature = try container.decode(Double.self, forKey: .colorTemperature)
+        mode = try container.decode(String.self, forKey: .mode)
+        activeEffect = try container.decodeIfPresent(String.self, forKey: .activeEffect)
+        
+        let red = try container.decode(Double.self, forKey: .colorRed)
+        let green = try container.decode(Double.self, forKey: .colorGreen)
+        let blue = try container.decode(Double.self, forKey: .colorBlue)
+        let opacity = try container.decode(Double.self, forKey: .colorOpacity)
+        
+        color = Color(.sRGB, red: red, green: green, blue: blue, opacity: opacity)
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(isOn, forKey: .isOn)
+        try container.encode(brightness, forKey: .brightness)
+        try container.encode(colorTemperature, forKey: .colorTemperature)
+        try container.encode(mode, forKey: .mode)
+        try container.encodeIfPresent(activeEffect, forKey: .activeEffect)
+        
+        // Extract color components
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var opacity: CGFloat = 0
+        
+        #if os(iOS) || os(macOS)
+        UIColor(color).getRed(&red, green: &green, blue: &blue, alpha: &opacity)
+        #else
+        // Default values for other platforms
+        red = 1.0
+        green = 1.0
+        blue = 1.0
+        opacity = 1.0
+        #endif
+        
+        try container.encode(red, forKey: .colorRed)
+        try container.encode(green, forKey: .colorGreen)
+        try container.encode(blue, forKey: .colorBlue)
+        try container.encode(opacity, forKey: .colorOpacity)
     }
 }
 
 // MARK: - Core Device State
-public enum Core_DeviceState {
+public enum Core_DeviceStateEnum: Codable, Equatable, Hashable {
     case on(brightness: Int, color: Core_Color)
     case off
+    case unknown
+    
+    // Add computed properties for easier access
+    public var isOn: Bool {
+        switch self {
+        case .on:
+            return true
+        case .off, .unknown:
+            return false
+        }
+    }
+    
+    public var brightness: Int {
+        switch self {
+        case .on(let brightness, _):
+            return brightness
+        case .off, .unknown:
+            return 0
+        }
+    }
+    
+    public var color: Core_Color {
+        switch self {
+        case .on(_, let color):
+            return color
+        case .off, .unknown:
+            return Core_Color(red: 1.0, green: 1.0, blue: 1.0)
+        }
+    }
+    
+    // Codable conformance
+    private enum CodingKeys: String, CodingKey {
+        case type, brightness, color
+    }
+    
+    private enum StateType: String, Codable {
+        case on, off, unknown
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(StateType.self, forKey: .type)
+        
+        switch type {
+        case .on:
+            let brightness = try container.decode(Int.self, forKey: .brightness)
+            let color = try container.decode(Core_Color.self, forKey: .color)
+            self = .on(brightness: brightness, color: color)
+        case .off:
+            self = .off
+        case .unknown:
+            self = .unknown
+        }
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        switch self {
+        case .on(let brightness, let color):
+            try container.encode(StateType.on, forKey: .type)
+            try container.encode(brightness, forKey: .brightness)
+            try container.encode(color, forKey: .color)
+        case .off:
+            try container.encode(StateType.off, forKey: .type)
+        case .unknown:
+            try container.encode(StateType.unknown, forKey: .type)
+        }
+    }
 }
 
-public struct Core_Color {
+public struct Core_Color: Codable, Equatable, Hashable {
     public var red: Double
     public var green: Double
     public var blue: Double
@@ -362,4 +468,10 @@ public struct Core_Color {
         self.green = green
         self.blue = blue
     }
+    
+    public static let white = Core_Color(red: 1.0, green: 1.0, blue: 1.0)
+    public static let black = Core_Color(red: 0.0, green: 0.0, blue: 0.0)
+    public static let red = Core_Color(red: 1.0, green: 0.0, blue: 0.0)
+    public static let green = Core_Color(red: 0.0, green: 1.0, blue: 0.0)
+    public static let blue = Core_Color(red: 0.0, green: 0.0, blue: 1.0)
 } 

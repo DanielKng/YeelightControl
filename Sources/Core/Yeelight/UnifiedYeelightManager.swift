@@ -159,7 +159,7 @@ public final class UnifiedYeelightManager: ObservableObject, Core_YeelightManagi
         stopDiscovery()
         
         // Create a new discovery session
-        let discoveredDevices = await withCheckedContinuation { continuation in
+        let discoveredDevices = await withCheckedContinuation { (continuation: CheckedContinuation<[YeelightDevice], Never>) in
             var discoveredDevices: [YeelightDevice] = []
             
             // Create UDP socket for discovery
@@ -200,7 +200,7 @@ public final class UnifiedYeelightManager: ObservableObject, Core_YeelightManagi
                     }
                     
                     // Parse the SSDP response
-                    if let device = self.parseDiscoveryResponse(responseString, from: context?.remoteEndpoint) {
+                    if let device = self.parseDiscoveryResponse(responseString, from: nil) {
                         if !discoveredDevices.contains(where: { $0.id == device.id }) {
                             discoveredDevices.append(device)
                         }
@@ -267,7 +267,7 @@ public final class UnifiedYeelightManager: ObservableObject, Core_YeelightManagi
         Task {
             do {
                 // Create commands based on scene properties
-                let commands = createCommandsForScene(scene)
+                let commands = createSceneCommands(for: scene, device: device)
                 
                 // Send each command to the device
                 for command in commands {
@@ -318,7 +318,7 @@ public final class UnifiedYeelightManager: ObservableObject, Core_YeelightManagi
                         firmwareVersion: coreDevice.firmwareVersion ?? "unknown",
                         ipAddress: coreDevice.ipAddress ?? "unknown",
                         port: 55443, // Default Yeelight port
-                        state: coreDevice.state ?? DeviceState(),
+                        state: coreDevice.state != nil ? DeviceState.from(coreState: coreDevice.state!) : DeviceState(),
                         isOnline: coreDevice.isConnected ?? false,
                         lastSeen: coreDevice.lastSeen ?? Date()
                     )
@@ -339,13 +339,13 @@ public final class UnifiedYeelightManager: ObservableObject, Core_YeelightManagi
                 return Core_Device(
                     id: device.id,
                     name: device.name,
-                    type: .light,
+                    type: .bulb,
                     manufacturer: "Yeelight",
                     model: device.model.rawValue,
                     firmwareVersion: device.firmwareVersion,
                     ipAddress: device.ipAddress,
                     macAddress: nil,
-                    state: device.state,
+                    state: device.state.coreState,
                     isConnected: device.isOnline,
                     lastSeen: device.lastSeen
                 )
@@ -421,7 +421,9 @@ public final class UnifiedYeelightManager: ObservableObject, Core_YeelightManagi
               let model = headers["model"],
               let firmwareVersion = headers["fw_ver"],
               let supportStr = headers["support"],
-              let ipAddress = (endpoint as? NWEndpoint.HostPort)?.host.debugDescription.replacingOccurrences(of: "\"", with: "") else {
+              let location = headers["location"],
+              let locationComponents = URLComponents(string: location),
+              let ipAddress = locationComponents.host else {
             return nil
         }
         
@@ -554,128 +556,32 @@ public final class UnifiedYeelightManager: ObservableObject, Core_YeelightManagi
         }
     }
     
-    private func createCommandsForScene(_ scene: Scene) -> [YeelightCommand] {
+    private func createSceneCommands(for scene: Scene, device: YeelightDevice) -> [YeelightCommand] {
         var commands: [YeelightCommand] = []
         
         // Generate a random command ID
         let commandId = Int.random(in: 1...1000)
         
-        // Create commands based on scene type
-        switch scene.type {
-        case .custom:
-            // Set power state
-            commands.append(YeelightCommand(
-                id: commandId,
-                method: "set_power",
-                params: ["on", "smooth", 500]
-            ))
-            
-            // Set brightness
-            if let brightness = scene.brightness {
-                commands.append(YeelightCommand(
-                    id: commandId + 1,
-                    method: "set_bright",
-                    params: [brightness, "smooth", 500]
-                ))
-            }
-            
-            // Set color temperature or RGB based on scene properties
-            if let colorTemp = scene.colorTemperature {
-                commands.append(YeelightCommand(
-                    id: commandId + 2,
-                    method: "set_ct_abx",
-                    params: [colorTemp, "smooth", 500]
-                ))
-            } else if let color = scene.color {
-                // Convert Color to RGB values
-                let red = Int(color.red * 255)
-                let green = Int(color.green * 255)
-                let blue = Int(color.blue * 255)
-                let rgb = (red << 16) + (green << 8) + blue
-                
-                commands.append(YeelightCommand(
-                    id: commandId + 2,
-                    method: "set_rgb",
-                    params: [rgb, "smooth", 500]
-                ))
-            }
-            
-        case .night:
-            // Night mode: low brightness, warm color temperature
-            commands.append(YeelightCommand(
-                id: commandId,
-                method: "set_power",
-                params: ["on", "smooth", 500]
-            ))
-            
-            commands.append(YeelightCommand(
-                id: commandId + 1,
-                method: "set_bright",
-                params: [1, "smooth", 500]
-            ))
-            
-            commands.append(YeelightCommand(
-                id: commandId + 2,
-                method: "set_ct_abx",
-                params: [2700, "smooth", 500]
-            ))
-            
-        case .reading:
-            // Reading mode: medium brightness, neutral color temperature
-            commands.append(YeelightCommand(
-                id: commandId,
-                method: "set_power",
-                params: ["on", "smooth", 500]
-            ))
-            
-            commands.append(YeelightCommand(
-                id: commandId + 1,
-                method: "set_bright",
-                params: [50, "smooth", 500]
-            ))
-            
-            commands.append(YeelightCommand(
-                id: commandId + 2,
-                method: "set_ct_abx",
-                params: [4000, "smooth", 500]
-            ))
-            
-        case .movie:
-            // Movie mode: low brightness, cool color
-            commands.append(YeelightCommand(
-                id: commandId,
-                method: "set_power",
-                params: ["on", "smooth", 1000]
-            ))
-            
-            commands.append(YeelightCommand(
-                id: commandId + 1,
-                method: "set_bright",
-                params: [20, "smooth", 1000]
-            ))
-            
-            commands.append(YeelightCommand(
-                id: commandId + 2,
-                method: "set_rgb",
-                params: [255, "smooth", 1000]
-            ))
-            
-        case .party:
-            // Party mode: color flow effect
-            let flowExpression = "0,1,255,100,500,2,5000,100,500,2,255,100,500,2,16711680,100,500,2,65280,100,500,2,16776960,100,500"
-            
-            commands.append(YeelightCommand(
-                id: commandId,
-                method: "set_power",
-                params: ["on", "smooth", 500]
-            ))
-            
-            commands.append(YeelightCommand(
-                id: commandId + 1,
-                method: "start_cf",
-                params: [0, 0, flowExpression]
-            ))
-        }
+        // Create basic power on command
+        commands.append(YeelightCommand(
+            id: commandId,
+            method: "set_power",
+            params: ["on", "smooth", 500]
+        ))
+        
+        // Set default brightness
+        commands.append(YeelightCommand(
+            id: commandId + 1,
+            method: "set_bright",
+            params: [100, "smooth", 500]
+        ))
+        
+        // Set default color temperature
+        commands.append(YeelightCommand(
+            id: commandId + 2,
+            method: "set_ct_abx",
+            params: [4000, "smooth", 500]
+        ))
         
         return commands
     }

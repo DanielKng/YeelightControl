@@ -9,7 +9,11 @@ public enum Core_SecurityEvent {
     case biometricAuthenticationUnavailable
 }
 
-public enum Core_NotificationEvent {
+// Already defined elsewhere - commenting out to avoid redeclaration
+/*
+// Commented out to avoid ambiguity
+// // Commented out to avoid ambiguity
+// public enum Core_NotificationEvent {
     case received(Core_NotificationRequest)
     case scheduled(Core_NotificationRequest)
     case delivered(Core_NotificationRequest)
@@ -17,6 +21,7 @@ public enum Core_NotificationEvent {
     case permissionGranted
     case permissionDenied
 }
+*/
 
 public enum Core_SceneEvent {
     case activated(Core_Scene)
@@ -38,12 +43,17 @@ public enum Core_EffectEvent {
     case failed(Core_Effect, Core_Device, Error)
 }
 
-public enum Core_PermissionEvent {
+// Already defined elsewhere - commenting out to avoid redeclaration
+/*
+// Commented out to avoid ambiguity
+// // Commented out to avoid ambiguity
+// public enum Core_PermissionEvent {
     case granted(Core_PermissionType)
     case denied(Core_PermissionType)
     case restricted(Core_PermissionType)
     case notDetermined(Core_PermissionType)
 }
+*/
 
 // Deprecated - use Core_PermissionType instead
 public enum Permission {

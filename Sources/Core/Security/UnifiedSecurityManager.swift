@@ -35,6 +35,18 @@ enum BiometryType {
     }
 }
 
+// MARK: - Security Error
+enum SecurityError: Error {
+    case invalidKey
+    case invalidData
+    case keychainSaveFailed(OSStatus)
+    case keychainLoadFailed(OSStatus)
+    case keychainDeleteFailed(OSStatus)
+    case accessControlCreationFailed(String)
+    case biometricsNotAvailable
+    case authenticationFailed
+}
+
 @MainActor
 public final class UnifiedSecurityManager: ObservableObject {
     // MARK: - Published Properties
@@ -107,41 +119,15 @@ public final class UnifiedSecurityManager: ObservableObject {
     
     // MARK: - Keychain Methods
     func saveToKeychain(_ data: Data, forKey key: String) throws {
-        var query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecValueData as String: data
-        ]
-        
-        if let accessGroup = config.keychainAccessGroup {
-            query[kSecAttrAccessGroup as String] = accessGroup
-        }
-        
-        if config.useAccessControl {
-            var error: Unmanaged<CFError>?
-            let access = SecAccessControlCreateWithFlags(
-                kCFAllocatorDefault,
-                kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                config.useBiometricProtection ? .biometryAny : [],
-                &error
-            )
-            
-            if let error = error?.takeRetainedValue() {
-                throw SecurityError.accessControlCreationFailed(error.localizedDescription)
-            }
-            
-            query[kSecAttrAccessControl as String] = access
-        }
+        var query = createKeychainQuery(forKey: key)
+        query[kSecValueData as String] = data
         
         let status = SecItemAdd(query as CFDictionary, nil)
-        if status == errSecDuplicateItem {
-            try removeFromKeychain(forKey: key)
-            try saveToKeychain(data, forKey: key)
-        } else if status != errSecSuccess {
+        if status != errSecSuccess {
             throw SecurityError.keychainSaveFailed(status)
         }
         
-        services.logger.info("Saved data to keychain for key: \(key)", category: .security)
+        print("Saved data to keychain for key: \(key)")
     }
     
     func loadFromKeychain(forKey key: String) throws -> Data {
@@ -166,17 +152,14 @@ public final class UnifiedSecurityManager: ObservableObject {
     }
     
     func removeFromKeychain(forKey key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key
-        ]
+        let query = createKeychainQuery(forKey: key)
         
         let status = SecItemDelete(query as CFDictionary)
         if status != errSecSuccess && status != errSecItemNotFound {
             throw SecurityError.keychainDeleteFailed(status)
         }
         
-        services.logger.info("Removed data from keychain for key: \(key)", category: .security)
+        print("Removed data from keychain for key: \(key)")
     }
     
     // MARK: - Authentication Methods
@@ -203,21 +186,22 @@ public final class UnifiedSecurityManager: ObservableObject {
     }
     
     func checkBiometryType() -> BiometryType {
-        let context = LAContext()
         var error: NSError?
         
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
             return .none
         }
         
-        switch context.biometryType {
+        let biometryType = context.biometryType
+        switch biometryType {
         case .none:
             return .none
         case .touchID:
             return .touchID
         case .faceID:
             return .faceID
-        @unknown default:
+        default:
+            // Handle any future biometry types
             return .none
         }
     }
@@ -227,6 +211,15 @@ public final class UnifiedSecurityManager: ObservableObject {
         var error: NSError?
         isBiometricsAvailable = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
         biometricType = context.biometryType
+    }
+    
+    private func createKeychainQuery(forKey key: String) -> [String: Any] {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key
+        ]
+        
+        return query
     }
 }
 

@@ -34,7 +34,11 @@ open class BaseServiceContainer {
     private func createStateManager() async -> UnifiedStateManager {
         // Use Task to handle the async call
         let task = Task {
-            return await UnifiedStateManager(services: self as! ServiceContainer)
+            // Avoid forced cast by using proper type checking
+            guard let serviceContainer = self as? ServiceContainer else {
+                fatalError("BaseServiceContainer cannot be used directly. Use ServiceContainer instead.")
+            }
+            return await UnifiedStateManager(services: serviceContainer)
         }
         return await task.value
     }

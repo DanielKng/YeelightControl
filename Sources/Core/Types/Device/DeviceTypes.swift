@@ -14,6 +14,8 @@ public enum Core_DeviceType: String, Codable, CaseIterable {
 }
 
 // MARK: - Device State
+// Commented out to avoid ambiguity with DeviceState.swift
+/*
 public enum Core_DeviceState: Codable, Hashable {
     case off
     case on(brightness: Int, color: Core_Color)
@@ -46,6 +48,7 @@ public enum Core_DeviceState: Codable, Hashable {
         }
     }
 }
+*/
 
 // Core_Color is defined in ColorTypes.swift
 // Removing duplicate definition to resolve ambiguity errors

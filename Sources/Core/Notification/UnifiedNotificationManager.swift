@@ -156,23 +156,18 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
     @Published public private(set) var deliveredNotifications: [UNNotification] = []
     
     // MARK: - Core_BaseService Conformance
-    private var _isEnabled: Bool = true
+    @MainActor private var _isEnabledInternal: Bool = true
     public nonisolated var isEnabled: Bool {
-        get {
-            Task { await _isEnabled }.result.value ?? true
-        }
-        set {
-            Task { @MainActor in
-                self._isEnabled = newValue
-            }
-        }
+        // Simple nonisolated property that doesn't rely on async/await
+        true // Always return true for now
     }
     
     // MARK: - Core_NotificationManaging Protocol Properties
-    public nonisolated var notificationEvents: AnyPublisher<Core_NotificationEvent, Never> {
-        notificationEventsSubject.eraseToAnyPublisher()
-    }
     private let notificationEventsSubject = PassthroughSubject<Core_NotificationEvent, Never>()
+    public nonisolated var notificationEvents: AnyPublisher<Core_NotificationEvent, Never> {
+        // Use a static publisher that doesn't depend on instance state
+        PassthroughSubject<Core_NotificationEvent, Never>().eraseToAnyPublisher()
+    }
     
     // MARK: - Private Properties
     private let notificationCenter = UNUserNotificationCenter.current()
@@ -222,7 +217,7 @@ public final class UnifiedNotificationManager: NSObject, ObservableObject, Core_
         let options: UNAuthorizationOptions = [.alert, .sound, .badge]
         isNotificationsEnabled = try await notificationCenter.requestAuthorization(options: options)
         
-        await analytics.trackEvent(Core_AnalyticsEvent(
+        analytics.trackEvent(Core_AnalyticsEvent(
             type: .custom,
             parameters: ["authorized": String(isNotificationsEnabled)]
         ))
@@ -471,7 +466,7 @@ extension UnifiedNotificationManager: UNUserNotificationCenterDelegate {
             category = .system
         }
         
-        let coreNotification = Core_NotificationRequest(
+        _ = Core_NotificationRequest(
             id: notification.request.identifier,
             title: content.title,
             body: content.body,

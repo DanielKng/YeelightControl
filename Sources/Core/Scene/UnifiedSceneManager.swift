@@ -56,7 +56,7 @@ public protocol Core_SceneManaging: AnyObject {
     func deleteScene(_ scene: Core_Scene) async
     func activateScene(_ scene: Core_Scene) async
     func deactivateScene(_ scene: Core_Scene) async
-    func scheduleScene(_ scene: Core_Scene, schedule: Core_SceneSchedule) async -> Core_Scene
+    func scheduleScene(_ scene: Core_Scene, schedule: Core_SceneSchedule) async
 }
 
 // MARK: - Unified Scene Manager Implementation
@@ -102,17 +102,20 @@ public final class UnifiedSceneManager: ObservableObject, Core_SceneManaging {
     }
     
     public func createScene(name: String, deviceIds: [String], effect: Core_Effect?) async -> Core_Scene {
+        // Create device states dictionary
+        let states: [String: DeviceState] = [:]
+        
         let newScene = Core_Scene(
             name: name,
             deviceIds: deviceIds,
-            effect: effect
+            states: states
         )
         
         scenes.append(newScene)
         sceneSubject.send(newScene)
         
         // Save scene to storage
-        try? await storageManager.save(newScene, withId: newScene.id, inCollection: "scenes")
+        try? await storageManager.save(newScene, forKey: newScene.id)
         
         return newScene
     }
@@ -122,8 +125,8 @@ public final class UnifiedSceneManager: ObservableObject, Core_SceneManaging {
             scenes[index] = scene
             sceneSubject.send(scene)
             
-            // Update scene in storage
-            try? await storageManager.save(scene, withId: scene.id, inCollection: "scenes")
+            // Save scene to storage
+            try? await storageManager.save(scene, forKey: scene.id)
         }
         
         return scene
@@ -135,49 +138,63 @@ public final class UnifiedSceneManager: ObservableObject, Core_SceneManaging {
             scenes.remove(at: index)
             
             // Delete scene from storage
-            try? await storageManager.delete(withId: sceneToDelete.id, fromCollection: "scenes")
+            try? await storageManager.remove(forKey: sceneToDelete.id)
         }
     }
     
     public func activateScene(_ scene: Core_Scene) async {
-        var updatedScene = scene
-        updatedScene.isActive = true
-        
-        // Activate the scene's effect if it has one
-        if let effect = updatedScene.effect {
-            await effectManager.startEffect(effect)
-        }
+        // Since isActive is a let property, we need to create a new scene with the updated value
+        let updatedScene = Core_Scene(
+            id: scene.id,
+            name: scene.name,
+            deviceIds: scene.deviceIds,
+            states: scene.states,
+            schedule: scene.schedule,
+            isActive: true,
+            lastActivated: Date()
+        )
         
         // Update the scene
         await updateScene(updatedScene)
     }
     
     public func deactivateScene(_ scene: Core_Scene) async {
-        var updatedScene = scene
-        updatedScene.isActive = false
-        
-        // Deactivate the scene's effect if it has one
-        if let effect = updatedScene.effect {
-            await effectManager.stopEffect(effect)
-        }
+        // Since isActive is a let property, we need to create a new scene with the updated value
+        let updatedScene = Core_Scene(
+            id: scene.id,
+            name: scene.name,
+            deviceIds: scene.deviceIds,
+            states: scene.states,
+            schedule: scene.schedule,
+            isActive: false,
+            lastActivated: scene.lastActivated
+        )
         
         // Update the scene
         await updateScene(updatedScene)
     }
     
-    public func scheduleScene(_ scene: Core_Scene, schedule: Core_SceneSchedule) async -> Core_Scene {
-        var updatedScene = scene
-        updatedScene.schedule = schedule
+    public func scheduleScene(_ scene: Core_Scene, schedule: Core_SceneSchedule) async {
+        // Since schedule is a let property, we need to create a new scene with the updated value
+        let updatedScene = Core_Scene(
+            id: scene.id,
+            name: scene.name,
+            deviceIds: scene.deviceIds,
+            states: scene.states,
+            schedule: schedule,
+            isActive: scene.isActive,
+            lastActivated: scene.lastActivated
+        )
         
         // Update the scene
-        return await updateScene(updatedScene)
+        await updateScene(updatedScene)
     }
     
     // MARK: - Private Methods
     
     private func loadScenes() async {
         do {
-            let loadedScenes: [Core_Scene] = try await storageManager.getAll(fromCollection: "scenes")
+            let loadedScenes: [Core_Scene] = try await storageManager.getAll(Core_Scene.self, withPrefix: "")
             
             await MainActor.run {
                 self.scenes = loadedScenes

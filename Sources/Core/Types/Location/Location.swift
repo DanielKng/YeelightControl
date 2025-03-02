@@ -1,7 +1,11 @@
 import CoreLocation
 import Foundation
 
-public struct Location: Codable, Hashable {
+// Already defined elsewhere - commenting out to avoid redeclaration
+/*
+// Commented out to avoid ambiguity
+// // Commented out to avoid ambiguity
+// public struct Location: Codable, Hashable {
     public var name: String
     public var coordinates: CLLocationCoordinate2D
     public var radius: CLLocationDistance
@@ -17,6 +21,7 @@ public struct Location: Codable, Hashable {
         self.address = address
     }
 }
+*/
 
 public struct LocationCoordinate: Hashable, Codable {
     public let latitude: CLLocationDegrees

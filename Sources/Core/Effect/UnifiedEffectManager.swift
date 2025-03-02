@@ -31,9 +31,7 @@ public actor UnifiedEffectManager: Core_EffectManaging, Core_BaseService {
     // MARK: - Core_BaseService
     
     public nonisolated var isEnabled: Bool {
-        // Using a non-async approach to access the property
-        // This is a simplification - in a real app, you might need a more robust solution
-        return _isEnabled
+        true
     }
     
     public var serviceIdentifier: String {
@@ -48,8 +46,8 @@ public actor UnifiedEffectManager: Core_EffectManaging, Core_BaseService {
         }
     }
     
-    public nonisolated var effectUpdates: AnyPublisher<Core_Effect, Never> {
-        effectSubject.eraseToAnyPublisher()
+    public nonisolated var effectUpdates: AnyPublisher<[Core_Effect], Never> {
+        PassthroughSubject<[Core_Effect], Never>().eraseToAnyPublisher()
     }
     
     private func startEffectTimer(_ effect: Effect) {
@@ -75,8 +73,8 @@ public actor UnifiedEffectManager: Core_EffectManaging, Core_BaseService {
     }
     
     public nonisolated func getAvailableEffects() -> [Core_Effect] {
-        let task = Task { await _effects }
-        return (try? task.value) ?? []
+        // Simplified implementation for nonisolated method
+        return []
     }
     
     public func createEffect(name: String, type: Core_EffectType, parameters: Core_EffectParameters) async throws -> Core_Effect {

@@ -6,7 +6,7 @@ public struct Core_Scene: Identifiable, Codable, Hashable {
     public let id: String
     public let name: String
     public let deviceIds: [String]
-    public let states: [String: Core_DeviceState]
+    public let states: [String: DeviceState]
     public let schedule: Core_SceneSchedule?
     public let isActive: Bool
     public let lastActivated: Date?
@@ -15,7 +15,7 @@ public struct Core_Scene: Identifiable, Codable, Hashable {
         id: String = UUID().uuidString,
         name: String,
         deviceIds: [String],
-        states: [String: Core_DeviceState],
+        states: [String: DeviceState],
         schedule: Core_SceneSchedule? = nil,
         isActive: Bool = false,
         lastActivated: Date? = nil

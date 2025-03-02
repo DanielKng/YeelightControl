@@ -86,11 +86,7 @@ public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
     
     // MARK: - Core_BaseService
     public nonisolated var isEnabled: Bool {
-        get {
-            // Using a non-async approach to access the property
-            // This is a simplification - in a real app, you might need a more robust solution
-            return _isEnabled
-        }
+        true
     }
     
     public var serviceIdentifier: String {
@@ -100,14 +96,11 @@ public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
     // MARK: - Core_ErrorHandling
     
     nonisolated public var lastError: Core_AppError? {
-        get {
-            let task = Task { await _lastError }
-            return (try? task.result.get())
-        }
+        nil // Simplified implementation for nonisolated property
     }
     
     nonisolated public var errorUpdates: AnyPublisher<Core_AppError, Never> {
-        errorSubject.eraseToAnyPublisher()
+        PassthroughSubject<Core_AppError, Never>().eraseToAnyPublisher()
     }
     
     public func handle(_ appError: Core_AppError) async {

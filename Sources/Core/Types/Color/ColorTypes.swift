@@ -2,7 +2,11 @@ import Foundation
 import SwiftUI
 
 // MARK: - Color Type
-public struct Core_Color: Codable, Equatable, Hashable {
+// Already defined elsewhere - commenting out to avoid redeclaration
+/*
+// Commented out to avoid ambiguity
+// // Commented out to avoid ambiguity
+// public struct Core_Color: Codable, Equatable, Hashable {
     public var red: Double
     public var green: Double
     public var blue: Double
@@ -37,4 +41,5 @@ public struct Core_Color: Codable, Equatable, Hashable {
         // In a real implementation, you would need a more robust conversion
         return Core_Color(red: 0, green: 0, blue: 0)
     }
-} 
+}
+*/ 

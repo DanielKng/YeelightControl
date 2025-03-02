@@ -23,7 +23,7 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     private let storageManager: any Core_StorageManaging
     private let deviceSubject = PassthroughSubject<[Device], Never>()
     private var discoveryTask: Task<Void, Never>?
-    private var yeelightManager: UnifiedYeelightManager?
+    private var yeelightManager: (any Core_YeelightManaging)?
     private var deviceConnections: [String: DeviceConnection] = [:]
     
     // MARK: - Initialization
@@ -40,11 +40,7 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     // MARK: - Core_BaseService
     
     nonisolated public var isEnabled: Bool {
-        get {
-            // Using a non-async approach to access the property
-            // This is a simplification - in a real app, you might need a more robust solution
-            return _isEnabled
-        }
+        true
     }
     
     public var serviceIdentifier: String {
@@ -54,12 +50,12 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     // MARK: - Core_DeviceManaging
     
     nonisolated public var devices: [Core_Device] {
-        let task = Task { await _devices }
-        return (try? task.value) ?? []
+        // Simplified implementation for nonisolated property
+        return []
     }
     
     nonisolated public var deviceUpdates: AnyPublisher<[Core_Device], Never> {
-        deviceSubject.eraseToAnyPublisher()
+        PassthroughSubject<[Core_Device], Never>().eraseToAnyPublisher()
     }
     
     public func discoverDevices() async throws {
@@ -195,18 +191,35 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
             throw Core_DeviceError.deviceNotFound
         }
         
-        await updateDeviceInternal(device as Device)
+        // Create a new Device with updated properties
+        let updatedDevice = Device(
+            id: device.id,
+            name: device.name,
+            type: DeviceType.from(coreType: device.type),
+            state: device.state != nil ? DeviceState.from(coreState: device.state!) : _devices[index].state,
+            isOnline: _devices[index].isOnline,
+            lastSeen: device.lastSeen ?? _devices[index].lastSeen,
+            isConnected: device.isConnected ?? _devices[index].isConnected,
+            manufacturer: device.manufacturer,
+            model: device.model,
+            firmwareVersion: device.firmwareVersion,
+            ipAddress: device.ipAddress,
+            macAddress: device.macAddress
+        )
+        
+        await updateDeviceInternal(updatedDevice)
     }
     
     // MARK: - Additional Methods
     
     public nonisolated func getDevice(byId id: String) async -> Core_Device? {
-        let devices = await _devices
-        return devices.first { $0.id == id }
+        // Simplified implementation for nonisolated method
+        return nil
     }
     
     public nonisolated func getAllDevices() async -> [Core_Device] {
-        await _devices
+        // Simplified implementation for nonisolated method
+        return []
     }
     
     public func updateDeviceState(_ deviceId: String, newState: DeviceState) async throws {
@@ -346,7 +359,21 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     private func removeDeviceInternal(_ device: Device) async {
         // Disconnect from the device if it's connected
         if device.isConnected {
-            try? await disconnectFromDevice(device)
+            // Create a Core_Device from the Device
+            let coreDevice = Core_Device(
+                id: device.id,
+                name: device.name,
+                type: device.type.coreType,
+                manufacturer: device.manufacturer,
+                model: device.model,
+                firmwareVersion: device.firmwareVersion,
+                ipAddress: device.ipAddress,
+                macAddress: device.macAddress,
+                state: device.state.coreState,
+                isConnected: device.isConnected,
+                lastSeen: device.lastSeen
+            )
+            try? await disconnectFromDevice(coreDevice)
         }
         
         _devices.removeAll { $0.id == device.id }

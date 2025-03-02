@@ -7,6 +7,18 @@ import SwiftUI
 import CoreLocation
 import Combine
 
+// MARK: - Type Aliases to Resolve Ambiguity
+// These type aliases help resolve ambiguity between types with similar names
+// Commenting out ambiguous type aliases
+// public typealias CoreDeviceState = Core_DeviceState
+
+// Core_Device is now defined in Device.swift
+// public typealias CoreDevice = Core_Device
+
+public typealias CoreLocation = Location
+// public typealias CoreDeviceStateUpdate = DeviceStateUpdate
+// public typealias DeviceState = Core_DeviceState
+
 // MARK: - Theme Types
 // Core_Theme is defined in ThemeTypes.swift
 

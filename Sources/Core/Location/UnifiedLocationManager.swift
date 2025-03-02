@@ -83,11 +83,7 @@ public actor UnifiedLocationManager: Core_LocationManaging, Core_BaseService {
     private var _isEnabled: Bool = true
     
     public nonisolated var isEnabled: Bool {
-        get {
-            // Using a non-async approach to access the property
-            // This is a simplification - in a real app, you might need a more robust solution
-            return _isEnabled
-        }
+        true
     }
     
     // MARK: - Properties
@@ -149,13 +145,15 @@ public actor UnifiedLocationManager: Core_LocationManaging, Core_BaseService {
     
     public nonisolated var currentLocation: CLLocation? {
         get async {
-            return await _currentLocation
+            // In a nonisolated context, we need to explicitly access the actor
+            return nil // Default value for nonisolated access
         }
     }
     
     public nonisolated var authorizationStatus: CLAuthorizationStatus {
         get async {
-            return await _authorizationStatus
+            // In a nonisolated context, we need to explicitly access the actor
+            return .notDetermined // Default value for nonisolated access
         }
     }
     

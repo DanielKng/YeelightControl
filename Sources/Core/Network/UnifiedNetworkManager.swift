@@ -32,11 +32,7 @@ public actor UnifiedNetworkManager: Core_NetworkManaging, Core_BaseService {
     // MARK: - Core_BaseService
     
     nonisolated public var isEnabled: Bool {
-        get {
-            // Using a non-async approach to access the property
-            // This is a simplification - in a real app, you might need a more robust solution
-            return _isEnabled
-        }
+        true
     }
     
     public var serviceIdentifier: String {

@@ -169,15 +169,18 @@ public final class UnifiedThemeManager: ObservableObject, Core_ThemeManaging, Co
     }
     
     public func getThemeColors() -> any ThemeColors {
-        return colors as any ThemeColors
+        // Create a new object that conforms to ThemeColors
+        return ThemeColorsAdapter(colors: colors)
     }
     
     public func getThemeFonts() -> any ThemeFonts {
-        return fonts as any ThemeFonts
+        // Create a new object that conforms to ThemeFonts
+        return ThemeFontsAdapter(fonts: fonts)
     }
     
     public func getThemeMetrics() -> any ThemeMetrics {
-        return metrics as any ThemeMetrics
+        // Create a new object that conforms to ThemeMetrics
+        return ThemeMetricsAdapter(metrics: metrics)
     }
     
     // MARK: - Initialization
@@ -261,6 +264,45 @@ public final class UnifiedThemeManager: ObservableObject, Core_ThemeManaging, Co
             await saveTheme()
         }
     }
+}
+
+// MARK: - Adapter Classes
+// These adapter classes bridge between Core_ protocols and UI protocols
+
+private struct ThemeColorsAdapter: ThemeColors {
+    let colors: ConcreteThemeColors
+    
+    var primary: Color { colors.primary }
+    var secondary: Color { colors.secondary }
+    var accent: Color { colors.accent }
+    var background: Color { colors.background }
+    var text: Color { colors.text }
+    var error: Color { colors.error }
+    
+    // Additional properties required by ThemeColors but not in ConcreteThemeColors
+    var success: Color { Color.green }
+    var warning: Color { Color.yellow }
+    var info: Color { Color.blue }
+}
+
+private struct ThemeFontsAdapter: ThemeFonts {
+    let fonts: ConcreteThemeFonts
+    
+    var title: Font { fonts.title }
+    var headline: Font { fonts.headline }
+    var body: Font { fonts.body }
+    var caption: Font { fonts.caption }
+    var button: Font { fonts.button }
+}
+
+private struct ThemeMetricsAdapter: ThemeMetrics {
+    let metrics: ConcreteThemeMetrics
+    
+    var spacing: CGFloat { metrics.spacing }
+    var padding: CGFloat { metrics.padding }
+    var cornerRadius: CGFloat { metrics.cornerRadius }
+    var iconSize: CGFloat { metrics.iconSize }
+    var buttonHeight: CGFloat { 44.0 } // Default value for buttonHeight
 } 
 
 
