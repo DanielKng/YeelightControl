@@ -87,8 +87,9 @@ public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
     // MARK: - Core_BaseService
     public nonisolated var isEnabled: Bool {
         get {
-            let task = Task { await _isEnabled }
-            return (try? task.result.get()) ?? false
+            // Using a non-async approach to access the property
+            // This is a simplification - in a real app, you might need a more robust solution
+            return _isEnabled
         }
     }
     
@@ -116,9 +117,9 @@ public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
         // Log the error
         let logger = services.logManager
         await logger.log(
-            message: appError.localizedDescription,
-            level: Core_LogLevel.error.rawValue,
-            category: Core_LogCategory.error.rawValue,
+            appError.localizedDescription,
+            level: Core_LogLevel.error,
+            category: Core_LogCategory.error,
             file: appError.sourceLocation.file,
             function: appError.sourceLocation.function,
             line: appError.sourceLocation.line
@@ -139,9 +140,9 @@ public actor UnifiedErrorHandler: Core_ErrorHandling, Core_BaseService {
             _lastError = appError
             let logger = services.logManager
             await logger.log(
-                message: error.localizedDescription,
-                level: Core_LogLevel.error.rawValue,
-                category: Core_LogCategory.error.rawValue,
+                error.localizedDescription,
+                level: Core_LogLevel.error,
+                category: Core_LogCategory.error,
                 file: sourceLocation.file,
                 function: sourceLocation.function,
                 line: sourceLocation.line

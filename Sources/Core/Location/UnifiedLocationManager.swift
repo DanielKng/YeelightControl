@@ -84,10 +84,9 @@ public actor UnifiedLocationManager: Core_LocationManaging, Core_BaseService {
     
     public nonisolated var isEnabled: Bool {
         get {
-            let task = Task { () -> Bool in
-                return await _isEnabled
-            }
-            return (try? task.result.get()) ?? false
+            // Using a non-async approach to access the property
+            // This is a simplification - in a real app, you might need a more robust solution
+            return _isEnabled
         }
     }
     

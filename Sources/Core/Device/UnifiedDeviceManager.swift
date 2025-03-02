@@ -41,8 +41,9 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     
     nonisolated public var isEnabled: Bool {
         get {
-            let task = Task { await _isEnabled }
-            return (try? task.value) ?? false
+            // Using a non-async approach to access the property
+            // This is a simplification - in a real app, you might need a more robust solution
+            return _isEnabled
         }
     }
     
@@ -79,7 +80,19 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
                 
                 // Convert YeelightDevices to Devices and add them
                 for yeelightDevice in yeelightDevices {
-                    let device = Device(yeelight: yeelightDevice)
+                    // Convert YeelightDevice to Yeelight
+                    let yeelight = Yeelight(
+                        id: yeelightDevice.id,
+                        name: yeelightDevice.name,
+                        model: yeelightDevice.model,
+                        firmwareVersion: yeelightDevice.firmwareVersion,
+                        ipAddress: yeelightDevice.ipAddress,
+                        port: yeelightDevice.port,
+                        state: yeelightDevice.state,
+                        isOnline: yeelightDevice.isOnline,
+                        lastSeen: yeelightDevice.lastSeen
+                    )
+                    let device = Device(yeelight: yeelight)
                     await addDeviceInternal(device)
                 }
             } catch {
@@ -118,7 +131,7 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
                 
                 // Create a device connection if it doesn't exist
                 if deviceConnections[device.id] == nil {
-                    let connection = DeviceConnection(device: yeelightDevice)
+                    let connection = await DeviceConnection(device: yeelightDevice)
                     deviceConnections[device.id] = connection
                     
                     // Start monitoring the device state
@@ -163,7 +176,7 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
                 
                 // Remove the device connection
                 if let connection = deviceConnections[device.id] {
-                    connection.disconnect()
+                    await connection.disconnect()
                     deviceConnections.removeValue(forKey: device.id)
                 }
             }
@@ -346,9 +359,7 @@ public actor UnifiedDeviceManager: Core_DeviceManaging, Core_BaseService {
     
     private func setupYeelightManager() async {
         // Get the network manager from the service container
-        if let serviceContainer = ServiceContainer.shared as? BaseServiceContainer {
-            self.yeelightManager = serviceContainer.yeelightManager
-        }
+        self.yeelightManager = ServiceContainer.shared.yeelightManager
     }
     
     private func loadDevices() async {
