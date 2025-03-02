@@ -12,9 +12,20 @@ extension ServiceContainer {
         if let manager = _yeelightManager {
             return manager
         }
-        let manager = ObservableYeelightManager(manager: self.yeelightManager as! UnifiedYeelightManager)
-        _yeelightManager = manager
-        return manager
+        
+        if let unifiedManager = self.yeelightManager as? UnifiedYeelightManager {
+            let manager = ObservableYeelightManager(manager: unifiedManager)
+            _yeelightManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let storageManager = self.storageManager as? UnifiedStorageManager ?? UnifiedStorageManager()
+            let networkManager = self.networkManager as? UnifiedNetworkManager ?? UnifiedNetworkManager()
+            let unifiedManager = UnifiedYeelightManager(storageManager: storageManager, networkManager: networkManager)
+            let manager = ObservableYeelightManager(manager: unifiedManager)
+            _yeelightManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for DeviceManager
@@ -22,9 +33,18 @@ extension ServiceContainer {
         if let manager = _deviceManager {
             return manager
         }
-        let manager = ObservableDeviceManager(manager: self.deviceManager as! UnifiedDeviceManager)
-        _deviceManager = manager
-        return manager
+        
+        if let unifiedManager = self.deviceManager as? UnifiedDeviceManager {
+            let manager = ObservableDeviceManager(manager: unifiedManager)
+            _deviceManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedDeviceManager()
+            let manager = ObservableDeviceManager(manager: unifiedManager)
+            _deviceManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for SceneManager
@@ -32,9 +52,18 @@ extension ServiceContainer {
         if let manager = _sceneManager {
             return manager
         }
-        let manager = ObservableSceneManager(manager: self.sceneManager as! UnifiedSceneManager)
-        _sceneManager = manager
-        return manager
+        
+        if let unifiedManager = self.sceneManager as? UnifiedSceneManager {
+            let manager = ObservableSceneManager(manager: unifiedManager)
+            _sceneManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedSceneManager()
+            let manager = ObservableSceneManager(manager: unifiedManager)
+            _sceneManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for EffectManager
@@ -42,9 +71,18 @@ extension ServiceContainer {
         if let manager = _effectManager {
             return manager
         }
-        let manager = ObservableEffectManager(manager: self.effectManager as! UnifiedEffectManager)
-        _effectManager = manager
-        return manager
+        
+        if let unifiedManager = self.effectManager as? UnifiedEffectManager {
+            let manager = ObservableEffectManager(manager: unifiedManager)
+            _effectManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedEffectManager()
+            let manager = ObservableEffectManager(manager: unifiedManager)
+            _effectManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for NetworkManager
@@ -52,9 +90,18 @@ extension ServiceContainer {
         if let manager = _networkManager {
             return manager
         }
-        let manager = ObservableNetworkManager(manager: self.networkManager as! UnifiedNetworkManager)
-        _networkManager = manager
-        return manager
+        
+        if let unifiedManager = self.networkManager as? UnifiedNetworkManager {
+            let manager = ObservableNetworkManager(manager: unifiedManager)
+            _networkManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedNetworkManager()
+            let manager = ObservableNetworkManager(manager: unifiedManager)
+            _networkManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for StorageManager
@@ -62,9 +109,18 @@ extension ServiceContainer {
         if let manager = _storageManager {
             return manager
         }
-        let manager = ObservableStorageManager(manager: self.storageManager as! UnifiedStorageManager)
-        _storageManager = manager
-        return manager
+        
+        if let unifiedManager = self.storageManager as? UnifiedStorageManager {
+            let manager = ObservableStorageManager(manager: unifiedManager)
+            _storageManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedStorageManager()
+            let manager = ObservableStorageManager(manager: unifiedManager)
+            _storageManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for LocationManager
@@ -72,9 +128,18 @@ extension ServiceContainer {
         if let manager = _locationManager {
             return manager
         }
-        let manager = ObservableLocationManager(manager: self.locationManager as! UnifiedLocationManager)
-        _locationManager = manager
-        return manager
+        
+        if let unifiedManager = self.locationManager as? UnifiedLocationManager {
+            let manager = ObservableLocationManager(manager: unifiedManager)
+            _locationManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedLocationManager()
+            let manager = ObservableLocationManager(manager: unifiedManager)
+            _locationManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for PermissionManager
@@ -82,9 +147,18 @@ extension ServiceContainer {
         if let manager = _permissionManager {
             return manager
         }
-        let manager = ObservablePermissionManager(manager: self.permissionManager as! UnifiedPermissionManager)
-        _permissionManager = manager
-        return manager
+        
+        if let unifiedManager = self.permissionManager as? UnifiedPermissionManager {
+            let manager = ObservablePermissionManager(manager: unifiedManager)
+            _permissionManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedPermissionManager()
+            let manager = ObservablePermissionManager(manager: unifiedManager)
+            _permissionManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for AnalyticsManager
@@ -92,9 +166,18 @@ extension ServiceContainer {
         if let manager = _analyticsManager {
             return manager
         }
-        let manager = ObservableAnalyticsManager(manager: self.analyticsManager as! UnifiedAnalyticsManager)
-        _analyticsManager = manager
-        return manager
+        
+        if let unifiedManager = self.analyticsManager as? UnifiedAnalyticsManager {
+            let manager = ObservableAnalyticsManager(manager: unifiedManager)
+            _analyticsManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedAnalyticsManager()
+            let manager = ObservableAnalyticsManager(manager: unifiedManager)
+            _analyticsManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for ConfigurationManager
@@ -102,9 +185,18 @@ extension ServiceContainer {
         if let manager = _configurationManager {
             return manager
         }
-        let manager = ObservableConfigurationManager(manager: self.configurationManager as! UnifiedConfigurationManager)
-        _configurationManager = manager
-        return manager
+        
+        if let unifiedManager = self.configurationManager as? UnifiedConfigurationManager {
+            let manager = ObservableConfigurationManager(manager: unifiedManager)
+            _configurationManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedConfigurationManager()
+            let manager = ObservableConfigurationManager(manager: unifiedManager)
+            _configurationManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for StateManager
@@ -112,9 +204,18 @@ extension ServiceContainer {
         if let manager = _stateManager {
             return manager
         }
-        let manager = ObservableStateManager(manager: self.stateManager as! UnifiedStateManager)
-        _stateManager = manager
-        return manager
+        
+        if let unifiedManager = self.stateManager as? UnifiedStateManager {
+            let manager = ObservableStateManager(manager: unifiedManager)
+            _stateManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedStateManager()
+            let manager = ObservableStateManager(manager: unifiedManager)
+            _stateManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for SecurityManager
@@ -122,9 +223,18 @@ extension ServiceContainer {
         if let manager = _securityManager {
             return manager
         }
-        let manager = ObservableSecurityManager(manager: self.securityManager as! UnifiedSecurityManager)
-        _securityManager = manager
-        return manager
+        
+        if let unifiedManager = self.securityManager as? UnifiedSecurityManager {
+            let manager = ObservableSecurityManager(manager: unifiedManager)
+            _securityManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedSecurityManager()
+            let manager = ObservableSecurityManager(manager: unifiedManager)
+            _securityManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for ErrorManager
@@ -132,9 +242,18 @@ extension ServiceContainer {
         if let manager = _errorManager {
             return manager
         }
-        let manager = ObservableErrorManager(manager: self.errorHandler as! UnifiedErrorManager)
-        _errorManager = manager
-        return manager
+        
+        if let unifiedManager = self.errorHandler as? UnifiedErrorManager {
+            let manager = ObservableErrorManager(manager: unifiedManager)
+            _errorManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedErrorManager()
+            let manager = ObservableErrorManager(manager: unifiedManager)
+            _errorManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for ThemeManager
@@ -142,9 +261,18 @@ extension ServiceContainer {
         if let manager = _themeManager {
             return manager
         }
-        let manager = ObservableThemeManager(manager: self.themeManager as! UnifiedThemeManager)
-        _themeManager = manager
-        return manager
+        
+        if let unifiedManager = self.themeManager as? UnifiedThemeManager {
+            let manager = ObservableThemeManager(manager: unifiedManager)
+            _themeManager = manager
+            return manager
+        } else {
+            // Create a new manager if the cast fails
+            let unifiedManager = UnifiedThemeManager()
+            let manager = ObservableThemeManager(manager: unifiedManager)
+            _themeManager = manager
+            return manager
+        }
     }
     
     /// Observable wrapper for Logger

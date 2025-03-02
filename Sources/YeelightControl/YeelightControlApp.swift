@@ -1,5 +1,6 @@
 import SwiftUI
 import Core
+import UI
 
 @main
 struct YeelightControlApp: App {
@@ -7,39 +8,74 @@ struct YeelightControlApp: App {
     
     private let serviceContainer = UnifiedServiceContainer.shared
     
-    @StateObject private var deviceManager: DeviceManagerObject
-    @StateObject private var effectManager: EffectManagerObject
-    @StateObject private var sceneManager: SceneManagerObject
-    @StateObject private var configurationManager: ConfigurationManagerObject
+    @StateObject private var uiEnvironment: UIEnvironment
     
     // MARK: - Initialization
     
     init() {
-        let deviceManager = DeviceManagerObject(manager: serviceContainer.deviceManager)
-        let effectManager = EffectManagerObject(manager: serviceContainer.effectManager)
-        let sceneManager = SceneManagerObject(manager: serviceContainer.sceneManager)
-        let configurationManager = ConfigurationManagerObject(manager: serviceContainer.configurationManager)
+        // Initialize the service container
+        initializeServiceContainer()
         
-        _deviceManager = StateObject(wrappedValue: deviceManager)
-        _effectManager = StateObject(wrappedValue: effectManager)
-        _sceneManager = StateObject(wrappedValue: sceneManager)
-        _configurationManager = StateObject(wrappedValue: configurationManager)
+        // Create the UI environment
+        let environment = UIEnvironment(container: serviceContainer)
+        _uiEnvironment = StateObject(wrappedValue: environment)
     }
     
     // MARK: - Body
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(deviceManager)
-                .environmentObject(effectManager)
-                .environmentObject(sceneManager)
-                .environmentObject(configurationManager)
+            MainView()
+                .environmentObject(uiEnvironment)
+                .environmentObject(serviceContainer.deviceManager)
+                .environmentObject(serviceContainer.yeelightManager)
+                .environmentObject(serviceContainer.sceneManager)
+                .environmentObject(serviceContainer.effectManager)
+                .environmentObject(serviceContainer.roomManager)
+                .environmentObject(serviceContainer.networkManager)
+                .environmentObject(serviceContainer.themeManager)
                 .task {
                     // Start device discovery when app launches
-                    await deviceManager.startDiscovery()
+                    try? await serviceContainer.yeelightManager.discover()
                 }
         }
+    }
+    
+    // MARK: - Private Methods
+    
+    private func initializeServiceContainer() {
+        // Create and configure the storage manager
+        let storageManager = UnifiedStorageManager()
+        
+        // Create and configure the network manager
+        let networkManager = UnifiedNetworkManager()
+        
+        // Create and configure the Yeelight manager
+        let yeelightManager = UnifiedYeelightManager(
+            storageManager: storageManager,
+            networkManager: networkManager
+        )
+        
+        // Create and configure the device manager
+        let deviceManager = UnifiedDeviceManager()
+        
+        // Create and configure the scene manager
+        let sceneManager = UnifiedSceneManager()
+        
+        // Create and configure the effect manager
+        let effectManager = UnifiedEffectManager()
+        
+        // Create and configure the error manager
+        let errorManager = UnifiedErrorManager()
+        
+        // Set up the service container
+        serviceContainer.registerService(storageManager as any Core_StorageManaging, for: \.storageManager)
+        serviceContainer.registerService(networkManager as any Core_NetworkManaging, for: \.networkManager)
+        serviceContainer.registerService(yeelightManager as any Core_YeelightManaging, for: \.yeelightManager)
+        serviceContainer.registerService(deviceManager as any Core_DeviceManaging, for: \.deviceManager)
+        serviceContainer.registerService(sceneManager as any Core_SceneManaging, for: \.sceneManager)
+        serviceContainer.registerService(effectManager as any Core_EffectManaging, for: \.effectManager)
+        serviceContainer.registerService(errorManager as any Core_ErrorHandling, for: \.errorHandler)
     }
 }
 

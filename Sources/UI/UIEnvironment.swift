@@ -577,4 +577,57 @@ public struct LogEntry: Identifiable, Equatable {
             }
         }
     }
+}
+
+// MARK: - UI Environment
+
+/// Main environment class for UI components
+@MainActor
+public class UIEnvironment: ObservableObject {
+    // MARK: - Properties
+    
+    // Service container
+    private let container: ServiceContainer
+    
+    // Published properties for UI updates
+    @Published public var theme: Theme
+    @Published public var isNetworkAvailable: Bool = true
+    @Published public var isDiscovering: Bool = false
+    @Published public var errorMessage: String?
+    
+    // MARK: - Initialization
+    
+    public init(container: ServiceContainer) {
+        self.container = container
+        self.theme = Theme.default
+        
+        // Set up network monitoring
+        setupNetworkMonitoring()
+    }
+    
+    // MARK: - Public Methods
+    
+    public func showError(_ message: String) {
+        errorMessage = message
+    }
+    
+    public func clearError() {
+        errorMessage = nil
+    }
+    
+    public func setTheme(_ theme: Theme) {
+        self.theme = theme
+    }
+    
+    // MARK: - Private Methods
+    
+    private func setupNetworkMonitoring() {
+        Task {
+            for await isAvailable in container.networkManager.networkStatusUpdates {
+                await MainActor.run {
+                    self.isNetworkAvailable = isAvailable
+                }
+            }
+        }
+    }
 } 

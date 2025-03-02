@@ -1,6 +1,48 @@
 import SwiftUI
 import Foundation
 
+// MARK: - Core Device
+
+public struct Core_Device: Identifiable, Codable, Hashable {
+    public let id: String
+    public let name: String
+    public let type: Core_DeviceType
+    public let manufacturer: String
+    public let model: String
+    public let firmwareVersion: String?
+    public let ipAddress: String?
+    public let macAddress: String?
+    public var state: DeviceState?
+    public var isConnected: Bool?
+    public var lastSeen: Date?
+    
+    public init(
+        id: String = UUID().uuidString,
+        name: String,
+        type: Core_DeviceType,
+        manufacturer: String,
+        model: String,
+        firmwareVersion: String? = nil,
+        ipAddress: String? = nil,
+        macAddress: String? = nil,
+        state: DeviceState? = nil,
+        isConnected: Bool? = nil,
+        lastSeen: Date? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.manufacturer = manufacturer
+        self.model = model
+        self.firmwareVersion = firmwareVersion
+        self.ipAddress = ipAddress
+        self.macAddress = macAddress
+        self.state = state
+        self.isConnected = isConnected
+        self.lastSeen = lastSeen
+    }
+}
+
 // MARK: - Device Type
 
 // Make Device the implementation of Core_Device
@@ -209,12 +251,74 @@ public struct DeviceColor: Codable, Hashable {
     }
 }
 
+// MARK: - Device State Update
+
 public struct DeviceStateUpdate: Codable, Hashable {
     public let deviceId: String
     public let state: DeviceState
+    public let timestamp: Date
     
-    public init(deviceId: String, state: DeviceState) {
+    public init(deviceId: String, state: DeviceState, timestamp: Date = Date()) {
         self.deviceId = deviceId
         self.state = state
+        self.timestamp = timestamp
+    }
+}
+
+// MARK: - Location
+
+public struct Location: Codable, Hashable {
+    public let latitude: Double
+    public let longitude: Double
+    public let altitude: Double?
+    public let horizontalAccuracy: Double?
+    public let verticalAccuracy: Double?
+    public let timestamp: Date
+    
+    public init(
+        latitude: Double,
+        longitude: Double,
+        altitude: Double? = nil,
+        horizontalAccuracy: Double? = nil,
+        verticalAccuracy: Double? = nil,
+        timestamp: Date = Date()
+    ) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.altitude = altitude
+        self.horizontalAccuracy = horizontalAccuracy
+        self.verticalAccuracy = verticalAccuracy
+        self.timestamp = timestamp
+    }
+}
+
+// MARK: - Conversion Methods
+
+extension Device {
+    public static func from(yeelightDevice: YeelightDevice) -> Device {
+        return Device(
+            id: yeelightDevice.id,
+            name: yeelightDevice.name,
+            type: .light,
+            state: DeviceState(
+                power: yeelightDevice.state.power,
+                brightness: yeelightDevice.state.brightness,
+                colorTemperature: yeelightDevice.state.colorTemperature,
+                color: DeviceColor(
+                    red: yeelightDevice.state.color.red,
+                    green: yeelightDevice.state.color.green,
+                    blue: yeelightDevice.state.color.blue
+                ),
+                mode: yeelightDevice.state.mode
+            ),
+            isOnline: yeelightDevice.isOnline,
+            lastSeen: yeelightDevice.lastSeen,
+            isConnected: yeelightDevice.isConnected,
+            manufacturer: "Yeelight",
+            model: yeelightDevice.model.rawValue,
+            firmwareVersion: yeelightDevice.firmwareVersion,
+            ipAddress: yeelightDevice.ipAddress,
+            macAddress: nil
+        )
     }
 } 

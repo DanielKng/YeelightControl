@@ -3,7 +3,7 @@ import Network
 
 public struct YeelightDevice: Codable, Identifiable, Equatable {
     public let id: String
-    public let name: String
+    public var name: String
     public let model: YeelightModel
     public let firmwareVersion: String
     public let ipAddress: String
@@ -11,6 +11,7 @@ public struct YeelightDevice: Codable, Identifiable, Equatable {
     public var state: DeviceState
     public var isOnline: Bool
     public var lastSeen: Date
+    public var isConnected: Bool
     
     public init(
         id: String = UUID().uuidString,
@@ -18,10 +19,11 @@ public struct YeelightDevice: Codable, Identifiable, Equatable {
         model: YeelightModel,
         firmwareVersion: String,
         ipAddress: String,
-        port: Int,
+        port: Int = 55443,
         state: DeviceState = .init(),
         isOnline: Bool = false,
-        lastSeen: Date = Date()
+        lastSeen: Date = Date(),
+        isConnected: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -32,6 +34,7 @@ public struct YeelightDevice: Codable, Identifiable, Equatable {
         self.state = state
         self.isOnline = isOnline
         self.lastSeen = lastSeen
+        self.isConnected = isConnected
     }
     
     private enum CodingKeys: String, CodingKey {
@@ -44,6 +47,7 @@ public struct YeelightDevice: Codable, Identifiable, Equatable {
         case state
         case isOnline
         case lastSeen
+        case isConnected
     }
     
     public init(from decoder: Decoder) throws {
@@ -57,6 +61,7 @@ public struct YeelightDevice: Codable, Identifiable, Equatable {
         state = try container.decode(DeviceState.self, forKey: .state)
         isOnline = try container.decode(Bool.self, forKey: .isOnline)
         lastSeen = try container.decode(Date.self, forKey: .lastSeen)
+        isConnected = try container.decodeIfPresent(Bool.self, forKey: .isConnected) ?? isOnline
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -70,6 +75,7 @@ public struct YeelightDevice: Codable, Identifiable, Equatable {
         try container.encode(state, forKey: .state)
         try container.encode(isOnline, forKey: .isOnline)
         try container.encode(lastSeen, forKey: .lastSeen)
+        try container.encode(isConnected, forKey: .isConnected)
     }
     
     public static func == (lhs: YeelightDevice, rhs: YeelightDevice) -> Bool {
@@ -81,7 +87,8 @@ public struct YeelightDevice: Codable, Identifiable, Equatable {
                lhs.port == rhs.port &&
                lhs.state == rhs.state &&
                lhs.isOnline == rhs.isOnline &&
-               lhs.lastSeen == rhs.lastSeen
+               lhs.lastSeen == rhs.lastSeen &&
+               lhs.isConnected == rhs.isConnected
     }
 }
 
@@ -123,7 +130,7 @@ public struct YeelightDeviceUpdate: Codable, Equatable {
     }
 }
 
-public enum YeelightDeviceState: String, Codable, Equatable {
+public enum ConnectionState: String, Codable, Equatable {
     case connected
     case disconnected
     case error
@@ -252,6 +259,104 @@ public enum YeelightError: Error {
             return "Device is in an invalid state"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
+        }
+    }
+}
+
+// MARK: - YeelightCommand Helpers
+
+extension YeelightCommand {
+    public static func setPower(on: Bool, effect: String = "smooth", duration: Int = 500) -> YeelightCommand {
+        return YeelightCommand(
+            id: Int.random(in: 1...1000),
+            method: "set_power",
+            params: [on ? "on" : "off", effect, duration]
+        )
+    }
+    
+    public static func setBrightness(_ brightness: Int, effect: String = "smooth", duration: Int = 500) -> YeelightCommand {
+        return YeelightCommand(
+            id: Int.random(in: 1...1000),
+            method: "set_bright",
+            params: [brightness, effect, duration]
+        )
+    }
+    
+    public static func setColorTemperature(_ temperature: Int, effect: String = "smooth", duration: Int = 500) -> YeelightCommand {
+        return YeelightCommand(
+            id: Int.random(in: 1...1000),
+            method: "set_ct_abx",
+            params: [temperature, effect, duration]
+        )
+    }
+    
+    public static func setRGB(red: Int, green: Int, blue: Int, effect: String = "smooth", duration: Int = 500) -> YeelightCommand {
+        let rgb = (red << 16) + (green << 8) + blue
+        return YeelightCommand(
+            id: Int.random(in: 1...1000),
+            method: "set_rgb",
+            params: [rgb, effect, duration]
+        )
+    }
+    
+    public static func setHSV(hue: Int, saturation: Int, effect: String = "smooth", duration: Int = 500) -> YeelightCommand {
+        return YeelightCommand(
+            id: Int.random(in: 1...1000),
+            method: "set_hsv",
+            params: [hue, saturation, effect, duration]
+        )
+    }
+    
+    public static func toggle() -> YeelightCommand {
+        return YeelightCommand(
+            id: Int.random(in: 1...1000),
+            method: "toggle",
+            params: []
+        )
+    }
+    
+    public static func startColorFlow(count: Int, action: Int, flowExpression: String) -> YeelightCommand {
+        return YeelightCommand(
+            id: Int.random(in: 1...1000),
+            method: "start_cf",
+            params: [count, action, flowExpression]
+        )
+    }
+    
+    public static func stopColorFlow() -> YeelightCommand {
+        return YeelightCommand(
+            id: Int.random(in: 1...1000),
+            method: "stop_cf",
+            params: []
+        )
+    }
+}
+
+// MARK: - YeelightColor
+
+public typealias YeelightColor = DeviceColor
+
+// MARK: - YeelightMode
+
+public enum YeelightMode: String, Codable, Equatable {
+    case normal
+    case colorFlow
+    case colorTemperature
+    case hsv
+    case rgb
+    
+    public var displayName: String {
+        switch self {
+        case .normal:
+            return "Normal"
+        case .colorFlow:
+            return "Color Flow"
+        case .colorTemperature:
+            return "Color Temperature"
+        case .hsv:
+            return "HSV"
+        case .rgb:
+            return "RGB"
         }
     }
 } 

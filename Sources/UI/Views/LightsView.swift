@@ -39,7 +39,7 @@ struct LightsView: View {
                 Button(action: refreshDevices) {
                     Image(systemName: "arrow.clockwise")
                 }
-                .disabled(deviceManager.isDiscovering)
+                .disabled(isRefreshing)
             }
         }
         .searchable(text: $searchText, prompt: "Search devices")
@@ -47,13 +47,13 @@ struct LightsView: View {
             await refreshDevicesAsync()
         }
         .sheet(isPresented: $showingAddDevice) {
-            AddDeviceView()
+            DeviceDiscoveryView()
         }
         .sheet(item: $selectedDevice) { device in
             DeviceDetailView(device: device)
         }
         .overlay {
-            if yeelightManager.devices.isEmpty && !deviceManager.isDiscovering {
+            if yeelightManager.devices.isEmpty && !isRefreshing {
                 ContentUnavailableView(
                     "No Devices Found",
                     systemImage: "lightbulb.slash",
@@ -77,7 +77,7 @@ struct LightsView: View {
     
     private func refreshDevices() {
         Task {
-            try? await yeelightManager.discover()
+            await refreshDevicesAsync()
         }
     }
     
@@ -92,10 +92,17 @@ struct LightsView: View {
 
 // MARK: - Preview
 
-#Preview {
-    NavigationView {
-        LightsView()
-            .environmentObject(ServiceContainer.shared.observableDeviceManager)
-            .environmentObject(ServiceContainer.shared.observableYeelightManager)
+struct LightsView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationView {
+            LightsView()
+                .environmentObject(ObservableDeviceManager(manager: UnifiedDeviceManager()))
+                .environmentObject(ObservableYeelightManager(
+                    manager: UnifiedYeelightManager(
+                        storageManager: UnifiedStorageManager(),
+                        networkManager: UnifiedNetworkManager()
+                    )
+                ))
+        }
     }
 } 
